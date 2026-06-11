@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>PRTS · Gym</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <style>
   :root {
@@ -53,6 +54,19 @@
   }
   #msg { margin-top: 10px; font-size: 0.85rem; color: var(--accent); min-height: 1.2em; }
   .hidden { display: none; }
+  .tabs { display: flex; gap: 8px; margin-top: 14px; }
+  .tab { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 8px; }
+  .tab.active { color: var(--text); border-color: var(--accent); }
+  .stag { display: inline-block; margin-left: 6px; color: #d29922; font-size: 0.75rem; font-weight: 600; }
+  #rest-timer {
+    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 100%; max-width: 480px; background: var(--card);
+    border-top: 1px solid var(--border); padding: 10px 16px;
+    display: flex; justify-content: space-between; align-items: center; font-weight: 600;
+  }
+  #rest-timer.hidden { display: none; }
+  #rest-timer.over #rest-time { color: var(--green); }
+  #rest-timer button { padding: 4px 10px; background: transparent; border: 1px solid var(--border); color: var(--muted); }
 </style>
 </head>
 <body>
@@ -83,7 +97,24 @@
       <a href="#" id="btn-logout" class="muted" style="font-size:0.75rem">salir</a>
     </div>
   </div>
+  <div class="tabs">
+    <button id="tab-hoy" class="tab active">Hoy</button>
+    <button id="tab-prog" class="tab">Progreso</button>
+  </div>
   <div id="exercises"></div>
+  <div id="progress" class="hidden">
+    <div class="card">
+      <select id="prog-ex" style="width:100%"></select>
+      <canvas id="prog-chart" style="margin-top:12px"></canvas>
+      <div id="prog-info" class="muted" style="margin-top:8px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Temporizador de descanso -->
+<div id="rest-timer" class="hidden">
+  <span><span id="rest-time">0:00</span> de descanso</span>
+  <button id="rest-close">✕</button>
 </div>
 
 <script>
@@ -199,17 +230,36 @@ async function renderDia() {
       .limit(60);
 
     let lastTxt = "Sin historial todavía";
+    let estancado = false;
     if (hist?.length) {
       const lastDate = hist.map(h => h.workout_sessions.session_date).sort().pop();
       const sets = hist.filter(h => h.workout_sessions.session_date === lastDate)
         .sort((a, b) => a.set_number - b.set_number);
       lastTxt = `Última vez (${lastDate}): ` + sets.map(s => `${+s.weight_kg}×${s.reps}`).join(" · ");
+
+      // estancamiento: ≥4 sesiones y el máximo de los últimos 21 días no supera al anterior
+      const porFecha = {};
+      hist.forEach(h => {
+        const d = h.workout_sessions.session_date;
+        porFecha[d] = Math.max(porFecha[d] || 0, +h.weight_kg);
+      });
+      const fechasEx = Object.keys(porFecha).sort();
+      if (fechasEx.length >= 4) {
+        const corte = new Date(fecha + "T12:00:00");
+        corte.setDate(corte.getDate() - 21);
+        const corteStr = corte.toISOString().slice(0, 10);
+        const rec = fechasEx.filter(d => d >= corteStr);
+        const ant = fechasEx.filter(d => d < corteStr);
+        if (rec.length >= 2 && ant.length >= 1) {
+          estancado = Math.max(...rec.map(d => porFecha[d])) <= Math.max(...ant.map(d => porFecha[d]));
+        }
+      }
     }
 
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
-      <div class="ex-name">${re.exercises.name}</div>
+      <div class="ex-name">${re.exercises.name}${estancado ? '<span class="stag">⚠ 3+ sem sin progresar</span>' : ""}</div>
       <div class="ex-target">${re.target_sets} series · ${re.rep_min}–${re.rep_max} reps</div>
       <div class="last">${lastTxt}</div>`;
 
@@ -239,12 +289,86 @@ async function renderDia() {
         row.classList.add("done");
         kg.disabled = reps.disabled = true;
         ev.target.textContent = "✓";
+        startRest();
       };
       card.appendChild(row);
     }
     cont.appendChild(card);
   }
 }
+
+// ---------- TABS ----------
+$("tab-hoy").onclick = () => switchTab("hoy");
+$("tab-prog").onclick = () => switchTab("prog");
+function switchTab(t) {
+  $("tab-hoy").classList.toggle("active", t === "hoy");
+  $("tab-prog").classList.toggle("active", t === "prog");
+  $("exercises").classList.toggle("hidden", t !== "hoy");
+  $("progress").classList.toggle("hidden", t !== "prog");
+  if (t === "prog") initProgreso();
+}
+
+// ---------- PROGRESO ----------
+let chart = null, progExLoaded = false;
+async function initProgreso() {
+  if (!progExLoaded) {
+    const { data: exs } = await sb.from("exercises").select("id, name").order("name");
+    $("prog-ex").innerHTML = exs.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
+    $("prog-ex").onchange = renderProgreso;
+    progExLoaded = true;
+  }
+  renderProgreso();
+}
+
+async function renderProgreso() {
+  const { data: sets } = await sb.from("workout_sets")
+    .select("weight_kg, reps, workout_sessions!inner(session_date)")
+    .eq("exercise_id", $("prog-ex").value).limit(1000);
+  const por = {};
+  (sets || []).forEach(s => {
+    const d = s.workout_sessions.session_date;
+    por[d] = por[d] || { max: 0, vol: 0 };
+    por[d].max = Math.max(por[d].max, +s.weight_kg);
+    por[d].vol += +s.weight_kg * s.reps;
+  });
+  const fechas = Object.keys(por).sort();
+  if (chart) chart.destroy();
+  chart = new Chart($("prog-chart"), {
+    type: "line",
+    data: {
+      labels: fechas,
+      datasets: [
+        { label: "Peso máx (kg)", data: fechas.map(d => por[d].max), borderColor: "#f78166", backgroundColor: "#f78166", yAxisID: "y", tension: 0.2 },
+        { label: "Volumen (kg)", data: fechas.map(d => por[d].vol), borderColor: "#58a6ff", backgroundColor: "#58a6ff", yAxisID: "y1", tension: 0.2 },
+      ],
+    },
+    options: {
+      scales: {
+        y:  { position: "left",  ticks: { color: "#8b949e" }, grid: { color: "#30363d" } },
+        y1: { position: "right", ticks: { color: "#8b949e" }, grid: { drawOnChartArea: false } },
+        x:  { ticks: { color: "#8b949e" }, grid: { color: "#30363d" } },
+      },
+      plugins: { legend: { labels: { color: "#e6edf3" } } },
+    },
+  });
+  $("prog-info").textContent = fechas.length
+    ? `${fechas.length} sesiones con este ejercicio`
+    : "Sin datos para este ejercicio todavía";
+}
+
+// ---------- TEMPORIZADOR DE DESCANSO ----------
+let restInt = null, restStart = null;
+function startRest() {
+  restStart = Date.now();
+  $("rest-timer").classList.remove("hidden", "over");
+  clearInterval(restInt);
+  restInt = setInterval(() => {
+    const s = Math.floor((Date.now() - restStart) / 1000);
+    $("rest-time").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+    if (s >= 90) $("rest-timer").classList.add("over");
+  }, 500);
+}
+$("rest-close").onclick = () => { clearInterval(restInt); $("rest-timer").classList.add("hidden"); };
 
 // arranque
 (async () => {
