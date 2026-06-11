@@ -1,4 +1,14 @@
 {
   "name": "prts",
   "version": "0.1.0",
-  "private": tru
+  "private": true,
+  "description": "Sistema Personal de Organización — PRTS",
+  "scripts": {
+    "dev": "npx serve app",
+    "db:push": "supabase db push",
+    "db:new": "supabase migration new"
+  },
+  "devDependencies": {
+    "supabase": "^2.105.0"
+  }
+}
