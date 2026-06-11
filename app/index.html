@@ -175,8 +175,12 @@
   <a class="nav-link" href="tareas.html">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
     Tareas</a>
-  <a class="nav-link soon" href="#"><span>Semana</span><span class="tag">pronto</span></a>
-  <a class="nav-link soon" href="#"><span>Proyectos</span><span class="tag">pronto</span></a>
+  <a class="nav-link" href="semana.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
+    Semana</a>
+  <a class="nav-link" href="proyectos.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+    Proyectos</a>
 
   <div class="nav-label mono">Estudio &amp; academias</div>
   <a class="nav-link" href="apuntes.html">
@@ -292,10 +296,10 @@ $("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signO
 const NODOS = [
   { id: "prts",      label: "PRTS",      sub: "Asistente · IA",      x: 0.50, y: 0.44, r: 30, core: true },
   { id: "dashboard", label: "Dashboard", sub: "Vista general",       x: 0.50, y: 0.13, r: 17, href: "index.html", on: true },
-  { id: "semana",    label: "Semana",    sub: "Bloques de tiempo",   x: 0.26, y: 0.20, r: 15 },
+  { id: "semana",    label: "Semana",    sub: "Bloques de tiempo",   x: 0.26, y: 0.20, r: 15, href: "semana.html", on: true },
   { id: "tareas",    label: "Tareas",    sub: "Pendientes del día",  x: 0.74, y: 0.20, r: 17, href: "tareas.html", on: true },
   { id: "alumnos",   label: "Alumnos",   sub: "Wolves · LevelUp",    x: 0.20, y: 0.42, r: 15 },
-  { id: "proyectos", label: "Proyectos", sub: "Semestre actual",     x: 0.78, y: 0.46, r: 15 },
+  { id: "proyectos", label: "Proyectos", sub: "Semestre actual",     x: 0.78, y: 0.46, r: 15, href: "proyectos.html", on: true },
   { id: "dieta",     label: "Dieta",     sub: "Superávit +200",      x: 0.92, y: 0.50, r: 15, href: "dieta.html", on: true },
   { id: "contenido", label: "Contenido", sub: "Instagram",           x: 0.12, y: 0.66, r: 13 },
   { id: "finanzas",  label: "Finanzas",  sub: "Ingresos · Gastos",   x: 0.30, y: 0.70, r: 14 },

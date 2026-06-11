@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · Proyectos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  /* ---------- Alta de proyecto ---------- */
+  #new-name { width: 100%; }
+  .quick-row { display: flex; gap: 6px; margin-top: 8px; }
+  .quick-row input { flex: 1; padding: 8px 6px; font-size: 13px; min-width: 0; }
+  .quick-row button { padding: 8px 18px; font-size: 18px; line-height: 1; }
+
+  /* ---------- Tarjeta de proyecto ---------- */
+  .proyecto { padding: 16px; }
+  .p-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .p-name { font-family: var(--serif); font-size: 1.25rem; font-weight: 500; word-break: break-word; }
+  .p-del { background: transparent; color: var(--faint); border: none; padding: 2px 6px; font-size: 0.95rem; }
+  .p-meta {
+    margin-top: 4px; display: flex; gap: 10px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .dl-vencida { color: var(--danger); font-weight: 500; }
+  .dl-urgente { color: var(--warn); }
+  .dl-normal { color: var(--faint); }
+
+  /* progreso */
+  .p-prog { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+  .p-bar { flex: 1; height: 6px; background: var(--surface-3); border-radius: 3px; overflow: hidden; }
+  .p-bar i { display: block; height: 100%; background: var(--accent-deep); border-radius: 3px; transition: width 0.4s; }
+  .p-bar i.full { background: var(--ok); }
+  .p-pct { font-family: var(--mono); font-size: 11px; color: var(--muted); min-width: 70px; text-align: right; }
+
+  /* subtareas */
+  .subs { margin-top: 10px; }
+  .sub {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 2px; border-bottom: 1px solid var(--line);
+  }
+  .sub:last-of-type { border-bottom: none; }
+  .sub .chk {
+    width: 19px; height: 19px; min-width: 19px; border-radius: 6px;
+    border: 1.5px solid var(--faint); background: transparent; padding: 0;
+    display: grid; place-items: center; color: transparent; font-size: 11px;
+  }
+  .sub.done .chk { border-color: var(--accent-deep); background: var(--accent-deep); color: #fff; }
+  .sub .t { flex: 1; font-size: 0.9rem; word-break: break-word; }
+  .sub.done .t { text-decoration: line-through; color: var(--muted); }
+  .sub .del { background: transparent; color: var(--faint); border: none; padding: 2px 6px; font-size: 0.9rem; }
+
+  .sub-add { display: flex; gap: 6px; margin-top: 10px; }
+  .sub-add input { flex: 1; padding: 8px 10px; font-size: 14px; min-width: 0; }
+  .sub-add button { padding: 8px 14px; font-size: 16px; line-height: 1; }
+
+  .p-done-btn {
+    margin-top: 12px; width: 100%; padding: 9px;
+    background: transparent; border: 1px solid var(--ok); color: var(--ok);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+
+  #toggle-done {
+    margin-top: 22px; width: 100%; padding: 9px;
+    background: transparent; border: 1px dashed var(--line); color: var(--faint);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .proyecto.completado .p-name { color: var(--muted); }
+  .screen-fade { animation: fade 0.25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Proyectos</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="view-app" class="hidden screen-fade">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Proyectos</small></div>
+    <div class="links"><a href="index.html">Inicio</a><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+
+  <h1 class="page-title">Proyectos</h1>
+  <div id="resumen" class="mono-label page-sub"></div>
+
+  <!-- Alta de proyecto -->
+  <div class="card">
+    <input id="new-name" placeholder="Nuevo proyecto…" autocomplete="off">
+    <div class="quick-row">
+      <input id="new-subject" placeholder="Materia" autocomplete="off">
+      <input type="date" id="new-due">
+      <button id="btn-add" class="btn-primary">+</button>
+    </div>
+  </div>
+
+  <div id="lista"></div>
+  <button id="toggle-done">Completados (0)</button>
+  <div id="lista-done" class="hidden"></div>
+</div>
+
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span>Inicio</span></a>
+    <a class="nav-item" href="gym.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+    <a class="nav-item" href="tareas.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
+      <span>Tareas</span></a>
+    <a class="nav-item" href="dieta.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v7a2.5 2.5 0 0 0 5 0V3"/><path d="M9.5 3v18"/><path d="M17 3c-1.5 2-2 4-2 6 0 2.5 1 3 2 3v9"/></svg>
+      <span>Dieta</span></a>
+    <a class="nav-item" href="apuntes.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>Apuntes</span></a>
+  </div>
+</nav>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/</g, "&lt;");
+
+function hoyMX() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+}
+
+function deadlineInfo(dl) {
+  if (!dl) return null;
+  const dias = Math.round((new Date(dl + "T12:00") - new Date(hoyMX() + "T12:00")) / 864e5);
+  if (dias < 0)  return { txt: `vencido hace ${-dias}d`, cls: "dl-vencida" };
+  if (dias === 0) return { txt: "entrega hoy", cls: "dl-vencida" };
+  if (dias <= 7)  return { txt: `entrega en ${dias}d`, cls: "dl-urgente" };
+  return { txt: "entrega " + new Date(dl + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }), cls: "dl-normal" };
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- CRUD proyectos ----------
+async function addProject() {
+  const name = $("new-name").value.trim();
+  if (!name) return;
+  $("btn-add").disabled = true;
+  const { error } = await sb.from("projects").insert({
+    name,
+    subject: $("new-subject").value.trim() || null,
+    due_date: $("new-due").value || null,
+  });
+  $("btn-add").disabled = false;
+  if (error) { alert(error.message); return; }
+  $("new-name").value = ""; $("new-subject").value = ""; $("new-due").value = "";
+  cargar();
+}
+
+async function setProjectStatus(id, status) {
+  await sb.from("projects").update({
+    status,
+    completed_at: status === "completado" ? new Date().toISOString() : null,
+  }).eq("id", id);
+  cargar();
+}
+
+async function editarProyecto(p) {
+  const nuevo = prompt("Editar nombre del proyecto:", p.name);
+  if (nuevo === null || !nuevo.trim() || nuevo === p.name) return;
+  await sb.from("projects").update({ name: nuevo.trim() }).eq("id", p.id);
+  cargar();
+}
+
+async function borrarProyecto(p) {
+  if (!confirm(`¿Eliminar "${p.name}" y todas sus subtareas?`)) return;
+  await sb.from("projects").delete().eq("id", p.id);
+  cargar();
+}
+
+// ---------- CRUD subtareas ----------
+async function addSub(projectId, input, nextPos) {
+  const title = input.value.trim();
+  if (!title) return;
+  const { error } = await sb.from("project_subtasks").insert({
+    project_id: projectId, title, position: nextPos,
+  });
+  if (error) { alert(error.message); return; }
+  cargar();
+}
+
+async function toggleSub(s) {
+  await sb.from("project_subtasks").update({ done: !s.done }).eq("id", s.id);
+  cargar();
+}
+
+async function editarSub(s) {
+  const nuevo = prompt("Editar subtarea:", s.title);
+  if (nuevo === null || !nuevo.trim() || nuevo === s.title) return;
+  await sb.from("project_subtasks").update({ title: nuevo.trim() }).eq("id", s.id);
+  cargar();
+}
+
+async function borrarSub(s) {
+  if (!confirm("¿Eliminar esta subtarea?")) return;
+  await sb.from("project_subtasks").delete().eq("id", s.id);
+  cargar();
+}
+
+// ---------- RENDER ----------
+function tarjeta(p) {
+  const subs = (p.project_subtasks || []).sort((a, b) => a.position - b.position);
+  const hechas = subs.filter(s => s.done).length;
+  const pct = subs.length ? Math.round((hechas / subs.length) * 100) : 0;
+  const activo = p.status === "activo";
+  const dl = deadlineInfo(p.due_date);
+
+  const card = document.createElement("div");
+  card.className = "card proyecto" + (activo ? "" : " completado");
+  card.innerHTML = `
+    <div class="p-head">
+      <div class="p-name">${esc(p.name)}</div>
+      <button class="p-del" title="${activo ? "Eliminar" : "Archivar"}">${activo ? "✕" : "🗄"}</button>
+    </div>
+    <div class="p-meta">
+      ${p.subject ? `<span style="color:var(--accent)">${esc(p.subject)}</span>` : ""}
+      ${dl ? `<span class="${dl.cls}">${dl.txt}</span>` : ""}
+      ${!activo ? `<span>completado</span>` : ""}
+    </div>
+    <div class="p-prog">
+      <div class="p-bar"><i class="${pct === 100 ? "full" : ""}" style="width:${pct}%"></i></div>
+      <div class="p-pct">${hechas}/${subs.length} · ${pct}%</div>
+    </div>
+    <div class="subs"></div>
+    ${activo ? `
+      <div class="sub-add">
+        <input placeholder="Nueva subtarea…" autocomplete="off">
+        <button class="btn-ghost">+</button>
+      </div>` : ""}
+    ${activo && subs.length && pct === 100 ? `<button class="p-done-btn">Marcar proyecto completado</button>` : ""}`;
+
+  card.querySelector(".p-name").onclick = () => activo && editarProyecto(p);
+  card.querySelector(".p-del").onclick = () =>
+    activo ? borrarProyecto(p) : setProjectStatus(p.id, "archivado");
+
+  const subsBox = card.querySelector(".subs");
+  for (const s of subs) {
+    const row = document.createElement("div");
+    row.className = "sub" + (s.done ? " done" : "");
+    row.innerHTML = `
+      <button class="chk" title="${s.done ? "Reabrir" : "Completar"}">✓</button>
+      <span class="t">${esc(s.title)}</span>
+      ${activo ? `<button class="del">✕</button>` : ""}`;
+    if (activo) {
+      row.querySelector(".chk").onclick = () => toggleSub(s);
+      row.querySelector(".t").onclick = () => editarSub(s);
+      row.querySelector(".del").onclick = () => borrarSub(s);
+    }
+    subsBox.appendChild(row);
+  }
+  if (!subs.length) subsBox.innerHTML = `<div class="muted" style="padding:6px 2px">Sin subtareas. Divide el proyecto para ver el avance.</div>`;
+
+  const addBox = card.querySelector(".sub-add");
+  if (addBox) {
+    const input = addBox.querySelector("input");
+    const nextPos = subs.length ? subs[subs.length - 1].position + 1 : 0;
+    addBox.querySelector("button").onclick = () => addSub(p.id, input, nextPos);
+    input.onkeydown = (e) => { if (e.key === "Enter") addSub(p.id, input, nextPos); };
+  }
+  const doneBtn = card.querySelector(".p-done-btn");
+  if (doneBtn) doneBtn.onclick = () => setProjectStatus(p.id, "completado");
+
+  return card;
+}
+
+async function cargar() {
+  const { data: projects, error } = await sb.from("projects")
+    .select("*, project_subtasks(*)")
+    .neq("status", "archivado")
+    .order("due_date", { ascending: true, nullsFirst: false });
+  if (error) { alert(error.message); return; }
+
+  const activos = projects.filter(p => p.status === "activo");
+  const completados = projects.filter(p => p.status === "completado")
+    .sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
+
+  const urgentes = activos.filter(p => p.due_date && deadlineInfo(p.due_date).cls !== "dl-normal").length;
+  $("resumen").textContent = `${activos.length} ${activos.length === 1 ? "ACTIVO" : "ACTIVOS"}` +
+    (urgentes ? ` · ${urgentes} POR ENTREGAR` : "");
+
+  const cont = $("lista");
+  cont.innerHTML = "";
+  activos.forEach(p => cont.appendChild(tarjeta(p)));
+  if (!activos.length) cont.innerHTML = `<div class="card muted">Sin proyectos activos este semestre.</div>`;
+
+  $("toggle-done").textContent = `Completados (${completados.length})`;
+  const ld = $("lista-done");
+  ld.innerHTML = "";
+  completados.forEach(p => ld.appendChild(tarjeta(p)));
+}
+
+// ---------- ARRANQUE ----------
+function show(id) {
+  $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden");
+  $(id).classList.remove("hidden");
+  $("navbar").classList.toggle("hidden", id === "view-login");
+}
+
+async function init() {
+  show("view-app");
+  $("btn-add").onclick = addProject;
+  $("new-name").onkeydown = (e) => { if (e.key === "Enter") addProject(); };
+  $("toggle-done").onclick = () => $("lista-done").classList.toggle("hidden");
+  cargar();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+
+// PWA: registrar service worker
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
