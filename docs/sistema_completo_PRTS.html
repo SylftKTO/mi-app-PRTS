@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema Personal</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+:root{--bg:#0f0f0f;--surface:#1a1a1a;--surface2:#222;--surface3:#2a2a2a;--border:#2e2e2e;--accent:#6c63ff;--accent2:#ff6b6b;--accent3:#43d9ad;--accent4:#ffd166;--accent5:#60a8ff;--text:#e8e8e8;--text2:#999;--text3:#555;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;display:flex}
+::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* SIDEBAR */
+.sidebar{width:220px;min-height:100vh;background:var(--surface);border-right:1px solid var(--border);padding:20px 0;position:fixed;top:0;left:0;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.sidebar-logo{padding:0 16px 16px;border-bottom:1px solid var(--border);margin-bottom:6px}
+.sidebar-logo span{font-size:12px;font-weight:700;color:var(--accent);letter-spacing:.1em;text-transform:uppercase;font-family:var(--mono)}
+.sidebar-logo p{font-size:10px;color:var(--text3);margin-top:2px}
+.nav-section{padding:10px 16px 3px;font-size:9px;font-weight:700;color:var(--text3);letter-spacing:.12em;text-transform:uppercase}
+.nav-item{display:flex;align-items:center;gap:9px;padding:7px 16px;font-size:12px;color:var(--text2);cursor:pointer;transition:background .12s,color .12s}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--surface3);color:var(--text)}
+.nav-item .icon{font-size:13px;width:16px;text-align:center}
+
+/* MAIN */
+.main{margin-left:220px;flex:1;padding:36px 44px;max-width:1000px}
+
+/* TABS */
+.tabs{display:flex;gap:2px;margin-bottom:28px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+.tab{padding:7px 14px 9px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .12s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.section{display:none}.section.active{display:block}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:28px}
+.page-header h1{font-size:26px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+.page-header p{font-size:12px;color:var(--text2)}
+
+/* GRIDS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:20px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.card-title{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.08em}
+.card h2{font-size:22px;font-weight:700;margin-bottom:3px}
+.card p{font-size:11px;color:var(--text2)}
+.stat-accent-1{border-left:3px solid var(--accent)}
+.stat-accent-2{border-left:3px solid var(--accent2)}
+.stat-accent-3{border-left:3px solid var(--accent3)}
+.stat-accent-4{border-left:3px solid var(--accent4)}
+.stat-accent-5{border-left:3px solid var(--accent5)}
+
+/* SECTION TITLE */
+.section-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.divider{height:1px;background:var(--border);margin:24px 0}
+
+/* TAG */
+.tag{display:inline-block;font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:3px;font-weight:500;margin-right:4px}
+
+/* TASKS */
+.task-list{display:flex;flex-direction:column;gap:7px;margin-bottom:20px}
+.task-item{display:flex;align-items:center;gap:11px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:11px 14px;transition:border-color .12s}
+.task-item:hover{border-color:var(--accent)}
+.task-check{width:15px;height:15px;border:1.5px solid var(--text3);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.task-check.done{background:var(--accent);border-color:var(--accent)}
+.task-check.done::after{content:'✓';font-size:9px;color:white}
+.task-text{flex:1;font-size:12px}
+.task-text.done{text-decoration:line-through;color:var(--text3)}
+.task-meta{display:flex;gap:7px;align-items:center}
+.priority{font-size:10px;font-family:var(--mono);padding:2px 6px;border-radius:3px}
+.p-alta{background:rgba(255,107,107,.15);color:#ff9f9f}
+.p-media{background:rgba(255,209,102,.15);color:#ffe080}
+.p-baja{background:rgba(67,217,173,.15);color:#7fffda}
+.due-date{font-size:10px;color:var(--text3);font-family:var(--mono)}
+
+/* PROGRESS */
+.progress-row{display:flex;align-items:center;gap:11px;margin-bottom:9px}
+.progress-label{font-size:11px;width:110px;color:var(--text2);flex-shrink:0}
+.progress-bar{flex:1;height:5px;background:var(--surface3);border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;border-radius:3px}
+.progress-val{font-size:10px;font-family:var(--mono);color:var(--text3);width:34px;text-align:right}
+
+/* CALENDAR */
+.calendar-grid{display:grid;grid-template-columns:54px repeat(7,1fr);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:20px;font-size:11px}
+.cal-header{background:var(--surface);padding:9px 6px;text-align:center;font-weight:600;font-size:10px;color:var(--text2);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.06em}
+.cal-time{background:var(--surface);padding:7px 6px;color:var(--text3);font-family:var(--mono);font-size:9px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);text-align:right}
+.cal-cell{padding:3px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);min-height:44px}
+.cal-block{border-radius:3px;padding:3px 5px;font-size:9px;font-weight:500;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.block-school{background:rgba(108,99,255,.2);color:#a09fff;border-left:2px solid var(--accent)}
+.block-gym{background:rgba(255,107,107,.15);color:#ff9f9f;border-left:2px solid var(--accent2)}
+.block-academy{background:rgba(67,217,173,.15);color:#7fffda;border-left:2px solid var(--accent3)}
+.block-wolves{background:rgba(255,107,107,.15);color:#ff9f9f;border-left:2px solid var(--accent2)}
+.block-levelup{background:rgba(67,217,173,.15);color:#7fffda;border-left:2px solid var(--accent3)}
+.block-personal{background:rgba(255,209,102,.15);color:#ffe080;border-left:2px solid var(--accent4)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text2)}
+.legend-dot{width:7px;height:7px;border-radius:2px}
+
+/* NOTES */
+.note-template{background:var(--surface);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:18px}
+.note-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.note-title{font-size:14px;font-weight:600}
+.note-date{font-size:10px;color:var(--text3);font-family:var(--mono);margin-left:auto}
+.note-body{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.note-field label{display:block;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:5px}
+.note-field .field-content{background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:9px 11px;font-size:11px;color:var(--text2);min-height:56px;font-style:italic;line-height:1.5}
+.note-field.full{grid-column:1/-1}
+
+/* TABLE */
+.data-table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:20px}
+.data-table th{background:var(--surface2);padding:9px 12px;text-align:left;font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)}
+.data-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text2);font-family:var(--mono);font-size:11px}
+.data-table tr:hover td{background:var(--surface2)}
+
+/* GYM */
+.muscle-tag{display:inline-block;font-size:9px;padding:2px 6px;border-radius:3px;background:rgba(108,99,255,.15);color:#a09fff;font-family:var(--sans)}
+
+/* DIET */
+.meal-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:10px}
+.meal-header{display:flex;align-items:center;justify-content:space-between}
+.meal-name{font-size:12px;font-weight:600;display:flex;align-items:center;gap:7px}
+.meal-time{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.macros{display:flex;gap:14px;font-size:10px;font-family:var(--mono)}
+.macro{display:flex;flex-direction:column;align-items:center;gap:1px}
+.macro span:first-child{font-size:13px;font-weight:700}
+.macro span:last-child{color:var(--text3);font-size:9px}
+.macro-p{color:#ff9f9f}.macro-c{color:#a09fff}.macro-g{color:#7fffda}.macro-kcal{color:var(--accent4)}
+.food-list{display:flex;flex-wrap:wrap;gap:5px}
+.food-item{background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:3px 9px;font-size:10px;color:var(--text2)}
+
+/* STUDENT */
+.student-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;display:flex;gap:14px;align-items:flex-start;margin-bottom:9px}
+.student-avatar{width:34px;height:34px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.student-info{flex:1}
+.student-name{font-size:12px;font-weight:600;margin-bottom:4px}
+.student-meta{font-size:10px;color:var(--text2);display:flex;gap:10px;flex-wrap:wrap}
+.level-badge{font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:3px;background:rgba(67,217,173,.15);color:#7fffda}
+.wolves-badge{font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:3px;background:rgba(255,107,107,.15);color:#ff9f9f}
+
+/* FINANCE */
+.fin-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+.fin-row:last-child{border-bottom:none}
+.fin-label{font-size:12px;color:var(--text2)}
+.fin-amount{font-size:13px;font-weight:600;font-family:var(--mono)}
+.fin-income{color:var(--accent3)}
+.fin-expense{color:var(--accent2)}
+.fin-cat{font-size:9px;font-family:var(--mono);padding:1px 6px;border-radius:3px;margin-left:8px}
+
+/* HABITS */
+.habit-row{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.habit-label{font-size:12px;color:var(--text2);width:140px;flex-shrink:0}
+.habit-days{display:flex;gap:5px}
+.habit-day{width:26px;height:26px;border-radius:5px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:9px;font-family:var(--mono);color:var(--text3);cursor:pointer;transition:all .12s}
+.habit-day.done{background:var(--accent);border-color:var(--accent);color:white}
+.habit-day.done-green{background:var(--accent3);border-color:var(--accent3);color:#0f0f0f}
+.habit-day.done-red{background:var(--accent2);border-color:var(--accent2);color:white}
+.habit-day.done-yellow{background:var(--accent4);border-color:var(--accent4);color:#0f0f0f}
+.habit-streak{font-size:10px;font-family:var(--mono);color:var(--text3);margin-left:6px}
+
+/* SLEEP */
+.sleep-bar{height:10px;background:var(--surface3);border-radius:5px;overflow:hidden;flex:1}
+.sleep-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent),var(--accent5))}
+
+/* RESOURCES */
+.resource-item{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:11px 14px;margin-bottom:7px;transition:border-color .12s}
+.resource-item:hover{border-color:var(--accent5)}
+.resource-icon{font-size:16px;flex-shrink:0}
+.resource-info{flex:1}
+.resource-title{font-size:12px;font-weight:500;margin-bottom:2px}
+.resource-meta{font-size:10px;color:var(--text3);display:flex;gap:8px}
+.resource-type{font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:3px}
+.type-pdf{background:rgba(255,107,107,.15);color:#ff9f9f}
+.type-video{background:rgba(108,99,255,.15);color:#a09fff}
+.type-link{background:rgba(96,168,255,.15);color:#a0d0ff}
+.stars{color:var(--accent4);font-size:11px}
+
+/* CONTENT CALENDAR */
+.post-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:9px}
+.post-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.post-academy{font-size:10px;font-family:var(--mono);padding:2px 7px;border-radius:3px;font-weight:600}
+.wolves-post{background:rgba(255,107,107,.15);color:#ff9f9f}
+.levelup-post{background:rgba(67,217,173,.15);color:#7fffda}
+.post-type{font-size:10px;color:var(--text3)}
+.post-date{font-size:10px;font-family:var(--mono);color:var(--text3);margin-left:auto}
+.post-idea{font-size:12px;color:var(--text);margin-bottom:6px}
+.post-status{display:inline-block;font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px}
+.status-idea{background:rgba(255,209,102,.15);color:#ffe080}
+.status-ready{background:rgba(108,99,255,.15);color:#a09fff}
+.status-published{background:rgba(67,217,173,.15);color:#7fffda}
+
+/* RETRO */
+.retro-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:14px}
+.retro-card h3{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.retro-item{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.5}
+.retro-item:last-child{border-bottom:none}
+.retro-bullet{flex-shrink:0;margin-top:2px}
+
+/* INFO BOX */
+.info-box{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent4);border-radius:8px;padding:14px 16px;margin-bottom:18px}
+.info-box p{font-size:12px;color:var(--text2);line-height:1.6}
+
+/* PROJECTS */
+.project-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:10px}
+.project-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.project-name{font-size:13px;font-weight:600}
+.project-pct{font-size:12px;font-family:var(--mono);color:var(--text3)}
+.project-bar{height:4px;background:var(--surface3);border-radius:2px;overflow:hidden;margin-bottom:12px}
+.project-fill{height:100%;border-radius:2px;background:var(--accent)}
+.subtask-list{display:flex;flex-direction:column;gap:6px}
+.subtask{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2)}
+.subtask-check{width:13px;height:13px;border:1.5px solid var(--text3);border-radius:3px;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.subtask-check.done{background:var(--accent3);border-color:var(--accent3)}
+.subtask-check.done::after{content:'✓';font-size:8px;color:#0f0f0f}
+
+/* NEURAL NETWORK PANEL */
+.neural-panel{position:relative;width:100%;height:420px;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:24px;cursor:default}
+.neural-panel canvas{position:absolute;top:0;left:0;width:100%;height:100%}
+.neural-panel-label{position:absolute;top:14px;left:18px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;font-family:var(--mono);z-index:10;pointer-events:none}
+.neural-tooltip{position:absolute;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:11px;pointer-events:none;z-index:20;opacity:0;transition:opacity .15s;white-space:nowrap}
+.neural-tooltip strong{display:block;font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px}
+.neural-tooltip span{color:var(--text2)}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <span>Mi Sistema</span>
+    <p>Organización personal v2</p>
+  </div>
+  <span class="nav-section">Principal</span>
+  <div class="nav-item active" onclick="go('dashboard',this)"><span class="icon">⌂</span>Dashboard</div>
+  <div class="nav-item" onclick="go('semana',this)"><span class="icon">◫</span>Semana</div>
+  <div class="nav-item" onclick="go('tareas',this)"><span class="icon">✓</span>Tareas</div>
+  <div class="nav-item" onclick="go('proyectos',this)"><span class="icon">◆</span>Proyectos</div>
+
+  <span class="nav-section">Estudio</span>
+  <div class="nav-item" onclick="go('apuntes',this)"><span class="icon">◈</span>Apuntes</div>
+  <div class="nav-item" onclick="go('recursos',this)"><span class="icon">◎</span>Recursos</div>
+
+  <span class="nav-section">Academias</span>
+  <div class="nav-item" onclick="go('alumnos',this)"><span class="icon">◐</span>Alumnos</div>
+  <div class="nav-item" onclick="go('contenido',this)"><span class="icon">◑</span>Contenido IG</div>
+
+  <span class="nav-section">Salud</span>
+  <div class="nav-item" onclick="go('gym',this)"><span class="icon">◉</span>Gimnasio</div>
+  <div class="nav-item" onclick="go('dieta',this)"><span class="icon">◒</span>Dieta</div>
+  <div class="nav-item" onclick="go('habitos',this)"><span class="icon">◓</span>Hábitos</div>
+
+  <span class="nav-section">Finanzas</span>
+  <div class="nav-item" onclick="go('finanzas',this)"><span class="icon">◔</span>Finanzas</div>
+
+  <span class="nav-section">Revisión</span>
+  <div class="nav-item" onclick="go('retro',this)"><span class="icon">↺</span>Retrospectiva</div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+<div class="tabs">
+  <div class="tab active" onclick="goTab('dashboard',this)">Dashboard</div>
+  <div class="tab" onclick="goTab('semana',this)">Semana</div>
+  <div class="tab" onclick="goTab('tareas',this)">Tareas</div>
+  <div class="tab" onclick="goTab('proyectos',this)">Proyectos</div>
+  <div class="tab" onclick="goTab('apuntes',this)">Apuntes</div>
+  <div class="tab" onclick="goTab('recursos',this)">Recursos</div>
+  <div class="tab" onclick="goTab('alumnos',this)">Alumnos</div>
+  <div class="tab" onclick="goTab('contenido',this)">Contenido</div>
+  <div class="tab" onclick="goTab('gym',this)">Gym</div>
+  <div class="tab" onclick="goTab('dieta',this)">Dieta</div>
+  <div class="tab" onclick="goTab('habitos',this)">Hábitos</div>
+  <div class="tab" onclick="goTab('finanzas',this)">Finanzas</div>
+  <div class="tab" onclick="goTab('retro',this)">Retro</div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════ -->
+<div class="section active" id="sec-dashboard">
+  <div class="page-header">
+    <h1>👋 Buen día</h1>
+    <p>Miércoles 11 de junio · Semana 24 · TecNM Celaya</p>
+  </div>
+
+  <div class="grid-4">
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Tareas hoy</span></div><h2>3</h2><p>2 pendientes</p></div>
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">Gym semana</span></div><h2>2/4</h2><p>sesiones</p></div>
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">Alumnos</span></div><h2>7</h2><p>Wolves 2 · LevelUp 5</p></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">Balance mes</span></div><h2 style="color:var(--accent3)">+$1,850</h2><p>ingresos - gastos</p></div>
+  </div>
+
+  <p class="section-title">Tareas prioritarias de hoy</p>
+  <div class="task-list">
+    <div class="task-item">
+      <div class="task-check done"></div>
+      <span class="task-text done">Entregar reporte de termodinámica</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(108,99,255,.15);color:#a09fff">Escuela</span><span class="priority p-alta">ALTA</span></div>
+    </div>
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Preparar clase LevelUp — Alumno A (7pm)</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(67,217,173,.15);color:#7fffda">LevelUp</span><span class="priority p-alta">ALTA</span></div>
+    </div>
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Sesión gym — Espalda + Bíceps</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(255,107,107,.15);color:#ff9f9f">Gym</span><span class="priority p-media">MEDIA</span></div>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div>
+      <p class="section-title">Progreso semanal</p>
+      <div class="card">
+        <div class="progress-row"><span class="progress-label">Tareas escolares</span><div class="progress-bar"><div class="progress-fill" style="width:60%;background:var(--accent)"></div></div><span class="progress-val">6/10</span></div>
+        <div class="progress-row"><span class="progress-label">Gym</span><div class="progress-bar"><div class="progress-fill" style="width:50%;background:var(--accent2)"></div></div><span class="progress-val">2/4</span></div>
+        <div class="progress-row"><span class="progress-label">Clases LevelUp</span><div class="progress-bar"><div class="progress-fill" style="width:80%;background:var(--accent3)"></div></div><span class="progress-val">4/5</span></div>
+        <div class="progress-row"><span class="progress-label">Clases Wolves</span><div class="progress-bar"><div class="progress-fill" style="width:100%;background:var(--accent2)"></div></div><span class="progress-val">2/2</span></div>
+        <div class="progress-row"><span class="progress-label">Hábitos</span><div class="progress-bar"><div class="progress-fill" style="width:70%;background:var(--accent4)"></div></div><span class="progress-val">70%</span></div>
+      </div>
+    </div>
+    <div>
+      <p class="section-title">Próximas clases</p>
+      <div class="task-list">
+        <div class="task-item" style="border-left:2px solid var(--accent3)">
+          <div style="flex:1"><div style="font-size:12px;font-weight:500">Alumno A — B1 Inglés</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Hoy 19:00 · LevelUp</div></div>
+          <span class="level-badge">hoy</span>
+        </div>
+        <div class="task-item" style="border-left:2px solid var(--accent2)">
+          <div style="flex:1"><div style="font-size:12px;font-weight:500">Grupo Robótica Jr</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Jue 16:00 · Wolves</div></div>
+          <span class="wolves-badge">mañana</span>
+        </div>
+        <div class="task-item" style="border-left:2px solid var(--accent3)">
+          <div style="flex:1"><div style="font-size:12px;font-weight:500">Alumno C — A1 Francés</div><div style="font-size:10px;color:var(--text3);margin-top:2px">Sáb 11:00 · LevelUp</div></div>
+          <span style="font-size:9px;font-family:var(--mono);padding:2px 6px;border-radius:3px;background:rgba(255,209,102,.15);color:#ffe080">sáb</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEURAL NETWORK MAP -->
+  <p class="section-title">Mapa del sistema</p>
+  <div class="neural-panel" id="neuralPanel">
+    <span class="neural-panel-label">red de módulos · click para navegar</span>
+    <canvas id="neuralCanvas"></canvas>
+    <div class="neural-tooltip" id="neuralTooltip"><strong></strong><span></span></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SEMANA
+══════════════════════════════════════════ -->
+<div class="section" id="sec-semana">
+  <div class="page-header"><h1>Semana 24</h1><p>9 – 15 de junio · Bloques de tiempo</p></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent)"></div>Escuela</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent2)"></div>Gym / Wolves</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent3)"></div>LevelUp</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--accent4)"></div>Personal</div>
+  </div>
+  <div class="calendar-grid">
+    <div class="cal-header"></div>
+    <div class="cal-header">LUN</div><div class="cal-header">MAR</div><div class="cal-header">MIÉ</div>
+    <div class="cal-header">JUE</div><div class="cal-header">VIE</div><div class="cal-header">SÁB</div><div class="cal-header">DOM</div>
+    <!-- 8am -->
+    <div class="cal-time">8:00</div>
+    <div class="cal-cell"><div class="cal-block block-gym">Gym — Pecho</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Física</div></div>
+    <div class="cal-cell"><div class="cal-block block-gym">Gym — Espalda</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Circuitos</div></div>
+    <div class="cal-cell"><div class="cal-block block-gym">Gym — Hombro</div></div>
+    <div class="cal-cell"><div class="cal-block block-gym">Gym — Pierna</div></div>
+    <div class="cal-cell"><div class="cal-block block-personal">Descanso</div></div>
+    <!-- 10am -->
+    <div class="cal-time">10:00</div>
+    <div class="cal-cell"><div class="cal-block block-school">Álgebra lineal</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Termodinámica</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Robótica</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Álgebra lineal</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Óptica</div></div>
+    <div class="cal-cell"></div><div class="cal-cell"></div>
+    <!-- 12pm -->
+    <div class="cal-time">12:00</div>
+    <div class="cal-cell"><div class="cal-block block-school">Estudio / tareas</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Estudio / tareas</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Estudio / tareas</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Estudio / tareas</div></div>
+    <div class="cal-cell"><div class="cal-block block-school">Repaso semana</div></div>
+    <div class="cal-cell"><div class="cal-block block-personal">Planeación</div></div>
+    <div class="cal-cell"></div>
+    <!-- 16pm -->
+    <div class="cal-time">16:00</div>
+    <div class="cal-cell"></div>
+    <div class="cal-cell"><div class="cal-block block-levelup">LevelUp clase</div></div>
+    <div class="cal-cell"></div>
+    <div class="cal-cell"><div class="cal-block block-wolves">Wolves clase</div></div>
+    <div class="cal-cell"></div>
+    <div class="cal-cell"><div class="cal-block block-levelup">LevelUp clase</div></div>
+    <div class="cal-cell"></div>
+    <!-- 19pm -->
+    <div class="cal-time">19:00</div>
+    <div class="cal-cell"><div class="cal-block block-levelup">LevelUp clase</div></div>
+    <div class="cal-cell"></div>
+    <div class="cal-cell"><div class="cal-block block-levelup">LevelUp clase</div></div>
+    <div class="cal-cell"><div class="cal-block block-wolves">Wolves clase</div></div>
+    <div class="cal-cell"><div class="cal-block block-personal">Desconexión</div></div>
+    <div class="cal-cell"><div class="cal-block block-personal">Desconexión</div></div>
+    <div class="cal-cell"><div class="cal-block block-personal">Planear semana</div></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     TAREAS
+══════════════════════════════════════════ -->
+<div class="section" id="sec-tareas">
+  <div class="page-header"><h1>Tareas</h1><p>Todas las tareas y entregas · Ordenadas por prioridad</p></div>
+  <p class="section-title">Escuela</p>
+  <div class="task-list">
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Práctica de laboratorio — Circuitos RC</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(108,99,255,.15);color:#a09fff">Circuitos</span><span class="priority p-alta">ALTA</span><span class="due-date">Jun 13</span></div>
+    </div>
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Problema set 4 — Álgebra lineal</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(108,99,255,.15);color:#a09fff">Álgebra</span><span class="priority p-media">MEDIA</span><span class="due-date">Jun 15</span></div>
+    </div>
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Avance proyecto robótica — Prototipo físico</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(108,99,255,.15);color:#a09fff">Robótica</span><span class="priority p-alta">ALTA</span><span class="due-date">Jun 20</span></div>
+    </div>
+  </div>
+  <p class="section-title">Wolves</p>
+  <div class="task-list">
+    <div class="task-item">
+      <div class="task-check done"></div>
+      <span class="task-text done">Preparar sesión Arduino — Sensores ultrasónicos</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(255,107,107,.15);color:#ff9f9f">Wolves</span><span class="priority p-baja">BAJA</span></div>
+    </div>
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Actualizar avance del grupo en Notion</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(255,107,107,.15);color:#ff9f9f">Wolves</span><span class="priority p-media">MEDIA</span><span class="due-date">Jun 12</span></div>
+    </div>
+  </div>
+  <p class="section-title">LevelUp</p>
+  <div class="task-list">
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Crear post IG — Tip pronunciación inglés</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(67,217,173,.15);color:#7fffda">LevelUp</span><span class="priority p-media">MEDIA</span><span class="due-date">Jun 12</span></div>
+    </div>
+    <div class="task-item">
+      <div class="task-check"></div>
+      <span class="task-text">Cobrar mensualidad — Alumno B y C</span>
+      <div class="task-meta"><span class="tag" style="background:rgba(67,217,173,.15);color:#7fffda">LevelUp</span><span class="priority p-alta">ALTA</span><span class="due-date">Jun 15</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     PROYECTOS
+══════════════════════════════════════════ -->
+<div class="section" id="sec-proyectos">
+  <div class="page-header"><h1>Proyectos</h1><p>Proyectos de semestre · Individuales · Con avance y subtareas</p></div>
+  <div class="info-box"><p>💡 Los proyectos son entregas grandes con fases. Cada uno tiene su propio avance y lista de subtareas. Actualiza el porcentaje manualmente conforme avanzas.</p></div>
+  <p class="section-title">Activos este semestre</p>
+
+  <div class="project-card">
+    <div class="project-header">
+      <div>
+        <div class="project-name">🤖 Proyecto Robótica — Brazo automatizado con Arduino</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--mono)">Entrega final: Jul 15 · Robótica</div>
+      </div>
+      <div class="project-pct">35%</div>
+    </div>
+    <div class="project-bar"><div class="project-fill" style="width:35%"></div></div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check done"></div><span>Definir especificaciones y alcance del proyecto</span></div>
+      <div class="subtask"><div class="subtask-check done"></div><span>Diagrama de circuito y selección de componentes</span></div>
+      <div class="subtask"><div class="subtask-check"></div><span>Construcción del prototipo físico</span></div>
+      <div class="subtask"><div class="subtask-check"></div><span>Programación del control de movimiento</span></div>
+      <div class="subtask"><div class="subtask-check"></div><span>Pruebas y ajustes</span></div>
+      <div class="subtask"><div class="subtask-check"></div><span>Reporte técnico y presentación final</span></div>
+    </div>
+  </div>
+
+  <div class="project-card">
+    <div class="project-header">
+      <div>
+        <div class="project-name">⚡ Proyecto Circuitos — Amplificador operacional</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:3px;font-family:var(--mono)">Entrega: Jun 28 · Circuitos Eléctricos</div>
+      </div>
+      <div class="project-pct">60%</div>
+    </div>
+    <div class="project-bar"><div class="project-fill" style="width:60%;background:var(--accent3)"></div></div>
+    <div class="subtask-list">
+      <div class="subtask"><div class="subtask-check done"></div><span>Marco teórico y análisis del circuito</span></div>
+      <div class="subtask"><div class="subtask-check done"></div><span>Simulación en Proteus / LTSpice</span></div>
+      <div class="subtask"><div class="subtask-check done"></div><span>Montaje en protoboard</span></div>
+      <div class="subtask"><div class="subtask-check"></div><span>Mediciones y análisis de resultados</span></div>
+      <div class="subtask"><div class="subtask-check"></div><span>Reporte final</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     APUNTES
+══════════════════════════════════════════ -->
+<div class="section" id="sec-apuntes">
+  <div class="page-header"><h1>Apuntes</h1><p>Plantilla de 5 campos · Llénala 10 min después de cada clase</p></div>
+  <div class="note-template">
+    <div class="note-header">
+      <span class="tag" style="background:rgba(108,99,255,.2);color:#a09fff">Termodinámica</span>
+      <span class="note-title">Ciclo de Carnot — Eficiencia térmica</span>
+      <span class="note-date">11 jun 2025</span>
+    </div>
+    <div class="note-body">
+      <div class="note-field"><label>📌 Conceptos clave (máx. 5)</label><div class="field-content">Ciclo reversible, eficiencia de Carnot, temperatura absoluta, trabajo neto, calor absorbido...</div></div>
+      <div class="note-field"><label>⚙️ Fórmulas importantes</label><div class="field-content">η = 1 − (T_L / T_H) · Solo depende de temperaturas absolutas. T en Kelvin siempre.</div></div>
+      <div class="note-field"><label>❓ Dudas pendientes</label><div class="field-content">¿Por qué no se puede superar la eficiencia de Carnot? · Diferencia ciclo real vs ideal</div></div>
+      <div class="note-field"><label>🔗 Conexión con otro tema</label><div class="field-content">Entropía (Física) · Aplicación en motores (Robótica) · Segunda ley de la termodinámica</div></div>
+      <div class="note-field full"><label>📝 Resumen en 3 líneas</label><div class="field-content">El ciclo de Carnot es el ciclo termodinámico de mayor eficiencia posible entre dos fuentes de temperatura. Su eficiencia depende únicamente de las temperaturas absolutas del foco caliente y frío. Ningún motor real puede superar esta eficiencia.</div></div>
+    </div>
+  </div>
+  <div class="info-box"><p>💡 <strong>Regla de los 10 minutos:</strong> Justo después de clase, 10 minutos para llenar esta plantilla mientras el tema está fresco. Un apunte hecho en 10 min vale más que releer 2 horas después.</p></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     RECURSOS
+══════════════════════════════════════════ -->
+<div class="section" id="sec-recursos">
+  <div class="page-header"><h1>Biblioteca de Recursos</h1><p>PDFs, videos, links — totalmente digitales · Ordenados por materia</p></div>
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Total</span></div><h2>24</h2><p>recursos guardados</p></div>
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">PDFs</span></div><h2>11</h2></div>
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">Videos</span></div><h2>8</h2></div>
+    <div class="card stat-accent-5"><div class="card-header"><span class="card-title">Links</span></div><h2>5</h2></div>
+  </div>
+  <p class="section-title">Recientes</p>
+  <div class="resource-item">
+    <div class="resource-icon">📄</div>
+    <div class="resource-info">
+      <div class="resource-title">Fundamentos de Termodinámica — Cengel 8va ed.</div>
+      <div class="resource-meta"><span>Termodinámica</span><span>Capítulos 6–9 subrayados</span></div>
+    </div>
+    <span class="resource-type type-pdf">PDF</span>
+    <div class="stars">★★★★★</div>
+  </div>
+  <div class="resource-item">
+    <div class="resource-icon">🎥</div>
+    <div class="resource-info">
+      <div class="resource-title">Transformadas de Laplace — 3Blue1Brown</div>
+      <div class="resource-meta"><span>Álgebra lineal</span><span>YouTube · 22 min</span></div>
+    </div>
+    <span class="resource-type type-video">VIDEO</span>
+    <div class="stars">★★★★☆</div>
+  </div>
+  <div class="resource-item">
+    <div class="resource-icon">🔗</div>
+    <div class="resource-info">
+      <div class="resource-title">Documentación Arduino — Servo library</div>
+      <div class="resource-meta"><span>Robótica · Wolves</span><span>arduino.cc/reference</span></div>
+    </div>
+    <span class="resource-type type-link">LINK</span>
+    <div class="stars">★★★★★</div>
+  </div>
+  <div class="resource-item">
+    <div class="resource-icon">📄</div>
+    <div class="resource-info">
+      <div class="resource-title">Cambridge Grammar in Use — Intermediate</div>
+      <div class="resource-meta"><span>LevelUp · Referencia de clases</span></div>
+    </div>
+    <span class="resource-type type-pdf">PDF</span>
+    <div class="stars">★★★★★</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ALUMNOS
+══════════════════════════════════════════ -->
+<div class="section" id="sec-alumnos">
+  <div class="page-header"><h1>Alumnos</h1><p>Wolves Academy · LevelUp Academy</p></div>
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">Wolves</span></div><h2>2</h2><p>alumnos activos</p></div>
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">LevelUp</span></div><h2>5</h2><p>alumnos activos</p></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">Clases / sem</span></div><h2>9</h2><p>programadas</p></div>
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Cobros pend.</span></div><h2>2</h2><p>alumnos</p></div>
+  </div>
+
+  <p class="section-title">🐺 Wolves Academy — Robótica</p>
+  <div class="student-card">
+    <div class="student-avatar">🤖</div>
+    <div class="student-info">
+      <div class="student-name">Grupo Jr A <span class="wolves-badge">Arduino básico</span></div>
+      <div class="student-meta"><span>Último tema: Sensores ultrasónicos HC-SR04</span><span>Próxima: Jue 16:00</span><span>Pago: ✓</span></div>
+    </div>
+  </div>
+  <div class="student-card">
+    <div class="student-avatar">🤖</div>
+    <div class="student-info">
+      <div class="student-name">Grupo Jr B <span class="wolves-badge">Programación básica</span></div>
+      <div class="student-meta"><span>Último tema: Condicionales y ciclos en C++</span><span>Próxima: Jue 19:00</span><span>Pago: ✓</span></div>
+    </div>
+  </div>
+
+  <p class="section-title" style="margin-top:20px">🎓 LevelUp Academy — Idiomas</p>
+  <div class="student-card">
+    <div class="student-avatar">👤</div>
+    <div class="student-info">
+      <div class="student-name">Alumno A <span class="level-badge">B1 — Inglés</span></div>
+      <div class="student-meta"><span>Último tema: Present Perfect vs Past Simple</span><span>Próxima: Hoy 19:00</span><span>Pago: ✓</span></div>
+    </div>
+  </div>
+  <div class="student-card">
+    <div class="student-avatar">👤</div>
+    <div class="student-info">
+      <div class="student-name">Alumno B <span class="level-badge">A2 — Inglés</span></div>
+      <div class="student-meta"><span>Último tema: Pasado simple — verbos irregulares</span><span>Próxima: Jue 17:00</span><span>Pago: ⚠ Pendiente</span></div>
+    </div>
+  </div>
+  <div class="student-card">
+    <div class="student-avatar">👤</div>
+    <div class="student-info">
+      <div class="student-name">Alumno C <span class="level-badge">A1 — Francés</span></div>
+      <div class="student-meta"><span>Último tema: Artículos y género de sustantivos</span><span>Próxima: Sáb 11:00</span><span>Pago: ⚠ Pendiente</span></div>
+    </div>
+  </div>
+  <div class="student-card">
+    <div class="student-avatar">👤</div>
+    <div class="student-info">
+      <div class="student-name">Alumno D <span class="level-badge">B2 — Inglés</span></div>
+      <div class="student-meta"><span>Último tema: Reported speech</span><span>Próxima: Sáb 13:00</span><span>Pago: ✓</span></div>
+    </div>
+  </div>
+  <div class="student-card">
+    <div class="student-avatar">👤</div>
+    <div class="student-info">
+      <div class="student-name">Alumno E <span class="level-badge">A2 — Inglés</span></div>
+      <div class="student-meta"><span>Último tema: Futuro con will y going to</span><span>Próxima: Lun 19:00</span><span>Pago: ✓</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     CONTENIDO IG
+══════════════════════════════════════════ -->
+<div class="section" id="sec-contenido">
+  <div class="page-header"><h1>Contenido Instagram</h1><p>Wolves + LevelUp · Meta: 2 posts / semana por academia</p></div>
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">Wolves / mes</span></div><h2>8</h2><p>meta mensual</p></div>
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">LevelUp / mes</span></div><h2>8</h2><p>meta mensual</p></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">Publicados</span></div><h2>5</h2><p>este mes</p></div>
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Pendientes</span></div><h2>11</h2><p>en pipeline</p></div>
+  </div>
+
+  <div class="info-box"><p>📌 <strong>Tipos de post sugeridos:</strong> Educativo (tip o concepto) · Detrás de cámaras (clase real) · Testimonio de alumno · Reto o pregunta para la audiencia. Rotar entre estos 4 para no repetir formato.</p></div>
+
+  <p class="section-title">Pipeline de contenido</p>
+  <div class="post-card">
+    <div class="post-header">
+      <span class="post-academy wolves-post">WOLVES</span>
+      <span class="post-type">Educativo</span>
+      <span class="post-date">Jun 12</span>
+    </div>
+    <div class="post-idea">¿Qué es un sensor ultrasónico y cómo funciona? — Explicación visual con diagrama del HC-SR04</div>
+    <span class="post-status status-ready">LISTO PARA PUBLICAR</span>
+  </div>
+  <div class="post-card">
+    <div class="post-header">
+      <span class="post-academy levelup-post">LEVELUP</span>
+      <span class="post-type">Educativo</span>
+      <span class="post-date">Jun 13</span>
+    </div>
+    <div class="post-idea">3 errores de pronunciación más comunes en inglés — con audio comparativo</div>
+    <span class="post-status status-idea">IDEA</span>
+  </div>
+  <div class="post-card">
+    <div class="post-header">
+      <span class="post-academy wolves-post">WOLVES</span>
+      <span class="post-type">Detrás de cámaras</span>
+      <span class="post-date">Jun 16</span>
+    </div>
+    <div class="post-idea">Video corto del grupo construyendo su primer robot — primera clase del semestre</div>
+    <span class="post-status status-idea">IDEA</span>
+  </div>
+  <div class="post-card">
+    <div class="post-header">
+      <span class="post-academy levelup-post">LEVELUP</span>
+      <span class="post-type">Reto</span>
+      <span class="post-date">Jun 17</span>
+    </div>
+    <div class="post-idea">¿Sabes la diferencia entre "since" y "for"? — Quiz interactivo en stories</div>
+    <span class="post-status status-published">PUBLICADO</span>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     GYM
+══════════════════════════════════════════ -->
+<div class="section" id="sec-gym">
+  <div class="page-header"><h1>Gimnasio</h1><p>2 años de entrenamiento · Objetivo: Superávit +200 kcal · Volumen · 5 días / semana</p></div>
+
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">Sesiones/sem</span></div><h2>5</h2><p>Dom–Vie</p></div>
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Completadas</span></div><h2>2</h2><p>esta semana</p></div>
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">Racha</span></div><h2>3 sem</h2><p>sin faltar</p></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">Hoy</span></div><h2>Pull</h2><p>Martes</p></div>
+  </div>
+
+  <!-- RESUMEN SEMANAL -->
+  <p class="section-title">Estructura semanal</p>
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;text-align:center">
+      <div style="background:rgba(67,217,173,.12);border:1px solid rgba(67,217,173,.25);border-radius:6px;padding:10px 4px">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">DOM</div>
+        <div style="font-size:11px;font-weight:600;color:#7fffda">Leg</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">8 ej.</div>
+      </div>
+      <div style="background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.25);border-radius:6px;padding:10px 4px">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">LUN</div>
+        <div style="font-size:11px;font-weight:600;color:#ff9f9f">Push</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">8 ej.</div>
+      </div>
+      <div style="background:rgba(108,99,255,.12);border:1px solid rgba(108,99,255,.25);border-radius:6px;padding:10px 4px">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">MAR</div>
+        <div style="font-size:11px;font-weight:600;color:#a09fff">Pull</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">6 ej.</div>
+      </div>
+      <div style="background:rgba(67,217,173,.12);border:1px solid rgba(67,217,173,.25);border-radius:6px;padding:10px 4px">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">MIÉ</div>
+        <div style="font-size:11px;font-weight:600;color:#7fffda">Leg</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">4 ej.</div>
+      </div>
+      <div style="background:rgba(255,107,107,.12);border:1px solid rgba(255,107,107,.25);border-radius:6px;padding:10px 4px">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">JUE</div>
+        <div style="font-size:11px;font-weight:600;color:#ff9f9f">Push</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">8 ej.</div>
+      </div>
+      <div style="background:rgba(108,99,255,.12);border:1px solid rgba(108,99,255,.25);border-radius:6px;padding:10px 4px">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">VIE</div>
+        <div style="font-size:11px;font-weight:600;color:#a09fff">Pull</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">6 ej.</div>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:10px 4px;opacity:.5">
+        <div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:4px">SÁB</div>
+        <div style="font-size:11px;font-weight:600;color:var(--text3)">Rest</div>
+        <div style="font-size:9px;color:var(--text3);margin-top:3px">—</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RUTINAS DETALLADAS -->
+  <p class="section-title">Rutinas detalladas</p>
+  <div class="grid-2">
+
+    <!-- DOMINGO — LEG A -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" style="color:#7fffda">Domingo — Leg A</span>
+        <span style="font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(67,217,173,.15);color:#7fffda">LEG</span>
+      </div>
+      <table class="data-table" style="margin:0">
+        <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Abductores</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Extensiones</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Péndulo / Hack</td><td>2</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Femoral</td><td>2</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Peso muerto</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Hip thrust</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Pantorrilla</td><td>3</td><td>10–15</td><td>___ kg</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- LUNES — PUSH A -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" style="color:#ff9f9f">Lunes — Push A</span>
+        <span style="font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(255,107,107,.15);color:#ff9f9f">PUSH</span>
+      </div>
+      <table class="data-table" style="margin:0">
+        <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Fondos</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Pushdowns</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Overhead</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Peck Deck (negra)</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Press pecho alto</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Militar</td><td>2</td><td>8–15</td><td>___ kg</td></tr>
+          <tr><td>Elevaciones</td><td>2</td><td>8–15</td><td>___ kg</td></tr>
+          <tr><td>Hombro posterior</td><td>3</td><td>8–15</td><td>___ kg</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MARTES — PULL A -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" style="color:#a09fff">Martes — Pull A</span>
+        <span style="font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(108,99,255,.15);color:#a09fff">PULL</span>
+      </div>
+      <table class="data-table" style="margin:0">
+        <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Predicador</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Martillo</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Jalón al pecho</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Jalón cerrado</td><td>2</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Remo T</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Gatitos</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- MIÉRCOLES — LEG B -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" style="color:#7fffda">Miércoles — Leg B</span>
+        <span style="font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(67,217,173,.15);color:#7fffda">LEG</span>
+      </div>
+      <table class="data-table" style="margin:0">
+        <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Abductores</td><td>4</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Extensiones</td><td>4</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Péndulo / Hack</td><td>4</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Pantorrilla</td><td>4</td><td>6–10</td><td>___ kg</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- JUEVES — PUSH B -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" style="color:#ff9f9f">Jueves — Push B</span>
+        <span style="font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(255,107,107,.15);color:#ff9f9f">PUSH</span>
+      </div>
+      <table class="data-table" style="margin:0">
+        <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Fondos</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Pushdowns</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Overhead</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Peck Deck (negra)</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Press pecho alto</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Militar</td><td>2</td><td>8–15</td><td>___ kg</td></tr>
+          <tr><td>Elevaciones</td><td>2</td><td>8–15</td><td>___ kg</td></tr>
+          <tr><td>Hombro posterior</td><td>3</td><td>8–15</td><td>___ kg</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- VIERNES — PULL B -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title" style="color:#a09fff">Viernes — Pull B</span>
+        <span style="font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:3px;background:rgba(108,99,255,.15);color:#a09fff">PULL</span>
+      </div>
+      <table class="data-table" style="margin:0">
+        <thead><tr><th>Ejercicio</th><th>Series</th><th>Reps</th><th>Peso</th></tr></thead>
+        <tbody>
+          <tr><td>Predicador</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Martillo</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Jalón al pecho</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Jalón cerrado</td><td>2</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Remo T</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+          <tr><td>Gatitos</td><td>3</td><td>6–10</td><td>___ kg</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     DIETA
+══════════════════════════════════════════ -->
+<div class="section" id="sec-dieta">
+  <div class="page-header"><h1>Dieta</h1><p>Plan de macros por comida · Objetivo: Superávit +200 kcal</p></div>
+
+  <!-- MEAL CARDS -->
+  <p class="section-title">Plan de macros por comida</p>
+
+  <div class="meal-card" id="mealcard-0">
+    <div class="meal-header">
+      <div class="meal-name">🌅 Desayuno <span class="meal-time">11:00 (al despertar)</span></div>
+      <div class="macros">
+        <div class="macro macro-kcal"><span id="mk0">530</span><span>kcal</span></div>
+        <div class="macro macro-p"><span id="mp0">30</span><span>prot</span></div>
+        <div class="macro macro-c"><span id="mc0">85</span><span>carb</span></div>
+        <div class="macro macro-g"><span id="mg0">12</span><span>gras</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meal-card" id="mealcard-1">
+    <div class="meal-header">
+      <div class="meal-name">☀️ Comida <span class="meal-time">14:00 — 15:00</span></div>
+      <div class="macros">
+        <div class="macro macro-kcal"><span id="mk1">700</span><span>kcal</span></div>
+        <div class="macro macro-p"><span id="mp1">35</span><span>prot</span></div>
+        <div class="macro macro-c"><span id="mc1">100</span><span>carb</span></div>
+        <div class="macro macro-g"><span id="mg1">18</span><span>gras</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meal-card" id="mealcard-2">
+    <div class="meal-header">
+      <div class="meal-name">⚡ Pre-gym <span class="meal-time">30 min antes</span></div>
+      <div class="macros">
+        <div class="macro macro-kcal"><span id="mk2">355</span><span>kcal</span></div>
+        <div class="macro macro-p"><span id="mp2">20</span><span>prot</span></div>
+        <div class="macro macro-c"><span id="mc2">60</span><span>carb</span></div>
+        <div class="macro macro-g"><span id="mg2">5</span><span>gras</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="meal-card" id="mealcard-3">
+    <div class="meal-header">
+      <div class="meal-name">🌙 Cena <span class="meal-time">21:00 — 22:00</span></div>
+      <div class="macros">
+        <div class="macro macro-kcal"><span id="mk3">550</span><span>kcal</span></div>
+        <div class="macro macro-p"><span id="mp3">25</span><span>prot</span></div>
+        <div class="macro macro-c"><span id="mc3">55</span><span>carb</span></div>
+        <div class="macro macro-g"><span id="mg3">20</span><span>gras</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:right;font-size:10px;font-family:var(--mono);color:var(--text3);margin-top:8px">
+    Total diario: 2,135 kcal · 110g P · 300g C · 55g G
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     HÁBITOS
+══════════════════════════════════════════ -->
+<div class="section" id="sec-habitos">
+  <div class="page-header"><h1>Hábitos</h1><p>Seguimiento semanal · Marca cada día que cumplas</p></div>
+
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">Hábitos activos</span></div><h2>5</h2></div>
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Mejor racha</span></div><h2>12 días</h2><p>Gym</p></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">% cumplimiento</span></div><h2>68%</h2><p>esta semana</p></div>
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">Sueño promedio</span></div><h2>7h</h2><p>esta semana</p></div>
+  </div>
+
+  <p class="section-title">Tracker semanal</p>
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:8px;align-items:center;margin-bottom:8px">
+      <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em"></div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">L</div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">M</div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">X</div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">J</div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">V</div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">S</div>
+      <div style="font-size:9px;font-weight:600;color:var(--text3);text-align:center">D</div>
+    </div>
+    <!-- Gym -->
+    <div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:8px;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text2)">🏋️ Gym</div>
+      <div style="text-align:center"><div class="habit-day done-red" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day done-red" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+    </div>
+    <!-- Dieta -->
+    <div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:8px;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text2)">🍽️ Dieta respetada</div>
+      <div style="text-align:center"><div class="habit-day done-green" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day done-green" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day done-green" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+    </div>
+    <!-- Leer -->
+    <div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:8px;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text2)">📚 Leer (20 min)</div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day done-yellow" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+    </div>
+    <!-- Apuntes -->
+    <div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:8px;align-items:center;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text2)">✏️ Repasar apuntes</div>
+      <div style="text-align:center"><div class="habit-day done" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day done" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+    </div>
+    <!-- Sueño -->
+    <div style="display:grid;grid-template-columns:140px repeat(7,1fr);gap:8px;align-items:center">
+      <div style="font-size:11px;color:var(--text2)">😴 Dormir antes 3am</div>
+      <div style="text-align:center"><div class="habit-day done" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day done" onclick="toggleHabit(this)">✓</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+      <div style="text-align:center"><div class="habit-day" onclick="toggleHabit(this)">—</div></div>
+    </div>
+  </div>
+
+  <p class="section-title">Sueño esta semana</p>
+  <div class="card">
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div class="progress-row"><span class="progress-label">Lunes</span><div class="sleep-bar"><div class="sleep-fill" style="width:75%"></div></div><span class="progress-val">7.5h</span></div>
+      <div class="progress-row"><span class="progress-label">Martes</span><div class="sleep-bar"><div class="sleep-fill" style="width:55%"></div></div><span class="progress-val">5.5h</span></div>
+      <div class="progress-row"><span class="progress-label">Miércoles</span><div class="sleep-bar"><div class="sleep-fill" style="width:80%"></div></div><span class="progress-val">8h</span></div>
+    </div>
+    <div style="font-size:10px;color:var(--text3);margin-top:14px;font-family:var(--mono)">Meta: 7–8h consistentes · Dormir: max 3am · Despertar: 11am</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     FINANZAS
+══════════════════════════════════════════ -->
+<div class="section" id="sec-finanzas">
+  <div class="page-header"><h1>Finanzas</h1><p>Registro de ingresos y gastos · Academias + Gastos fijos</p></div>
+  <div class="grid-4" style="margin-bottom:20px">
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">Ingresos mes</span></div><h2 style="color:var(--accent3)">$4,800</h2></div>
+    <div class="card stat-accent-2"><div class="card-header"><span class="card-title">Gastos fijos</span></div><h2 style="color:var(--accent2)">$2,950</h2></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">Balance</span></div><h2 style="color:var(--accent4)">+$1,850</h2></div>
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Cobros pend.</span></div><h2>$800</h2><p>2 alumnos</p></div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><span class="card-title" style="color:var(--accent3)">Ingresos — Junio</span></div>
+      <div class="fin-row"><span class="fin-label">Wolves — Grupo Jr A<span class="fin-cat" style="background:rgba(255,107,107,.15);color:#ff9f9f">wolves</span></span><span class="fin-amount fin-income">+$600</span></div>
+      <div class="fin-row"><span class="fin-label">Wolves — Grupo Jr B<span class="fin-cat" style="background:rgba(255,107,107,.15);color:#ff9f9f">wolves</span></span><span class="fin-amount fin-income">+$600</span></div>
+      <div class="fin-row"><span class="fin-label">LevelUp — Alumno A<span class="fin-cat" style="background:rgba(67,217,173,.15);color:#7fffda">levelup</span></span><span class="fin-amount fin-income">+$700</span></div>
+      <div class="fin-row"><span class="fin-label">LevelUp — Alumno D<span class="fin-cat" style="background:rgba(67,217,173,.15);color:#7fffda">levelup</span></span><span class="fin-amount fin-income">+$700</span></div>
+      <div class="fin-row"><span class="fin-label">LevelUp — Alumno E<span class="fin-cat" style="background:rgba(67,217,173,.15);color:#7fffda">levelup</span></span><span class="fin-amount fin-income">+$600</span></div>
+      <div class="fin-row"><span class="fin-label">LevelUp — Alumno B <span style="font-size:9px;color:var(--accent4)">⚠ pendiente</span></span><span class="fin-amount" style="color:var(--accent4)">+$0</span></div>
+      <div class="fin-row"><span class="fin-label">LevelUp — Alumno C <span style="font-size:9px;color:var(--accent4)">⚠ pendiente</span></span><span class="fin-amount" style="color:var(--accent4)">+$0</span></div>
+      <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between">
+        <span style="font-size:11px;font-weight:600;color:var(--text2)">Total cobrado</span>
+        <span style="font-size:13px;font-weight:700;color:var(--accent3);font-family:var(--mono)">$3,200</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px">
+        <span style="font-size:11px;color:var(--text3)">Pendiente por cobrar</span>
+        <span style="font-size:12px;font-weight:600;color:var(--accent4);font-family:var(--mono)">+$800</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title" style="color:var(--accent2)">Gastos fijos mensuales</span></div>
+      <div class="fin-row"><span class="fin-label">Gym<span class="fin-cat" style="background:rgba(255,107,107,.15);color:#ff9f9f">salud</span></span><span class="fin-amount fin-expense">−$450</span></div>
+      <div class="fin-row"><span class="fin-label">Dieta / suplementos<span class="fin-cat" style="background:rgba(255,107,107,.15);color:#ff9f9f">salud</span></span><span class="fin-amount fin-expense">−$1,200</span></div>
+      <div class="fin-row"><span class="fin-label">Transporte<span class="fin-cat" style="background:rgba(255,209,102,.15);color:#ffe080">movilidad</span></span><span class="fin-amount fin-expense">−$800</span></div>
+      <div class="fin-row"><span class="fin-label">Spotify<span class="fin-cat" style="background:rgba(67,217,173,.15);color:#7fffda">suscripción</span></span><span class="fin-amount fin-expense">−$99</span></div>
+      <div class="fin-row"><span class="fin-label">Claude (Anthropic)<span class="fin-cat" style="background:rgba(108,99,255,.15);color:#a09fff">suscripción</span></span><span class="fin-amount fin-expense">−$280</span></div>
+      <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:10px;display:flex;justify-content:space-between">
+        <span style="font-size:11px;font-weight:600;color:var(--text2)">Total gastos fijos</span>
+        <span style="font-size:13px;font-weight:700;color:var(--accent2);font-family:var(--mono)">$2,829</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:6px">
+        <span style="font-size:11px;color:var(--text3)">Balance neto (cobrado)</span>
+        <span style="font-size:12px;font-weight:600;color:var(--accent3);font-family:var(--mono)">+$371</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box"><p>📌 Los montos están en MXN y son de referencia. Ajusta los cobros por alumno según lo real cada mes. El balance neto considera solo lo ya cobrado — con los 2 pendientes el balance real sería <strong>+$1,171</strong>.</p></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     RETROSPECTIVA
+══════════════════════════════════════════ -->
+<div class="section" id="sec-retro">
+  <div class="page-header"><h1>Retrospectiva</h1><p>Revisión mensual · Mayo 2025 · 15 min cada fin de mes</p></div>
+  <div class="grid-3" style="margin-bottom:20px">
+    <div class="card stat-accent-3"><div class="card-header"><span class="card-title">Meses completados</span></div><h2>5</h2><p>enero – mayo</p></div>
+    <div class="card stat-accent-4"><div class="card-header"><span class="card-title">Objetivo cumplido</span></div><h2>3/5</h2><p>meses</p></div>
+    <div class="card stat-accent-1"><div class="card-header"><span class="card-title">Próxima retro</span></div><h2>Jun 30</h2></div>
+  </div>
+
+  <div class="retro-card">
+    <h3>✅ ¿Qué salió bien este mes?</h3>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Mantuve 4 sesiones de gym por semana durante 3 semanas consecutivas — mejor racha hasta ahora.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Incorporé 2 alumnos nuevos en LevelUp sin descuidar los existentes.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Entregué todos los proyectos escolares antes de la fecha límite.</span></div>
+  </div>
+
+  <div class="retro-card">
+    <h3>❌ ¿Qué no funcionó y por qué?</h3>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>No publiqué nada en Instagram de ninguna de las dos academias. Razón: sin sistema de contenido previo, siempre quedó para después.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Dormí tarde más de 4 días a la semana. Afectó el rendimiento de mañana siguiente.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>No cobré a tiempo a 2 alumnos — no tuve un recordatorio activo.</span></div>
+  </div>
+
+  <div class="retro-card">
+    <h3>🔧 ¿Qué ajustar el próximo mes?</h3>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Preparar los 4 posts del mes el primer domingo — tenerlos listos antes de necesitarlos.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Poner recordatorio el día 1 y 15 de cada mes para cobros pendientes.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Silenciar el teléfono a las 2am — si no duermo antes de esa hora, al menos sin pantallas.</span></div>
+  </div>
+
+  <div class="retro-card">
+    <h3>🎯 Objetivos para el próximo mes</h3>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Publicar mínimo 2 posts por academia (4 en total).</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Cerrar el semestre con todas las materias en verde.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Mantener gym 4x/sem al menos 3 de las 4 semanas.</span></div>
+    <div class="retro-item"><span class="retro-bullet">→</span><span>Cobrar el 100% antes del día 10 de cada mes.</span></div>
+  </div>
+</div>
+
+</main>
+
+<script>
+const SECTIONS = ['dashboard','semana','tareas','proyectos','apuntes','recursos','alumnos','contenido','gym','dieta','habitos','finanzas','retro'];
+
+function go(id, navEl) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  navEl.classList.add('active');
+  const idx = SECTIONS.indexOf(id);
+  if (idx >= 0) document.querySelectorAll('.tab')[idx].classList.add('active');
+}
+
+function goTab(id, tabEl) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('sec-' + id).classList.add('active');
+  tabEl.classList.add('active');
+  const match = document.querySelector(`.nav-item[onclick="go('${id}',this)"]`);
+  if (match) match.classList.add('active');
+}
+
+document.querySelectorAll('.task-check').forEach(c => {
+  c.addEventListener('click', () => {
+    c.classList.toggle('done');
+    const t = c.nextElementSibling;
+    if (t) t.classList.toggle('done');
+  });
+});
+
+document.querySelectorAll('.subtask-check').forEach(c => {
+  c.addEventListener('click', () => c.classList.toggle('done'));
+});
+
+function toggleHabit(el) {
+  el.classList.toggle('done');
+  if (!el.classList.contains('done')) el.textContent = '—';
+  else el.textContent = '✓';
+}
+
+/* ══════════════════════════════════════════
+   NEURAL NETWORK MAP
+══════════════════════════════════════════ */
+(function(){
+  const canvas = document.getElementById('neuralCanvas');
+  const panel  = document.getElementById('neuralPanel');
+  const tip    = document.getElementById('neuralTooltip');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  // Node definitions: id, label, sublabel, section, color, group
+  const NODES = [
+    // Central hub
+    { id:'hub',    label:'Sistema',    sub:'Centro',         sec:null,        color:'#6c63ff', r:26, group:'hub' },
+    // Main sections
+    { id:'dash',   label:'Dashboard',  sub:'Vista general',  sec:'dashboard', color:'#6c63ff', r:20, group:'main' },
+    { id:'semana', label:'Semana',     sub:'Bloques de tiempo',sec:'semana',  color:'#6c63ff', r:18, group:'main' },
+    { id:'tareas', label:'Tareas',     sub:'Pendientes del día',sec:'tareas', color:'#6c63ff', r:18, group:'main' },
+    { id:'proyec', label:'Proyectos',  sub:'Semestre actual', sec:'proyectos',color:'#6c63ff', r:17, group:'main' },
+    // Study
+    { id:'apunte', label:'Apuntes',    sub:'Plantilla 5 campos',sec:'apuntes',color:'#a09fff', r:17, group:'study' },
+    { id:'recurs', label:'Recursos',   sub:'Biblioteca digital',sec:'recursos',color:'#a09fff',r:16, group:'study' },
+    // Academias
+    { id:'alumno', label:'Alumnos',    sub:'Wolves · LevelUp',sec:'alumnos',  color:'#43d9ad', r:18, group:'acad' },
+    { id:'conten', label:'Contenido',  sub:'Instagram IG',    sec:'contenido',color:'#43d9ad', r:16, group:'acad' },
+    // Health
+    { id:'gym',    label:'Gimnasio',   sub:'Rutina 4 días',   sec:'gym',      color:'#ff6b6b', r:18, group:'health' },
+    { id:'dieta',  label:'Dieta',      sub:'Superávit +200',  sec:'dieta',    color:'#ff6b6b', r:17, group:'health' },
+    { id:'habit',  label:'Hábitos',    sub:'Tracker semanal', sec:'habitos',  color:'#ffd166', r:16, group:'health' },
+    // Finance & retro
+    { id:'finan',  label:'Finanzas',   sub:'Ingresos · Gastos',sec:'finanzas',color:'#60a8ff', r:18, group:'fin' },
+    { id:'retro',  label:'Retro',      sub:'Revisión mensual', sec:'retro',   color:'#60a8ff', r:16, group:'fin' },
+  ];
+
+  // Edge connections [from, to]
+  const EDGES = [
+    ['hub','dash'],['hub','semana'],['hub','tareas'],['hub','proyec'],
+    ['hub','alumno'],['hub','gym'],['hub','finan'],
+    ['tareas','proyec'],['tareas','semana'],
+    ['apunte','recurs'],['apunte','tareas'],
+    ['alumno','conten'],['alumno','finan'],
+    ['gym','dieta'],['gym','habit'],['dieta','habit'],
+    ['finan','retro'],['semana','habit'],
+    ['dash','apunte'],['dash','recurs'],
+    ['proyec','apunte'],
+  ];
+
+  // Layout positions — computed as ratios (0–1) then scaled to canvas
+  const POS = {
+    hub:   [0.50, 0.50],
+    dash:  [0.50, 0.24],
+    semana:[0.26, 0.34],
+    tareas:[0.74, 0.34],
+    proyec:[0.74, 0.58],
+    apunte:[0.50, 0.74],
+    recurs:[0.30, 0.82],
+    alumno:[0.20, 0.56],
+    conten:[0.08, 0.72],
+    gym:   [0.80, 0.76],
+    dieta: [0.92, 0.60],
+    habit: [0.92, 0.80],
+    finan: [0.20, 0.78],
+    retro: [0.38, 0.88],
+  };
+
+  let W, H, dpr, mouse = {x:-999,y:-999};
+  let hoveredNode = null;
+  let particles = [];
+  let t = 0;
+
+  function resize(){
+    dpr = window.devicePixelRatio || 1;
+    const rect = panel.getBoundingClientRect();
+    W = rect.width; H = panel.offsetHeight || 420;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.scale(dpr, dpr);
+  }
+
+  function nodePos(id){
+    const p = POS[id];
+    return { x: p[0]*W, y: p[1]*H };
+  }
+
+  // Particles traveling along edges
+  function spawnParticle(){
+    const edge = EDGES[Math.floor(Math.random()*EDGES.length)];
+    const from = nodePos(edge[0]);
+    const to   = nodePos(edge[1]);
+    const n = NODES.find(n=>n.id===edge[0]);
+    particles.push({ fx:from.x, fy:from.y, tx:to.x, ty:to.y, p:0, speed:0.004+Math.random()*0.004, color: n ? n.color : '#6c63ff', alpha:0 });
+  }
+
+  function hexAlpha(hex, a){
+    const r=parseInt(hex.slice(1,3),16), g=parseInt(hex.slice(3,5),16), b=parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    t += 0.008;
+
+    // Spawn particles occasionally
+    if(Math.random()<0.04 && particles.length < 18) spawnParticle();
+
+    // Draw edges
+    EDGES.forEach(([a,b])=>{
+      const pa = nodePos(a), pb = nodePos(b);
+      const na = NODES.find(n=>n.id===a);
+      const isHovered = hoveredNode && (hoveredNode.id===a || hoveredNode.id===b);
+      ctx.beginPath();
+      ctx.moveTo(pa.x, pa.y);
+      ctx.lineTo(pb.x, pb.y);
+      ctx.strokeStyle = isHovered ? hexAlpha(na.color, 0.55) : 'rgba(255,255,255,0.06)';
+      ctx.lineWidth   = isHovered ? 1.5 : 0.8;
+      ctx.stroke();
+    });
+
+    // Draw particles
+    particles = particles.filter(p=>p.p<=1.05);
+    particles.forEach(p=>{
+      p.p += p.speed;
+      p.alpha = p.p < 0.15 ? p.p/0.15 : p.p > 0.85 ? (1-p.p)/0.15 : 1;
+      const x = p.fx + (p.tx-p.fx)*p.p;
+      const y = p.fy + (p.ty-p.fy)*p.p;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.2, 0, Math.PI*2);
+      ctx.fillStyle = hexAlpha(p.color, p.alpha * 0.85);
+      ctx.fill();
+      // Glow
+      ctx.beginPath();
+      ctx.arc(x, y, 5, 0, Math.PI*2);
+      const grd = ctx.createRadialGradient(x,y,0,x,y,5);
+      grd.addColorStop(0, hexAlpha(p.color, p.alpha*0.3));
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grd;
+      ctx.fill();
+    });
+
+    // Draw nodes
+    NODES.forEach(node=>{
+      const {x,y} = nodePos(node.id);
+      const isHov = hoveredNode && hoveredNode.id === node.id;
+      const pulse = node.id === 'hub' ? Math.sin(t*1.5)*2 : 0;
+      const r = node.r + pulse + (isHov ? 4 : 0);
+
+      // Outer glow
+      const grd = ctx.createRadialGradient(x,y,0,x,y,r*2.5);
+      grd.addColorStop(0, hexAlpha(node.color, isHov ? 0.25 : 0.10));
+      grd.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath();
+      ctx.arc(x,y,r*2.5,0,Math.PI*2);
+      ctx.fillStyle = grd;
+      ctx.fill();
+
+      // Node circle
+      ctx.beginPath();
+      ctx.arc(x,y,r,0,Math.PI*2);
+      const cGrd = ctx.createRadialGradient(x-r*.3,y-r*.3,r*.1,x,y,r);
+      cGrd.addColorStop(0, hexAlpha(node.color, isHov ? 0.9 : 0.6));
+      cGrd.addColorStop(1, hexAlpha(node.color, isHov ? 0.5 : 0.25));
+      ctx.fillStyle = cGrd;
+      ctx.fill();
+      ctx.strokeStyle = hexAlpha(node.color, isHov ? 0.9 : 0.4);
+      ctx.lineWidth = isHov ? 2 : 1;
+      ctx.stroke();
+
+      // Label
+      ctx.fillStyle = isHov ? '#ffffff' : 'rgba(232,232,232,0.85)';
+      ctx.font = `${isHov?'600 ':''}${node.id==='hub'?'11':'10'}px Inter, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(node.label, x, y);
+
+      // Sub-label below node
+      if(node.id !== 'hub'){
+        ctx.fillStyle = 'rgba(153,153,153,0.7)';
+        ctx.font = '9px Inter, sans-serif';
+        ctx.fillText(node.sub, x, y + r + 10);
+      }
+    });
+
+    requestAnimationFrame(draw);
+  }
+
+  function getHoveredNode(mx, my){
+    for(const node of NODES){
+      const {x,y} = nodePos(node.id);
+      const dist = Math.hypot(mx-x, my-y);
+      if(dist <= node.r + 8) return node;
+    }
+    return null;
+  }
+
+  panel.addEventListener('mousemove', e=>{
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    mouse = {x:mx, y:my};
+    hoveredNode = getHoveredNode(mx, my);
+    canvas.style.cursor = hoveredNode && hoveredNode.sec ? 'pointer' : 'default';
+
+    if(hoveredNode){
+      tip.querySelector('strong').textContent = hoveredNode.label;
+      tip.querySelector('span').textContent   = hoveredNode.sub;
+      const tx = Math.min(mx + 14, W - 160);
+      const ty = Math.max(my - 36, 8);
+      tip.style.left    = tx + 'px';
+      tip.style.top     = ty + 'px';
+      tip.style.opacity = '1';
+    } else {
+      tip.style.opacity = '0';
+    }
+  });
+
+  panel.addEventListener('mouseleave', ()=>{
+    hoveredNode = null;
+    tip.style.opacity = '0';
+    canvas.style.cursor = 'default';
+  });
+
+  panel.addEventListener('click', e=>{
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const node = getHoveredNode(mx, my);
+    if(node && node.sec){
+      const idx = SECTIONS.indexOf(node.sec);
+      if(idx >= 0){
+        const tabs = document.querySelectorAll('.tab');
+        goTab(node.sec, tabs[idx]);
+        window.scrollTo({top:0, behavior:'smooth'});
+      }
+    }
+  });
+
+  // Init
+  resize();
+  // Pre-spawn some particles
+  for(let i=0;i<8;i++) spawnParticle();
+  draw();
+  window.addEventListener('resize', ()=>{ resize(); });
+})();
+</script>
+</body>
+</html>

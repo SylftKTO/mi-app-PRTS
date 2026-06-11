@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PRTS · Gym</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e;
+    --accent: #f78166; --green: #3fb950; --blue: #58a6ff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    max-width: 480px; margin: 0 auto; padding: 16px; padding-bottom: 60px;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-top: 14px;
+  }
+  input, button, select {
+    font-size: 1rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); padding: 10px;
+  }
+  input { width: 100%; margin-top: 8px; }
+  button {
+    cursor: pointer; background: var(--accent); color: #fff;
+    border: none; font-weight: 600; padding: 12px;
+  }
+  button.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  button:disabled { opacity: 0.5; }
+  .w100 { width: 100%; margin-top: 12px; }
+  .ex-name { font-weight: 600; font-size: 1.05rem; }
+  .ex-target { color: var(--muted); font-size: 0.8rem; }
+  .last { font-size: 0.8rem; color: var(--blue); margin-top: 4px; }
+  .set-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+  .set-row span.n { width: 22px; color: var(--muted); font-size: 0.85rem; }
+  .set-row input { margin: 0; flex: 1; text-align: center; padding: 8px; }
+  .set-row button { padding: 8px 14px; font-size: 0.9rem; }
+  .set-row.done input { border-color: var(--green); color: var(--green); }
+  .set-row.done button { background: var(--green); }
+  .topbar { display: flex; justify-content: space-between; align-items: center; }
+  .topbar select { padding: 6px 8px; font-size: 0.85rem; }
+  .badge {
+    display: inline-block; padding: 2px 10px; border-radius: 99px;
+    font-size: 0.75rem; font-weight: 700; background: var(--accent); color: #fff;
+  }
+  #msg { margin-top: 10px; font-size: 0.85rem; color: var(--accent); min-height: 1.2em; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden">
+  <h1>PRTS · Gym</h1>
+  <p class="muted">Inicia sesión para registrar tu entrenamiento</p>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button id="btn-login" class="w100">Entrar</button>
+    <button id="btn-signup" class="w100 secondary">Crear cuenta</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="view-app" class="hidden">
+  <div class="topbar">
+    <div>
+      <h1 id="day-title">—</h1>
+      <span id="day-date" class="muted"></span>
+    </div>
+    <div style="text-align:right">
+      <select id="day-select"></select><br>
+      <a href="#" id="btn-logout" class="muted" style="font-size:0.75rem">salir</a>
+    </div>
+  </div>
+  <div id="exercises"></div>
+</div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+
+const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+// Rutina real (seed inicial; después la fuente de verdad es la BD)
+const SEED = {
+  0: { name: "Leg A",  ex: [["Abductores",3,6,10],["Extensiones",3,6,10],["Péndulo / Hack",2,6,10],["Femoral",2,6,10],["Peso muerto",3,6,10],["Hip thrust",3,6,10],["Pantorrilla",3,10,15]] },
+  1: { name: "Push A", ex: [["Fondos",3,6,10],["Pushdowns",3,6,10],["Overhead",3,6,10],["Peck Deck (negra)",3,6,10],["Press pecho alto",3,6,10],["Militar",2,8,15],["Elevaciones",2,8,15],["Hombro posterior",3,8,15]] },
+  2: { name: "Pull A", ex: [["Predicador",3,6,10],["Martillo",3,6,10],["Jalón al pecho",3,6,10],["Jalón cerrado",2,6,10],["Remo T",3,6,10],["Gatitos",3,6,10]] },
+  3: { name: "Leg B",  ex: [["Abductores",4,6,10],["Extensiones",4,6,10],["Péndulo / Hack",4,6,10],["Pantorrilla",4,6,10]] },
+  4: { name: "Push B", ex: [["Fondos",3,6,10],["Pushdowns",3,6,10],["Overhead",3,6,10],["Peck Deck (negra)",3,6,10],["Press pecho alto",3,6,10],["Militar",2,8,15],["Elevaciones",2,8,15],["Hombro posterior",3,8,15]] },
+  5: { name: "Pull B", ex: [["Predicador",3,6,10],["Martillo",3,6,10],["Jalón al pecho",3,6,10],["Jalón cerrado",2,6,10],["Remo T",3,6,10],["Gatitos",3,6,10]] },
+};
+
+const $ = (id) => document.getElementById(id);
+const show = (id) => { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); };
+
+function hoyMX() {
+  const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); // YYYY-MM-DD
+  const wd = new Date(s + "T12:00:00").getDay();
+  return { fecha: s, weekday: wd };
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-signup").onclick = async () => {
+  const { error } = await sb.auth.signUp({ email: $("email").value, password: $("password").value });
+  $("msg").textContent = error ? error.message : "Cuenta creada. Si pide confirmación, revisa tu correo.";
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); show("view-login"); };
+
+// ---------- SEED ----------
+async function seedSiVacio() {
+  const { count } = await sb.from("routine_days").select("*", { count: "exact", head: true });
+  if (count > 0) return;
+  // catálogo de ejercicios únicos
+  const nombres = [...new Set(Object.values(SEED).flatMap(d => d.ex.map(e => e[0])))];
+  const { data: exs } = await sb.from("exercises").insert(nombres.map(name => ({ name }))).select();
+  const exId = Object.fromEntries(exs.map(e => [e.name, e.id]));
+  for (const [wd, d] of Object.entries(SEED)) {
+    const { data: day } = await sb.from("routine_days").insert({ weekday: +wd, name: d.name }).select().single();
+    await sb.from("routine_exercises").insert(d.ex.map((e, i) => ({
+      routine_day_id: day.id, exercise_id: exId[e[0]], position: i,
+      target_sets: e[1], rep_min: e[2], rep_max: e[3],
+    })));
+  }
+}
+
+// ---------- VISTA ----------
+let sessionId = null;
+let routineDays = [];
+
+async function init() {
+  show("view-app");
+  await seedSiVacio();
+  const { data } = await sb.from("routine_days").select("*").order("weekday");
+  routineDays = data;
+  const { weekday, fecha } = hoyMX();
+  $("day-select").innerHTML = DIAS.map((d, i) => {
+    const rd = routineDays.find(r => r.weekday === i);
+    return `<option value="${i}" ${i === weekday ? "selected" : ""}>${d.slice(0,3)} · ${rd ? rd.name : "Descanso"}</option>`;
+  }).join("");
+  $("day-select").onchange = () => renderDia(+$("day-select").value, fecha);
+  renderDia(weekday, fecha);
+}
+
+async function renderDia(weekday, fecha) {
+  const rd = routineDays.find(r => r.weekday === weekday);
+  $("day-title").textContent = rd ? rd.name : "Descanso";
+  $("day-date").textContent = `${DIAS[weekday]} · ${fecha}`;
+  const cont = $("exercises");
+  cont.innerHTML = "";
+  if (!rd) { cont.innerHTML = `<div class="card muted">Hoy toca descansar. 😴</div>`; return; }
+
+  // sesión de hoy (si existe)
+  const { data: ses } = await sb.from("workout_sessions").select("id").eq("session_date", fecha).maybeSingle();
+  sessionId = ses?.id ?? null;
+
+  const { data: rex } = await sb.from("routine_exercises")
+    .select("*, exercises(name)").eq("routine_day_id", rd.id).order("position");
+
+  // sets ya registrados hoy
+  let setsHoy = [];
+  if (sessionId) {
+    const { data } = await sb.from("workout_sets").select("*").eq("session_id", sessionId);
+    setsHoy = data;
+  }
+
+  for (const re of rex) {
+    // última carga registrada para este ejercicio (antes de hoy)
+    const { data: last } = await sb.from("workout_sets")
+      .select("weight_kg, reps, created_at, workout_sessions!inner(session_date)")
+      .eq("exercise_id", re.exercise_id)
+      .neq("workout_sessions.session_date", fecha)
+      .order("created_at", { ascending: false }).limit(re.target_sets);
+
+    const lastTxt = last?.length
+      ? "Última vez: " + last.reverse().map(s => `${s.weight_kg}×${s.reps}`).join(" · ")
+      : "Sin historial todavía";
+
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="ex-name">${re.exercises.name}</div>
+      <div class="ex-target">${re.target_sets} series · ${re.rep_min}–${re.rep_max} reps</div>
+      <div class="last">${lastTxt}</div>`;
+
+    for (let n = 1; n <= re.target_sets; n++) {
+      const done = setsHoy.find(s => s.exercise_id === re.exercise_id && s.set_number === n);
+      const row = document.createElement("div");
+      row.className = "set-row" + (done ? " done" : "");
+      row.innerHTML = `
+        <span class="n">${n}</span>
+        <input type="number" inputmode="decimal" placeholder="kg" value="${done ? done.weight_kg : ""}" ${done ? "disabled" : ""}>
+        <input type="number" inputmode="numeric" placeholder="reps" value="${done ? done.reps : ""}" ${done ? "disabled" : ""}>
+        <button ${done ? "disabled" : ""}>${done ? "✓" : "OK"}</button>`;
+      const [kg, reps] = row.querySelectorAll("input");
+      row.querySelector("button").onclick = async (ev) => {
+        if (!kg.value || !reps.value) return;
+        ev.target.disabled = true;
+        if (!sessionId) {
+          const { data: s } = await sb.from("workout_sessions")
+            .insert({ routine_day_id: rd.id, session_date: fecha }).select().single();
+          sessionId = s.id;
+        }
+        const { error } = await sb.from("workout_sets").insert({
+          session_id: sessionId, exercise_id: re.exercise_id,
+          set_number: n, weight_kg: +kg.value, reps: +reps.value,
+        });
+        if (error) { ev.target.disabled = false; alert(error.message); return; }
+        row.classList.add("done");
+        kg.disabled = reps.disabled = true;
+        ev.target.textContent = "✓";
+      };
+      card.appendChild(row);
+    }
+    cont.appendChild(card);
+  }
+}
+
+// arranque
+(async () => {
+  if (PRTS_CONFIG.SUPABASE_URL.includes("TU-PROYECTO")) {
+    show("view-login");
+    $("msg").textContent = "Falta configurar config.js con los datos de tu proyecto Supabase.";
+    return;
+  }
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+</script>
+</body>
+</html>
