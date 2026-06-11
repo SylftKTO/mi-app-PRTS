@@ -121,6 +121,137 @@
   /* clases (contenedor futuro) */
   .future-note { color: var(--dim); font-size: 0.8rem; line-height: 1.5; }
 
+  /* ---------- VISTAS (Semana / Proyectos) ---------- */
+  .tab-fade { animation: tfade 0.2s ease; }
+  @keyframes tfade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .view-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .view-head h2 { font-family: "Source Serif 4", serif; font-size: 1.7rem; font-weight: 500; }
+
+  .f-in, .f-sel {
+    padding: 9px 11px; font-size: 0.88rem; font-family: inherit; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none;
+  }
+  .f-in:focus, .f-sel:focus { border-color: var(--blue); }
+  .f-in::placeholder { color: var(--dim); }
+  input[type="date"].f-in, input[type="time"].f-in { color-scheme: dark; }
+  .f-btn {
+    padding: 9px 16px; border: none; border-radius: 8px; background: var(--blue);
+    color: #0B0D12; font-weight: 600; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+  }
+  .f-btn:disabled { opacity: 0.5; cursor: default; }
+  .form-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .form-3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; margin-top: 8px; }
+  .form-4 { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; margin-top: 8px; }
+  .ghost-wide {
+    margin-top: 16px; width: 100%; padding: 9px; background: transparent; cursor: pointer;
+    border: 1px dashed var(--border); border-radius: 10px; color: var(--dim);
+    font-family: "JetBrains Mono", monospace; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+
+  /* --- Semana: grid semanal --- */
+  .week-layout { display: grid; grid-template-columns: 1fr 330px; gap: 16px; align-items: start; }
+  #week-grid {
+    display: grid; grid-template-columns: 48px repeat(7, 1fr);
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  }
+  .wg-corner { border-bottom: 1px solid var(--border); }
+  .wg-head {
+    padding: 9px 2px; text-align: center; border-bottom: 1px solid var(--border);
+    border-left: 1px solid var(--border); cursor: pointer;
+    font-family: "JetBrains Mono", monospace; font-size: 0.62rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .wg-head.on { color: var(--blue); background: var(--panel2); }
+  .wg-axis div {
+    height: 40px; font-family: "JetBrains Mono", monospace; font-size: 0.58rem;
+    color: var(--dim); text-align: right; padding: 2px 6px 0 0;
+  }
+  .wg-col {
+    position: relative; border-left: 1px solid var(--border); cursor: pointer;
+    background-image: repeating-linear-gradient(to bottom, rgba(29, 34, 48, 0.6) 0 1px, transparent 1px 40px);
+  }
+  .wg-col.on { background-color: rgba(125, 162, 216, 0.05); }
+  .wg-block {
+    position: absolute; left: 3px; right: 3px; border-radius: 5px;
+    padding: 3px 6px; overflow: hidden; font-size: 0.68rem; line-height: 1.25;
+    border-left: 3px solid; color: var(--text);
+  }
+  .wg-block small { display: block; font-family: "JetBrains Mono", monospace; font-size: 0.55rem; color: var(--muted); }
+  .leyenda { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .leyenda span {
+    display: flex; align-items: center; gap: 5px;
+    font-family: "JetBrains Mono", monospace; font-size: 0.58rem;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim);
+  }
+  .leyenda i { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* --- Semana: editor lateral --- */
+  .blk-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+  .blk-row:last-child { border-bottom: none; }
+  .blk-row .hora { font-family: "JetBrains Mono", monospace; font-size: 0.68rem; color: var(--muted); min-width: 66px; line-height: 1.5; cursor: pointer; }
+  .blk-row .t { font-size: 0.88rem; cursor: pointer; word-break: break-word; }
+  .blk-row .rol { font-family: "JetBrains Mono", monospace; font-size: 0.55rem; letter-spacing: 0.12em; text-transform: uppercase; margin-top: 1px; }
+  .solapa { color: var(--yellow); }
+  .blk-row .del, .sub .del, .p-del { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 0.9rem; padding: 2px 5px; }
+  .blk-row .del:hover, .sub .del:hover, .p-del:hover { color: var(--red); }
+
+  /* --- Proyectos --- */
+  .proj-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 16px; }
+  .p-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .p-name { font-family: "Source Serif 4", serif; font-size: 1.15rem; font-weight: 500; cursor: pointer; word-break: break-word; }
+  .pcard.completado .p-name { color: var(--muted); cursor: default; }
+  .p-meta {
+    margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap;
+    font-family: "JetBrains Mono", monospace; font-size: 0.6rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+  }
+  .dlv { color: var(--red); } .dlu { color: var(--yellow); }
+  .p-prog { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .p-pct { font-family: "JetBrains Mono", monospace; font-size: 0.65rem; color: var(--muted); min-width: 64px; text-align: right; }
+  .sub { display: flex; align-items: center; gap: 9px; padding: 7px 2px; border-bottom: 1px solid var(--border); }
+  .sub:last-of-type { border-bottom: none; }
+  .sub .chk {
+    width: 17px; height: 17px; min-width: 17px; border-radius: 5px;
+    border: 1.5px solid var(--dim); background: transparent; cursor: pointer; padding: 0;
+    color: transparent; font-size: 10px; display: grid; place-items: center;
+  }
+  .sub.done .chk { background: var(--blue); border-color: var(--blue); color: #0B0D12; }
+  .sub .t { flex: 1; font-size: 0.85rem; cursor: pointer; word-break: break-word; }
+  .sub.done .t { text-decoration: line-through; color: var(--dim); }
+  .sub-add { display: flex; gap: 6px; margin-top: 10px; }
+  .sub-add input { flex: 1; min-width: 0; }
+  .p-done-btn {
+    margin-top: 10px; width: 100%; padding: 7px; background: transparent; cursor: pointer;
+    border: 1px solid var(--green); border-radius: 8px; color: var(--green);
+    font-family: "JetBrains Mono", monospace; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+
+  /* --- Tareas --- */
+  .torigin-head {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+    font-family: "JetBrains Mono", monospace; font-size: 0.62rem;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim);
+  }
+  .torigin-head .dot { width: 7px; height: 7px; border-radius: 50%; }
+  .task { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--border); }
+  .task:last-child { border-bottom: none; }
+  .task .chk {
+    width: 18px; height: 18px; min-width: 18px; border-radius: 6px;
+    border: 1.5px solid var(--dim); background: transparent; cursor: pointer; padding: 0;
+    color: transparent; font-size: 10px; display: grid; place-items: center;
+  }
+  .task.done .chk { background: var(--blue); border-color: var(--blue); color: #0B0D12; }
+  .task .t { font-size: 0.9rem; cursor: pointer; word-break: break-word; }
+  .task.done .t { text-decoration: line-through; color: var(--dim); }
+  .task .meta {
+    margin-top: 1px; display: flex; gap: 10px; flex-wrap: wrap;
+    font-family: "JetBrains Mono", monospace; font-size: 0.58rem;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim);
+  }
+  .task .del { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 0.9rem; padding: 2px 5px; }
+  .task .del:hover { color: var(--red); }
+  .pri-alta { color: var(--red); } .pri-media { color: var(--yellow); } .pri-baja { color: var(--dim); }
+
   /* ---------- LOGIN ---------- */
   #view-login { margin: auto; width: min(360px, 90vw); }
   #view-login .panel { padding: 26px; }
@@ -138,6 +269,7 @@
   @media (max-width: 900px) {
     aside { display: none; }
     .grid { grid-template-columns: 1fr; }
+    .week-layout { grid-template-columns: 1fr; }
     main { padding: 16px; }
   }
 </style>
@@ -169,16 +301,16 @@
   </div>
 
   <div class="nav-label mono">Principal</div>
-  <a class="nav-link on" href="index.html">
+  <a class="nav-link on" href="#dashboard" data-view="dashboard">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
     Dashboard</a>
-  <a class="nav-link" href="tareas.html">
+  <a class="nav-link" href="#tareas" data-view="tareas">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
     Tareas</a>
-  <a class="nav-link" href="semana.html">
+  <a class="nav-link" href="#semana" data-view="semana">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="3"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
     Semana</a>
-  <a class="nav-link" href="proyectos.html">
+  <a class="nav-link" href="#proyectos" data-view="proyectos">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
     Proyectos</a>
 
@@ -210,6 +342,9 @@
 
 <!-- MAIN -->
 <main id="view-app" class="hidden">
+
+<!-- VISTA DASHBOARD -->
+<div id="tab-dashboard" class="tab-fade">
   <div class="map-head">
     <div class="mono" style="color:var(--blue)">Mapa del sistema</div>
     <div class="muted">Red de módulos · pasa el cursor para explorar · clic para navegar</div>
@@ -238,7 +373,7 @@
       <div class="panel">
         <div class="panel-head">
           <span class="mono">Tareas prioritarias</span>
-          <a href="tareas.html">ver todas ›</a>
+          <a href="#tareas" data-view="tareas">ver todas ›</a>
         </div>
         <div id="lista-tareas"><div class="empty">Cargando…</div></div>
       </div>
@@ -269,6 +404,83 @@
       </div>
     </div>
   </div>
+</div><!-- /tab-dashboard -->
+
+<!-- VISTA SEMANA -->
+<div id="tab-semana" class="hidden tab-fade">
+  <div class="view-head">
+    <h2>Semana</h2>
+    <span class="mono" id="sem-resumen"></span>
+  </div>
+  <div class="week-layout">
+    <div>
+      <div id="week-grid"></div>
+      <div class="leyenda" id="sem-leyenda"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="mono" id="sem-dia-titulo">—</span>
+        <span class="mono" id="sem-dia-horas"></span>
+      </div>
+      <div id="sem-lista"></div>
+      <div style="border-top:1px solid var(--border); margin-top:12px; padding-top:12px">
+        <input id="sem-label" class="f-in" placeholder="Nuevo bloque… (p. ej. Cálculo)" style="width:100%" autocomplete="off">
+        <div class="form-2">
+          <input id="sem-start" class="f-in" type="time" step="300">
+          <input id="sem-end" class="f-in" type="time" step="300">
+        </div>
+        <div class="form-2">
+          <select id="sem-role" class="f-sel"></select>
+          <button id="sem-add" class="f-btn">Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- VISTA PROYECTOS -->
+<div id="tab-proyectos" class="hidden tab-fade">
+  <div class="view-head">
+    <h2>Proyectos</h2>
+    <span class="mono" id="proj-resumen"></span>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+    <input id="proj-name" class="f-in" placeholder="Nuevo proyecto…" style="width:100%" autocomplete="off">
+    <div class="form-3">
+      <input id="proj-subject" class="f-in" placeholder="Materia" autocomplete="off">
+      <input id="proj-due" class="f-in" type="date">
+      <button id="proj-add" class="f-btn">Agregar</button>
+    </div>
+  </div>
+  <div id="proj-lista" class="proj-grid"></div>
+  <button id="proj-toggle" class="ghost-wide">Completados (0)</button>
+  <div id="proj-done" class="proj-grid hidden" style="margin-top:16px"></div>
+</div>
+
+<!-- VISTA TAREAS -->
+<div id="tab-tareas" class="hidden tab-fade">
+  <div class="view-head">
+    <h2>Tareas</h2>
+    <span class="mono" id="tarea-resumen"></span>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+    <input id="tarea-title" class="f-in" placeholder="Nueva tarea…" style="width:100%" autocomplete="off">
+    <div class="form-4">
+      <select id="tarea-origin" class="f-sel"></select>
+      <select id="tarea-priority" class="f-sel">
+        <option value="alta">Alta</option>
+        <option value="media" selected>Media</option>
+        <option value="baja">Baja</option>
+      </select>
+      <input id="tarea-deadline" class="f-in" type="date">
+      <button id="tarea-add" class="f-btn">Agregar</button>
+    </div>
+  </div>
+  <div id="tarea-lista" class="proj-grid"></div>
+  <button id="tarea-toggle" class="ghost-wide">Completadas (0)</button>
+  <div id="tarea-done" class="panel hidden" style="margin-top:16px"></div>
+</div>
+
 </main>
 
 <div id="rest"></div>
@@ -277,12 +489,29 @@
 const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
+const esc = (s) => s.replace(/</g, "&lt;");
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+
+// ---------- VISTAS ----------
+const TABS = ["dashboard", "semana", "proyectos", "tareas"];
+function switchView(v) {
+  if (!TABS.includes(v)) v = "dashboard";
+  for (const t of TABS) {
+    $("tab-" + t).classList.toggle("hidden", t !== v);
+    document.querySelector(`.nav-link[data-view="${t}"]`)?.classList.toggle("on", t === v);
+  }
+  if (v === "dashboard") { cargarTareas(HOY.fecha); cargarProgreso(HOY.fecha, HOY.weekday); }
+  if (v === "semana") cargarSemana();
+  if (v === "proyectos") cargarProyectos();
+  if (v === "tareas") cargarTareasView();
+  history.replaceState(null, "", "#" + v);
+}
 
 function hoyMX() {
   const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
   return { fecha: s, weekday: new Date(s + "T12:00:00").getDay() };
 }
+const HOY = hoyMX();
 
 // ---------- AUTH ----------
 $("btn-login").onclick = async () => {
@@ -296,10 +525,10 @@ $("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signO
 const NODOS = [
   { id: "prts",      label: "PRTS",      sub: "Asistente · IA",      x: 0.50, y: 0.44, r: 30, core: true },
   { id: "dashboard", label: "Dashboard", sub: "Vista general",       x: 0.50, y: 0.13, r: 17, href: "index.html", on: true },
-  { id: "semana",    label: "Semana",    sub: "Bloques de tiempo",   x: 0.26, y: 0.20, r: 15, href: "semana.html", on: true },
-  { id: "tareas",    label: "Tareas",    sub: "Pendientes del día",  x: 0.74, y: 0.20, r: 17, href: "tareas.html", on: true },
+  { id: "semana",    label: "Semana",    sub: "Bloques de tiempo",   x: 0.26, y: 0.20, r: 15, view: "semana", on: true },
+  { id: "tareas",    label: "Tareas",    sub: "Pendientes del día",  x: 0.74, y: 0.20, r: 17, view: "tareas", on: true },
   { id: "alumnos",   label: "Alumnos",   sub: "Wolves · LevelUp",    x: 0.20, y: 0.42, r: 15 },
-  { id: "proyectos", label: "Proyectos", sub: "Semestre actual",     x: 0.78, y: 0.46, r: 15, href: "proyectos.html", on: true },
+  { id: "proyectos", label: "Proyectos", sub: "Semestre actual",     x: 0.78, y: 0.46, r: 15, view: "proyectos", on: true },
   { id: "dieta",     label: "Dieta",     sub: "Superávit +200",      x: 0.92, y: 0.50, r: 15, href: "dieta.html", on: true },
   { id: "contenido", label: "Contenido", sub: "Instagram",           x: 0.12, y: 0.66, r: 13 },
   { id: "finanzas",  label: "Finanzas",  sub: "Ingresos · Gastos",   x: 0.30, y: 0.70, r: 14 },
@@ -393,18 +622,21 @@ function initMapa() {
   canvas.addEventListener("mousemove", (e) => {
     const rect = canvas.getBoundingClientRect();
     hovered = nodoEn(e.clientX - rect.left, e.clientY - rect.top);
-    canvas.style.cursor = hovered && (hovered.href || hovered.core) ? "pointer" : "default";
+    canvas.style.cursor = hovered && (hovered.href || hovered.view || hovered.core) ? "pointer" : "default";
     const tip = $("map-tip");
     if (hovered) {
       tip.style.left = hovered.x * W + "px";
       tip.style.top = hovered.y * H + "px";
       tip.textContent = hovered.core ? "PRTS — capa de IA (Fase 4)" :
-        hovered.href ? `${hovered.label} — abrir` : `${hovered.label} — próximamente`;
+        (hovered.href || hovered.view) ? `${hovered.label} — abrir` : `${hovered.label} — próximamente`;
       tip.style.opacity = 1;
     } else tip.style.opacity = 0;
   });
   canvas.addEventListener("mouseleave", () => { hovered = null; $("map-tip").style.opacity = 0; });
-  canvas.addEventListener("click", () => { if (hovered?.href) location.href = hovered.href; });
+  canvas.addEventListener("click", () => {
+    if (hovered?.view) switchView(hovered.view);
+    else if (hovered?.href) location.href = hovered.href;
+  });
   requestAnimationFrame(drawMap);
 }
 
@@ -479,6 +711,427 @@ async function cargarProgreso(fecha, weekday) {
   $("txt-tareas").textContent = `${hechas}/${total}`;
 }
 
+// ---------- SEMANA (plantilla de bloques) ----------
+// weekday: convención JS getDay() → 0=Dom … 6=Sáb. Se muestra Lun→Dom.
+const ORDEN_SEM = [1, 2, 3, 4, 5, 6, 0];
+const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+const ROLES_SEM = {
+  escuela:  { label: "Escuela",  color: "#7DA2D8" },
+  gym:      { label: "Gym",      color: "#6FB5AE" },
+  wolves:   { label: "Wolves",   color: "#D2A547" },
+  levelup:  { label: "LevelUp",  color: "#5FB97E" },
+  personal: { label: "Personal", color: "#B49FD9" },
+};
+const SEM_HI = 6, SEM_HF = 23, SEM_PXH = 40;   // rango visible 6:00–23:00, 40px/hora
+let semBloques = [], semDia = hoyMX().weekday;
+const mins = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+const hhmm = (t) => t.slice(0, 5);
+const fmtH = (h) => h % 1 ? h.toFixed(1) : h;
+
+async function cargarSemana() {
+  const { data, error } = await sb.from("week_blocks")
+    .select("*").order("weekday").order("start_time");
+  if (error) { alert(error.message); return; }
+  semBloques = data;
+  const horas = semBloques.reduce((a, b) => a + (mins(b.end_time) - mins(b.start_time)), 0) / 60;
+  $("sem-resumen").textContent = semBloques.length
+    ? `${semBloques.length} bloques · ${fmtH(horas)} h planeadas`
+    : "plantilla vacía";
+  renderSemana();
+}
+
+function renderSemana() {
+  const grid = $("week-grid");
+  grid.innerHTML = "";
+  const altoCol = (SEM_HF - SEM_HI) * SEM_PXH;
+
+  grid.appendChild(Object.assign(document.createElement("div"), { className: "wg-corner" }));
+  for (const d of ORDEN_SEM) {
+    const h = document.createElement("div");
+    h.className = "wg-head" + (d === semDia ? " on" : "");
+    h.textContent = DIAS_CORTO[d];
+    h.onclick = () => { semDia = d; renderSemana(); };
+    grid.appendChild(h);
+  }
+
+  const eje = document.createElement("div");
+  eje.className = "wg-axis";
+  eje.style.height = altoCol + "px";
+  for (let h = SEM_HI; h < SEM_HF; h++) eje.innerHTML += `<div>${String(h).padStart(2, "0")}</div>`;
+  grid.appendChild(eje);
+
+  for (const d of ORDEN_SEM) {
+    const col = document.createElement("div");
+    col.className = "wg-col" + (d === semDia ? " on" : "");
+    col.style.height = altoCol + "px";
+    col.onclick = () => { semDia = d; renderSemana(); };
+    for (const b of semBloques.filter(x => x.weekday === d)) {
+      const ini = Math.max(SEM_HI * 60, mins(b.start_time));
+      const fin = Math.min(SEM_HF * 60, mins(b.end_time));
+      const c = ROLES_SEM[b.role].color;
+      const el = document.createElement("div");
+      el.className = "wg-block";
+      el.style.cssText = `top:${(ini - SEM_HI * 60) / 60 * SEM_PXH}px;` +
+        `height:${Math.max(14, (fin - ini) / 60 * SEM_PXH - 2)}px;` +
+        `background:${c}22;border-left-color:${c}`;
+      el.innerHTML = `${esc(b.label)}<small>${hhmm(b.start_time)}–${hhmm(b.end_time)}</small>`;
+      col.appendChild(el);
+    }
+    grid.appendChild(col);
+  }
+  renderSemDia();
+}
+
+function renderSemDia() {
+  const dia = semBloques.filter(b => b.weekday === semDia)
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+  const horas = dia.reduce((a, b) => a + (mins(b.end_time) - mins(b.start_time)), 0) / 60;
+  $("sem-dia-titulo").textContent = DIAS[semDia];
+  $("sem-dia-horas").textContent = dia.length ? `${dia.length} bloques · ${fmtH(horas)} h` : "libre";
+
+  const cont = $("sem-lista");
+  cont.innerHTML = "";
+  dia.forEach((b, i) => {
+    const solapa = i > 0 && mins(b.start_time) < mins(dia[i - 1].end_time);
+    const c = ROLES_SEM[b.role].color;
+    const div = document.createElement("div");
+    div.className = "blk-row";
+    div.innerHTML = `
+      <div class="hora" title="Editar horario">${hhmm(b.start_time)}<br>${hhmm(b.end_time)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="t" title="Editar nombre">${esc(b.label)}</div>
+        <div class="rol" style="color:${c}">${ROLES_SEM[b.role].label}${solapa ? ` · <span class="solapa">⚠ solapado</span>` : ""}</div>
+      </div>
+      <button class="del" title="Eliminar">✕</button>`;
+    div.querySelector(".hora").onclick = () => editarHorarioSem(b);
+    div.querySelector(".t").onclick = () => editarLabelSem(b);
+    div.querySelector(".del").onclick = () => borrarBloque(b);
+    cont.appendChild(div);
+  });
+  if (!dia.length) cont.innerHTML = `<div class="empty">Día libre en la plantilla.</div>`;
+}
+
+async function addBloque() {
+  const label = $("sem-label").value.trim();
+  const start = $("sem-start").value, end = $("sem-end").value;
+  if (!label || !start || !end) return;
+  if (mins(end) <= mins(start)) { alert("La hora de fin debe ser mayor que la de inicio."); return; }
+  $("sem-add").disabled = true;
+  const { error } = await sb.from("week_blocks").insert({
+    weekday: semDia, start_time: start, end_time: end,
+    role: $("sem-role").value, label,
+  });
+  $("sem-add").disabled = false;
+  if (error) { alert(error.message); return; }
+  $("sem-label").value = "";
+  cargarSemana();
+}
+
+async function editarLabelSem(b) {
+  const nuevo = prompt("Editar bloque:", b.label);
+  if (nuevo === null || !nuevo.trim() || nuevo === b.label) return;
+  await sb.from("week_blocks").update({ label: nuevo.trim() }).eq("id", b.id);
+  cargarSemana();
+}
+
+async function editarHorarioSem(b) {
+  const valida = (t) => /^([01]?\d|2[0-3]):[0-5]\d$/.test(t);
+  const ini = prompt("Hora de inicio (HH:MM):", hhmm(b.start_time));
+  if (ini === null) return;
+  const fin = prompt("Hora de fin (HH:MM):", hhmm(b.end_time));
+  if (fin === null) return;
+  if (!valida(ini) || !valida(fin) || mins(fin) <= mins(ini)) { alert("Horario inválido."); return; }
+  await sb.from("week_blocks").update({ start_time: ini, end_time: fin }).eq("id", b.id);
+  cargarSemana();
+}
+
+async function borrarBloque(b) {
+  if (!confirm(`¿Eliminar "${b.label}"?`)) return;
+  await sb.from("week_blocks").delete().eq("id", b.id);
+  cargarSemana();
+}
+
+// ---------- PROYECTOS ----------
+function deadlineProj(dl) {
+  if (!dl) return null;
+  const dias = Math.round((new Date(dl + "T12:00") - new Date(hoyMX().fecha + "T12:00")) / 864e5);
+  if (dias < 0)  return { txt: `vencido hace ${-dias}d`, cls: "dlv" };
+  if (dias === 0) return { txt: "entrega hoy", cls: "dlv" };
+  if (dias <= 7)  return { txt: `entrega en ${dias}d`, cls: "dlu" };
+  return { txt: "entrega " + new Date(dl + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }), cls: "" };
+}
+
+async function addProyecto() {
+  const name = $("proj-name").value.trim();
+  if (!name) return;
+  $("proj-add").disabled = true;
+  const { error } = await sb.from("projects").insert({
+    name,
+    subject: $("proj-subject").value.trim() || null,
+    due_date: $("proj-due").value || null,
+  });
+  $("proj-add").disabled = false;
+  if (error) { alert(error.message); return; }
+  $("proj-name").value = ""; $("proj-subject").value = ""; $("proj-due").value = "";
+  cargarProyectos();
+}
+
+async function setProjStatus(id, status) {
+  await sb.from("projects").update({
+    status,
+    completed_at: status === "completado" ? new Date().toISOString() : null,
+  }).eq("id", id);
+  cargarProyectos();
+}
+
+async function editarProyecto(p) {
+  const nuevo = prompt("Editar nombre del proyecto:", p.name);
+  if (nuevo === null || !nuevo.trim() || nuevo === p.name) return;
+  await sb.from("projects").update({ name: nuevo.trim() }).eq("id", p.id);
+  cargarProyectos();
+}
+
+async function borrarProyecto(p) {
+  if (!confirm(`¿Eliminar "${p.name}" y todas sus subtareas?`)) return;
+  await sb.from("projects").delete().eq("id", p.id);
+  cargarProyectos();
+}
+
+async function addSubP(projectId, input, nextPos) {
+  const title = input.value.trim();
+  if (!title) return;
+  const { error } = await sb.from("project_subtasks").insert({
+    project_id: projectId, title, position: nextPos,
+  });
+  if (error) { alert(error.message); return; }
+  cargarProyectos();
+}
+
+async function toggleSubP(s) {
+  await sb.from("project_subtasks").update({ done: !s.done }).eq("id", s.id);
+  cargarProyectos();
+}
+
+async function editarSubP(s) {
+  const nuevo = prompt("Editar subtarea:", s.title);
+  if (nuevo === null || !nuevo.trim() || nuevo === s.title) return;
+  await sb.from("project_subtasks").update({ title: nuevo.trim() }).eq("id", s.id);
+  cargarProyectos();
+}
+
+async function borrarSubP(s) {
+  if (!confirm("¿Eliminar esta subtarea?")) return;
+  await sb.from("project_subtasks").delete().eq("id", s.id);
+  cargarProyectos();
+}
+
+function tarjetaProj(p) {
+  const subs = (p.project_subtasks || []).sort((a, b) => a.position - b.position);
+  const hechas = subs.filter(s => s.done).length;
+  const pct = subs.length ? Math.round((hechas / subs.length) * 100) : 0;
+  const activo = p.status === "activo";
+  const dl = deadlineProj(p.due_date);
+
+  const card = document.createElement("div");
+  card.className = "panel pcard" + (activo ? "" : " completado");
+  card.innerHTML = `
+    <div class="p-head">
+      <div class="p-name">${esc(p.name)}</div>
+      <button class="p-del" title="${activo ? "Eliminar" : "Archivar"}">${activo ? "✕" : "🗄"}</button>
+    </div>
+    <div class="p-meta">
+      ${p.subject ? `<span style="color:var(--blue)">${esc(p.subject)}</span>` : ""}
+      ${dl ? `<span class="${dl.cls}">${dl.txt}</span>` : ""}
+      ${!activo ? `<span>completado</span>` : ""}
+    </div>
+    <div class="p-prog">
+      <div class="bar"><i style="width:${pct}%${pct === 100 ? ";background:var(--green)" : ""}"></i></div>
+      <div class="p-pct">${hechas}/${subs.length} · ${pct}%</div>
+    </div>
+    <div class="subs"></div>
+    ${activo ? `
+      <div class="sub-add">
+        <input class="f-in" placeholder="Nueva subtarea…" autocomplete="off">
+        <button class="f-btn">+</button>
+      </div>` : ""}
+    ${activo && subs.length && pct === 100 ? `<button class="p-done-btn">Marcar proyecto completado</button>` : ""}`;
+
+  card.querySelector(".p-name").onclick = () => activo && editarProyecto(p);
+  card.querySelector(".p-del").onclick = () =>
+    activo ? borrarProyecto(p) : setProjStatus(p.id, "archivado");
+
+  const subsBox = card.querySelector(".subs");
+  for (const s of subs) {
+    const row = document.createElement("div");
+    row.className = "sub" + (s.done ? " done" : "");
+    row.innerHTML = `
+      <button class="chk" title="${s.done ? "Reabrir" : "Completar"}">✓</button>
+      <span class="t">${esc(s.title)}</span>
+      ${activo ? `<button class="del">✕</button>` : ""}`;
+    if (activo) {
+      row.querySelector(".chk").onclick = () => toggleSubP(s);
+      row.querySelector(".t").onclick = () => editarSubP(s);
+      row.querySelector(".del").onclick = () => borrarSubP(s);
+    }
+    subsBox.appendChild(row);
+  }
+  if (!subs.length) subsBox.innerHTML = `<div class="empty">Sin subtareas. Divide el proyecto para ver el avance.</div>`;
+
+  const addBox = card.querySelector(".sub-add");
+  if (addBox) {
+    const input = addBox.querySelector("input");
+    const nextPos = subs.length ? subs[subs.length - 1].position + 1 : 0;
+    addBox.querySelector("button").onclick = () => addSubP(p.id, input, nextPos);
+    input.onkeydown = (e) => { if (e.key === "Enter") addSubP(p.id, input, nextPos); };
+  }
+  const doneBtn = card.querySelector(".p-done-btn");
+  if (doneBtn) doneBtn.onclick = () => setProjStatus(p.id, "completado");
+
+  return card;
+}
+
+async function cargarProyectos() {
+  const { data: projects, error } = await sb.from("projects")
+    .select("*, project_subtasks(*)")
+    .neq("status", "archivado")
+    .order("due_date", { ascending: true, nullsFirst: false });
+  if (error) { alert(error.message); return; }
+
+  const activos = projects.filter(p => p.status === "activo");
+  const completados = projects.filter(p => p.status === "completado")
+    .sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
+
+  const urgentes = activos.filter(p => p.due_date && deadlineProj(p.due_date).cls).length;
+  $("proj-resumen").textContent = `${activos.length} ${activos.length === 1 ? "activo" : "activos"}` +
+    (urgentes ? ` · ${urgentes} por entregar` : "");
+
+  const cont = $("proj-lista");
+  cont.innerHTML = "";
+  activos.forEach(p => cont.appendChild(tarjetaProj(p)));
+  if (!activos.length) cont.innerHTML = `<div class="panel empty">Sin proyectos activos este semestre.</div>`;
+
+  $("proj-toggle").textContent = `Completados (${completados.length})`;
+  const ld = $("proj-done");
+  ld.innerHTML = "";
+  completados.forEach(p => ld.appendChild(tarjetaProj(p)));
+}
+
+// ---------- TAREAS (vista completa) ----------
+const ORIGENES_T = {
+  escuela:  { label: "Escuela",  color: "#7DA2D8" },
+  wolves:   { label: "Wolves",   color: "#D2A547" },
+  levelup:  { label: "LevelUp",  color: "#5FB97E" },
+  personal: { label: "Personal", color: "#B49FD9" },
+};
+const PESO_PRI = { alta: 0, media: 1, baja: 2 };
+
+function deadlineInfoT(dl) {
+  if (!dl) return null;
+  const dias = Math.round((new Date(dl + "T12:00") - new Date(HOY.fecha + "T12:00")) / 864e5);
+  if (dias < 0)  return { txt: `vencida hace ${-dias}d`, cls: "dlv" };
+  if (dias === 0) return { txt: "hoy", cls: "dlv" };
+  if (dias === 1) return { txt: "mañana", cls: "dlu" };
+  if (dias <= 2)  return { txt: `en ${dias} días`, cls: "dlu" };
+  return { txt: new Date(dl + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }), cls: "" };
+}
+
+async function addTarea() {
+  const title = $("tarea-title").value.trim();
+  if (!title) return;
+  $("tarea-add").disabled = true;
+  const { error } = await sb.from("tasks").insert({
+    title,
+    origin: $("tarea-origin").value,
+    priority: $("tarea-priority").value,
+    deadline: $("tarea-deadline").value || null,
+  });
+  $("tarea-add").disabled = false;
+  if (error) { alert(error.message); return; }
+  $("tarea-title").value = ""; $("tarea-deadline").value = "";
+  $("tarea-title").focus();
+  cargarTareasView();
+}
+
+async function setTareaStatus(id, status) {
+  await sb.from("tasks").update({
+    status,
+    completed_at: status === "completada" ? new Date().toISOString() : null,
+  }).eq("id", id);
+  cargarTareasView();
+}
+
+async function editarTarea(t) {
+  const nuevo = prompt("Editar tarea:", t.title);
+  if (nuevo === null || !nuevo.trim() || nuevo === t.title) return;
+  await sb.from("tasks").update({ title: nuevo.trim() }).eq("id", t.id);
+  cargarTareasView();
+}
+
+async function borrarTarea(t) {
+  if (!confirm("¿Eliminar esta tarea?")) return;
+  await sb.from("tasks").delete().eq("id", t.id);
+  cargarTareasView();
+}
+
+function filaTareaV(t) {
+  const done = t.status === "completada";
+  const dl = deadlineInfoT(t.deadline);
+  const div = document.createElement("div");
+  div.className = "task" + (done ? " done" : "");
+  div.innerHTML = `
+    <button class="chk" title="${done ? "Reabrir" : "Completar"}">✓</button>
+    <div style="flex:1;min-width:0">
+      <div class="t">${esc(t.title)}</div>
+      <div class="meta">
+        ${done ? `<span style="color:${ORIGENES_T[t.origin].color}">${ORIGENES_T[t.origin].label}</span>` : ""}
+        <span class="pri-${t.priority}">${t.priority}</span>
+        ${dl ? `<span class="${dl.cls}">${dl.txt}</span>` : ""}
+      </div>
+    </div>
+    <button class="del" title="${done ? "Archivar" : "Eliminar"}">${done ? "🗄" : "✕"}</button>`;
+  div.querySelector(".chk").onclick = () => setTareaStatus(t.id, done ? "pendiente" : "completada");
+  div.querySelector(".t").onclick = () => !done && editarTarea(t);
+  div.querySelector(".del").onclick = () => done ? setTareaStatus(t.id, "archivada") : borrarTarea(t);
+  return div;
+}
+
+async function cargarTareasView() {
+  const { data: tasks, error } = await sb.from("tasks")
+    .select("*").neq("status", "archivada")
+    .order("deadline", { ascending: true, nullsFirst: false });
+  if (error) { alert(error.message); return; }
+
+  const pend = tasks.filter(t => t.status === "pendiente")
+    .sort((a, b) => (a.deadline || "9999") < (b.deadline || "9999") ? -1 :
+                    (a.deadline || "9999") > (b.deadline || "9999") ? 1 :
+                    PESO_PRI[a.priority] - PESO_PRI[b.priority]);
+  const done = tasks.filter(t => t.status === "completada")
+    .sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
+
+  const urgentes = pend.filter(t => t.deadline && deadlineInfoT(t.deadline).cls).length;
+  $("tarea-resumen").textContent = `${pend.length} ${pend.length === 1 ? "pendiente" : "pendientes"}` +
+    (urgentes ? ` · ${urgentes} ${urgentes === 1 ? "urgente" : "urgentes"}` : "");
+
+  const cont = $("tarea-lista");
+  cont.innerHTML = "";
+  for (const [key, o] of Object.entries(ORIGENES_T)) {
+    const grupo = pend.filter(t => t.origin === key);
+    if (!grupo.length) continue;
+    const panel = document.createElement("div");
+    panel.className = "panel";
+    panel.innerHTML = `<div class="torigin-head"><span class="dot" style="background:${o.color}"></span>${o.label} · ${grupo.length}</div>`;
+    grupo.forEach(t => panel.appendChild(filaTareaV(t)));
+    cont.appendChild(panel);
+  }
+  if (!pend.length) cont.innerHTML = `<div class="panel empty">Sin pendientes. Tu sistema, en orden.</div>`;
+
+  $("tarea-toggle").textContent = `Completadas (${done.length})`;
+  const ld = $("tarea-done");
+  ld.innerHTML = "";
+  done.slice(0, 20).forEach(t => ld.appendChild(filaTareaV(t)));
+  if (!done.length) ld.innerHTML = `<div class="empty">Nada completado todavía.</div>`;
+}
+
 // ---------- ARRANQUE ----------
 async function init() {
   $("view-login").classList.add("hidden");
@@ -493,10 +1146,36 @@ async function init() {
   const { fecha, weekday } = hoyMX();
   $("fecha-hoy").textContent = new Date(fecha + "T12:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
 
+  // vistas conmutables
+  document.querySelectorAll("[data-view]").forEach(a => {
+    a.onclick = (e) => { e.preventDefault(); switchView(a.dataset.view); };
+  });
+
+  // controles Tareas
+  $("tarea-origin").innerHTML = Object.entries(ORIGENES_T)
+    .map(([k, o]) => `<option value="${k}">${o.label}</option>`).join("");
+  $("tarea-add").onclick = addTarea;
+  $("tarea-title").onkeydown = (e) => { if (e.key === "Enter") addTarea(); };
+  $("tarea-toggle").onclick = () => $("tarea-done").classList.toggle("hidden");
+
+  // controles Semana
+  $("sem-role").innerHTML = Object.entries(ROLES_SEM)
+    .map(([k, r]) => `<option value="${k}">${r.label}</option>`).join("");
+  $("sem-leyenda").innerHTML = Object.values(ROLES_SEM)
+    .map(r => `<span><i style="background:${r.color}"></i>${r.label}</span>`).join("");
+  $("sem-add").onclick = addBloque;
+  $("sem-label").onkeydown = (e) => { if (e.key === "Enter") addBloque(); };
+
+  // controles Proyectos
+  $("proj-add").onclick = addProyecto;
+  $("proj-name").onkeydown = (e) => { if (e.key === "Enter") addProyecto(); };
+  $("proj-toggle").onclick = () => $("proj-done").classList.toggle("hidden");
+
   initMapa();
   cargarTareas(fecha);
   cargarGym(fecha, weekday);
   cargarProgreso(fecha, weekday);
+  switchView(location.hash.slice(1) || "dashboard");
 }
 
 (async () => {
