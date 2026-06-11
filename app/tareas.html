@@ -250,7 +250,7 @@ function show(id) { $("view-login").classList.add("hidden"); $("view-app").class
 async function init() {
   show("view-app");
   $("btn-add").onclick = addTask;
-  $("new-title").onkeydown = (e) => e.key === "Enter" && addTask();
+  $("new-title").onkeydown = (e) => { if (e.key === "Enter") addTask(); };
   $("toggle-done").onclick = () => $("lista-done").classList.toggle("hidden");
   cargar();
 }
