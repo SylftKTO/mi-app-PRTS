@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · Dieta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  .day-tools { margin-top: 14px; }
+  .day-tools input[type="date"] { width: 100%; }
+
+  /* semáforo en stat-cards */
+  .stat-grid.macros { grid-template-columns: repeat(4, 1fr); }
+  .v.ok { color: var(--ok); } .v.warn { color: var(--warn); } .v.over { color: var(--danger); }
+
+  /* tarjeta de comida */
+  .meal-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .meal-head .nombre { font-family: var(--serif); font-size: 19px; }
+  .meal-head .hora { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--faint); }
+  .meal-target { font-family: var(--mono); font-size: 10.5px; color: var(--faint); margin-top: 3px; letter-spacing: 0.06em; }
+  .meal-kcal { font-family: var(--serif); font-size: 15px; color: var(--muted); }
+  .meal-kcal b { color: var(--text); font-weight: 500; font-size: 19px; }
+
+  .mlog { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .mlog:first-of-type { margin-top: 10px; }
+  .mlog .n { flex: 1; font-size: 0.92rem; }
+  .mlog .m { font-family: var(--mono); font-size: 10px; color: var(--faint); white-space: nowrap; }
+  .mlog .x { background: transparent; border: none; color: var(--faint); padding: 2px 6px; font-size: 0.85rem; }
+
+  .btn-add { margin-top: 12px; width: 100%; padding: 9px; font-size: 0.85rem; }
+
+  /* formulario de captura */
+  .add-form { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 12px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 14px; font-size: 0.82rem; color: var(--text);
+  }
+  .chip small { color: var(--faint); font-family: var(--mono); font-size: 9px; margin-left: 5px; }
+  .chip:active { border-color: var(--accent-deep); }
+  .add-form .sep { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 12px 0 8px; }
+  .add-form input[type="text"] { width: 100%; }
+  .macro-row { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+  .macro-row input { flex: 1; min-width: 0; text-align: center; padding: 9px 4px; font-size: 0.9rem; }
+  .kcal-calc {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    white-space: nowrap; min-width: 76px; text-align: right;
+  }
+  .form-foot { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+  .form-foot label { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 6px; flex: 1; }
+  .form-foot input[type="checkbox"] { accent-color: var(--accent-deep); width: 16px; height: 16px; }
+  .form-foot button { padding: 9px 22px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Dieta</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="view-app" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Dieta</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+
+  <h1 class="page-title">Dieta</h1>
+  <div class="mono-label page-sub">Superávit +200 kcal · 4 comidas</div>
+
+  <div class="day-tools"><input type="date" id="day-date-pick"></div>
+
+  <!-- Totales del día con semáforo -->
+  <div class="stat-grid macros">
+    <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s">de 2,135</div></div>
+    <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s">de 110 g</div></div>
+    <div class="stat-card"><div class="l">Carbs</div><div class="v" id="tot-c">0</div><div class="s">de 300 g</div></div>
+    <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s">de 55 g</div></div>
+  </div>
+
+  <div id="comidas"></div>
+</div>
+
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span>Inicio</span></a>
+    <a class="nav-item" href="gym.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+    <a class="nav-item" href="tareas.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
+      <span>Tareas</span></a>
+    <a class="nav-item on" href="dieta.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v7a2.5 2.5 0 0 0 5 0V3"/><path d="M9.5 3v18"/><path d="M17 3c-1.5 2-2 4-2 6 0 2.5 1 3 2 3v9"/></svg>
+      <span>Dieta</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+
+// Targets por comida (doc sección 12)
+const COMIDAS = [
+  { id: "desayuno", label: "Desayuno", hora: "11:00 · al despertar", t: { k: 530, p: 30, c: 85, g: 12 } },
+  { id: "comida",   label: "Comida",   hora: "14:00 — 15:00",        t: { k: 700, p: 35, c: 100, g: 18 } },
+  { id: "pregym",   label: "Pre-gym",  hora: "30 min antes",         t: { k: 355, p: 20, c: 60, g: 5 } },
+  { id: "cena",     label: "Cena",     hora: "21:00 — 22:00",        t: { k: 550, p: 25, c: 55, g: 20 } },
+];
+const TOTAL = { k: 2135, p: 110, c: 300, g: 55 };
+
+let banco = [];
+let formAbierto = null; // id de comida con formulario abierto
+
+function hoyMX() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+}
+function toast(txt) {
+  const t = $("toast");
+  t.textContent = txt; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+function semaforo(real, target) {
+  const pct = real / target;
+  return pct > 1.1 ? "over" : pct >= 0.8 ? "ok" : pct > 0 ? "warn" : "";
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- DATOS ----------
+async function cargarBanco() {
+  const { data } = await sb.from("foods").select("*").order("name");
+  banco = data || [];
+}
+
+async function registrar(meal, item, guardarEnBanco) {
+  const fecha = $("day-date-pick").value;
+  let foodId = item.food_id || null;
+  if (guardarEnBanco && !foodId) {
+    const { data: f, error } = await sb.from("foods").insert({
+      name: item.name, kcal: item.kcal, protein_g: item.p, carbs_g: item.c, fat_g: item.g,
+    }).select().single();
+    if (!error) { foodId = f.id; banco.push(f); }
+  }
+  const { error } = await sb.from("meal_logs").insert({
+    log_date: fecha, meal, food_id: foodId,
+    name: item.name, kcal: item.kcal, protein_g: item.p, carbs_g: item.c, fat_g: item.g,
+  });
+  if (error) { alert(error.message); return; }
+  toast(`${item.name} registrado`);
+  cargar();
+}
+
+async function borrar(id) {
+  await sb.from("meal_logs").delete().eq("id", id);
+  cargar();
+}
+
+// ---------- RENDER ----------
+function formCaptura(meal) {
+  const wrap = document.createElement("div");
+  wrap.className = "add-form";
+  const chips = banco.length
+    ? `<div class="sep">Banco de comidas</div>
+       <div class="chips">${banco.map(f =>
+         `<button class="chip" data-id="${f.id}">${f.name}<small>${+f.kcal} kcal</small></button>`).join("")}</div>`
+    : "";
+  wrap.innerHTML = `
+    ${chips}
+    <div class="sep">Captura manual</div>
+    <input type="text" id="f-name" placeholder="¿Qué comiste?">
+    <div class="macro-row">
+      <input type="number" id="f-p" inputmode="numeric" placeholder="P g">
+      <input type="number" id="f-c" inputmode="numeric" placeholder="C g">
+      <input type="number" id="f-g" inputmode="numeric" placeholder="G g">
+      <span class="kcal-calc" id="f-kcal">= 0 kcal</span>
+    </div>
+    <div class="form-foot">
+      <label><input type="checkbox" id="f-save" checked> Guardar en banco</label>
+      <button class="btn-primary" id="f-ok">Registrar</button>
+    </div>`;
+  wrap.querySelectorAll(".chip").forEach(ch => {
+    ch.onclick = () => {
+      const f = banco.find(b => b.id === ch.dataset.id);
+      registrar(meal, { food_id: f.id, name: f.name, kcal: +f.kcal, p: +f.protein_g, c: +f.carbs_g, g: +f.fat_g }, false);
+    };
+  });
+  // kcal calculadas en vivo: P×4 + C×4 + G×9
+  const kcalDe = () => {
+    const p = +wrap.querySelector("#f-p").value || 0;
+    const c = +wrap.querySelector("#f-c").value || 0;
+    const g = +wrap.querySelector("#f-g").value || 0;
+    return { p, c, g, kcal: p * 4 + c * 4 + g * 9 };
+  };
+  ["f-p", "f-c", "f-g"].forEach(id => {
+    wrap.querySelector("#" + id).oninput = () =>
+      wrap.querySelector("#f-kcal").textContent = `= ${Math.round(kcalDe().kcal)} kcal`;
+  });
+  wrap.querySelector("#f-ok").onclick = () => {
+    const name = wrap.querySelector("#f-name").value.trim();
+    const { p, c, g, kcal } = kcalDe();
+    if (!name || !kcal) { toast("Falta nombre o macros"); return; }
+    registrar(meal, { name, kcal, p, c, g }, wrap.querySelector("#f-save").checked);
+  };
+  return wrap;
+}
+
+async function cargar() {
+  const fecha = $("day-date-pick").value;
+  const { data: logs, error } = await sb.from("meal_logs").select("*").eq("log_date", fecha).order("created_at");
+  if (error) { alert(error.message); return; }
+
+  // totales con semáforo
+  const sum = { k: 0, p: 0, c: 0, g: 0 };
+  logs.forEach(l => { sum.k += +l.kcal; sum.p += +l.protein_g; sum.c += +l.carbs_g; sum.g += +l.fat_g; });
+  for (const [key, el] of [["k", "tot-k"], ["p", "tot-p"], ["c", "tot-c"], ["g", "tot-g"]]) {
+    $(el).textContent = Math.round(sum[key]);
+    $(el).className = "v " + semaforo(sum[key], TOTAL[key]);
+  }
+
+  const cont = $("comidas");
+  cont.innerHTML = "";
+  for (const cm of COMIDAS) {
+    const items = logs.filter(l => l.meal === cm.id);
+    const k = items.reduce((a, l) => a + +l.kcal, 0);
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="meal-head">
+        <div>
+          <div class="nombre">${cm.label}</div>
+          <div class="hora">${cm.hora}</div>
+        </div>
+        <div class="meal-kcal"><b>${Math.round(k)}</b> / ${cm.t.k} kcal</div>
+      </div>
+      <div class="meal-target">target · ${cm.t.p}P · ${cm.t.c}C · ${cm.t.g}G</div>`;
+    for (const it of items) {
+      const row = document.createElement("div");
+      row.className = "mlog";
+      row.innerHTML = `
+        <span class="n">${it.name.replace(/</g, "&lt;")}</span>
+        <span class="m">${+it.kcal} kcal · ${+it.protein_g}P ${+it.carbs_g}C ${+it.fat_g}G</span>
+        <button class="x">✕</button>`;
+      row.querySelector(".x").onclick = () => borrar(it.id);
+      card.appendChild(row);
+    }
+    const btn = document.createElement("button");
+    btn.className = "btn-ghost btn-add";
+    btn.textContent = formAbierto === cm.id ? "Cerrar" : "+ Agregar";
+    btn.onclick = () => { formAbierto = formAbierto === cm.id ? null : cm.id; cargar(); };
+    card.appendChild(btn);
+    if (formAbierto === cm.id) card.appendChild(formCaptura(cm.id));
+    cont.appendChild(card);
+  }
+}
+
+// ---------- ARRANQUE ----------
+function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+
+async function init() {
+  show("view-app");
+  $("day-date-pick").value = hoyMX();
+  $("day-date-pick").onchange = () => { formAbierto = null; cargar(); };
+  await cargarBanco();
+  cargar();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
