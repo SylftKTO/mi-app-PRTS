@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PRTS · Tareas</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --card: #161b22; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e;
+    --accent: #f78166; --green: #3fb950; --blue: #58a6ff;
+    --yellow: #d29922; --red: #f85149; --purple: #bc8cff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    max-width: 480px; margin: 0 auto; padding: 16px 16px 60px;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .muted { color: var(--muted); font-size: 0.85rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px; margin-top: 14px;
+  }
+  input, button, select {
+    font-size: 1rem; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); padding: 10px;
+  }
+  button { cursor: pointer; background: var(--accent); color: #fff; border: none; font-weight: 600; }
+  button:disabled { opacity: 0.5; }
+  .topbar { display: flex; justify-content: space-between; align-items: baseline; }
+  #new-title { width: 100%; }
+  .quick-row { display: flex; gap: 6px; margin-top: 8px; }
+  .quick-row select, .quick-row input { flex: 1; padding: 8px 6px; font-size: 0.85rem; min-width: 0; }
+  .quick-row button { padding: 8px 16px; }
+  .grupo-titulo { margin-top: 18px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .task {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  }
+  .task .chk {
+    width: 22px; height: 22px; min-width: 22px; border-radius: 50%;
+    border: 2px solid var(--muted); background: transparent; padding: 0;
+  }
+  .task.done .chk { border-color: var(--green); background: var(--green); }
+  .task .cuerpo { flex: 1; min-width: 0; }
+  .task .titulo { font-size: 0.95rem; word-break: break-word; }
+  .task.done .titulo { text-decoration: line-through; color: var(--muted); }
+  .task .meta { font-size: 0.75rem; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .task .del { background: transparent; color: var(--muted); border: none; padding: 4px 6px; font-size: 0.9rem; }
+  .pri-alta { color: var(--red); } .pri-media { color: var(--yellow); } .pri-baja { color: var(--muted); }
+  .dl-vencida { color: var(--red); font-weight: 700; }
+  .dl-urgente { color: var(--yellow); font-weight: 600; }
+  .dl-normal { color: var(--muted); }
+  #toggle-done { margin-top: 18px; background: transparent; border: 1px solid var(--border); color: var(--muted); width: 100%; padding: 8px; }
+  #msg { margin-top: 10px; font-size: 0.85rem; color: var(--accent); min-height: 1.2em; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div id="view-login" class="hidden">
+  <h1>PRTS · Tareas</h1>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:8px">
+    <button id="btn-login" style="width:100%;margin-top:12px;padding:12px">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<div id="view-app" class="hidden">
+  <div class="topbar">
+    <div>
+      <h1>Tareas</h1>
+      <span id="resumen" class="muted"></span>
+    </div>
+    <div style="text-align:right;font-size:0.75rem">
+      <a href="index.html" class="muted">‹ gym</a> ·
+      <a href="#" id="btn-logout" class="muted">salir</a>
+    </div>
+  </div>
+
+  <!-- Captura rápida -->
+  <div class="card">
+    <input id="new-title" placeholder="Nueva tarea…" autocomplete="off">
+    <div class="quick-row">
+      <select id="new-origin">
+        <option value="escuela">Escuela</option>
+        <option value="wolves">Wolves</option>
+        <option value="levelup">LevelUp</option>
+        <option value="personal">Personal</option>
+      </select>
+      <select id="new-priority">
+        <option value="alta">Alta</option>
+        <option value="media" selected>Media</option>
+        <option value="baja">Baja</option>
+      </select>
+      <input type="date" id="new-deadline">
+      <button id="btn-add">+</button>
+    </div>
+  </div>
+
+  <div id="listas"></div>
+  <button id="toggle-done">Completadas (0)</button>
+  <div id="lista-done" class="hidden"></div>
+</div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+
+const ORIGENES = {
+  escuela:  { label: "Escuela",  color: "var(--blue)" },
+  wolves:   { label: "Wolves",   color: "var(--accent)" },
+  levelup:  { label: "LevelUp",  color: "var(--green)" },
+  personal: { label: "Personal", color: "var(--purple)" },
+};
+const PESO_PRI = { alta: 0, media: 1, baja: 2 };
+
+function hoyMX() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+}
+
+function deadlineInfo(dl) {
+  if (!dl) return null;
+  const hoy = hoyMX();
+  const dias = Math.round((new Date(dl + "T12:00") - new Date(hoy + "T12:00")) / 864e5);
+  if (dias < 0)  return { txt: `vencida hace ${-dias}d`, cls: "dl-vencida" };
+  if (dias === 0) return { txt: "hoy", cls: "dl-vencida" };
+  if (dias === 1) return { txt: "mañana", cls: "dl-urgente" };
+  if (dias <= 2)  return { txt: `en ${dias} días`, cls: "dl-urgente" };
+  return { txt: new Date(dl + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }), cls: "dl-normal" };
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- CRUD ----------
+async function addTask() {
+  const title = $("new-title").value.trim();
+  if (!title) return;
+  $("btn-add").disabled = true;
+  const { error } = await sb.from("tasks").insert({
+    title,
+    origin: $("new-origin").value,
+    priority: $("new-priority").value,
+    deadline: $("new-deadline").value || null,
+  });
+  $("btn-add").disabled = false;
+  if (error) { alert(error.message); return; }
+  $("new-title").value = "";
+  $("new-deadline").value = "";
+  $("new-title").focus();
+  cargar();
+}
+
+async function setStatus(id, status) {
+  await sb.from("tasks").update({
+    status,
+    completed_at: status === "completada" ? new Date().toISOString() : null,
+  }).eq("id", id);
+  cargar();
+}
+
+async function editar(t) {
+  const nuevo = prompt("Editar tarea:", t.title);
+  if (nuevo === null || !nuevo.trim() || nuevo === t.title) return;
+  await sb.from("tasks").update({ title: nuevo.trim() }).eq("id", t.id);
+  cargar();
+}
+
+async function borrar(id) {
+  if (!confirm("¿Eliminar esta tarea?")) return;
+  await sb.from("tasks").delete().eq("id", id);
+  cargar();
+}
+
+// ---------- RENDER ----------
+function filaTarea(t) {
+  const done = t.status === "completada";
+  const dl = deadlineInfo(t.deadline);
+  const div = document.createElement("div");
+  div.className = "task" + (done ? " done" : "");
+  div.innerHTML = `
+    <button class="chk" title="${done ? "Reabrir" : "Completar"}"></button>
+    <div class="cuerpo">
+      <div class="titulo">${t.title.replace(/</g, "&lt;")}</div>
+      <div class="meta">
+        <span style="color:${ORIGENES[t.origin].color}">● ${ORIGENES[t.origin].label}</span>
+        <span class="pri-${t.priority}">${t.priority}</span>
+        ${dl ? `<span class="${dl.cls}">📅 ${dl.txt}</span>` : ""}
+      </div>
+    </div>
+    <button class="del">${done ? "🗄" : "✕"}</button>`;
+  div.querySelector(".chk").onclick = () => setStatus(t.id, done ? "pendiente" : "completada");
+  div.querySelector(".titulo").onclick = () => !done && editar(t);
+  div.querySelector(".del").onclick = () => done ? setStatus(t.id, "archivada") : borrar(t.id);
+  return div;
+}
+
+async function cargar() {
+  const { data: tasks, error } = await sb.from("tasks")
+    .select("*").neq("status", "archivada")
+    .order("deadline", { ascending: true, nullsFirst: false });
+  if (error) { alert(error.message); return; }
+
+  const pend = tasks.filter(t => t.status === "pendiente")
+    .sort((a, b) => (a.deadline || "9999") < (b.deadline || "9999") ? -1 :
+                    (a.deadline || "9999") > (b.deadline || "9999") ? 1 :
+                    PESO_PRI[a.priority] - PESO_PRI[b.priority]);
+  const done = tasks.filter(t => t.status === "completada")
+    .sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
+
+  const urgentes = pend.filter(t => t.deadline && deadlineInfo(t.deadline).cls !== "dl-normal").length;
+  $("resumen").textContent = `${pend.length} pendientes` + (urgentes ? ` · ${urgentes} urgentes` : "");
+
+  const cont = $("listas");
+  cont.innerHTML = "";
+  for (const key of Object.keys(ORIGENES)) {
+    const grupo = pend.filter(t => t.origin === key);
+    if (!grupo.length) continue;
+    const h = document.createElement("div");
+    h.className = "grupo-titulo";
+    h.style.color = ORIGENES[key].color;
+    h.textContent = `${ORIGENES[key].label} (${grupo.length})`;
+    cont.appendChild(h);
+    grupo.forEach(t => cont.appendChild(filaTarea(t)));
+  }
+  if (!pend.length) cont.innerHTML = `<div class="card muted">Sin pendientes. 🎉</div>`;
+
+  $("toggle-done").textContent = `Completadas (${done.length})`;
+  const ld = $("lista-done");
+  ld.innerHTML = "";
+  done.slice(0, 20).forEach(t => ld.appendChild(filaTarea(t)));
+}
+
+// ---------- ARRANQUE ----------
+function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+
+async function init() {
+  show("view-app");
+  $("btn-add").onclick = addTask;
+  $("new-title").onkeydown = (e) => e.key === "Enter" && addTask();
+  $("toggle-done").onclick = () => $("lista-done").classList.toggle("hidden");
+  cargar();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+</script>
+</body>
+</html>

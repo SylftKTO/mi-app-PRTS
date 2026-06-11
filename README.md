@@ -2,7 +2,7 @@
 
 Sistema integral para gestionar tres roles: estudiante (TecNM Celaya), instructor (Wolves robótica / LevelUp idiomas) y vida personal (salud, finanzas).
 
-**Estado actual:** Fase 0–1 · Corte vertical del módulo **Gym** en producción.
+**Estado actual:** Fase 1 · Módulos **Gym** y **Tareas** en producción.
 
 ## Estructura
 
