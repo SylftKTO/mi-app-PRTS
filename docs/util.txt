@@ -7,3 +7,16 @@ juancarloslr.kt@gmail.com
 kal98SiT
 
 npx serve app
+
+git add -A
+git commit -m "Actualizacion"
+git push
+
+
+
+
+----
+prototipo
+cd C:\Users\Sylft\Desktop\Projects\mi-app-personal
+npm run dev:frontend
+npm run dev:backend
