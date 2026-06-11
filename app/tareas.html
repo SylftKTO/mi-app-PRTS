@@ -2,88 +2,91 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>PRTS · Tareas</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<title>SYLFT · Tareas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
 <style>
-  :root {
-    --bg: #0d1117; --card: #161b22; --border: #30363d;
-    --text: #e6edf3; --muted: #8b949e;
-    --accent: #f78166; --green: #3fb950; --blue: #58a6ff;
-    --yellow: #d29922; --red: #f85149; --purple: #bc8cff;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    max-width: 480px; margin: 0 auto; padding: 16px 16px 60px;
-  }
-  h1 { font-size: 1.3rem; margin-bottom: 4px; }
-  .muted { color: var(--muted); font-size: 0.85rem; }
-  .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px; margin-top: 14px;
-  }
-  input, button, select {
-    font-size: 1rem; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--text); padding: 10px;
-  }
-  button { cursor: pointer; background: var(--accent); color: #fff; border: none; font-weight: 600; }
-  button:disabled { opacity: 0.5; }
-  .topbar { display: flex; justify-content: space-between; align-items: baseline; }
+  /* ---------- Captura rápida ---------- */
   #new-title { width: 100%; }
   .quick-row { display: flex; gap: 6px; margin-top: 8px; }
-  .quick-row select, .quick-row input { flex: 1; padding: 8px 6px; font-size: 0.85rem; min-width: 0; }
-  .quick-row button { padding: 8px 16px; }
-  .grupo-titulo { margin-top: 18px; font-size: 0.8rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+  .quick-row select, .quick-row input { flex: 1; padding: 8px 6px; font-size: 13px; min-width: 0; }
+  .quick-row select { padding-right: 24px; background-position: right 8px center; }
+  .quick-row button { padding: 8px 18px; font-size: 18px; line-height: 1; }
+
+  /* ---------- Grupos ---------- */
+  .grupo-titulo {
+    margin: 22px 2px 2px; display: flex; align-items: baseline; gap: 8px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .grupo-titulo .dot { width: 6px; height: 6px; border-radius: 50%; align-self: center; }
+
+  /* ---------- Tarea ---------- */
   .task {
-    display: flex; align-items: center; gap: 10px;
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 12px 14px; margin-top: 8px;
   }
   .task .chk {
-    width: 22px; height: 22px; min-width: 22px; border-radius: 50%;
-    border: 2px solid var(--muted); background: transparent; padding: 0;
+    width: 21px; height: 21px; min-width: 21px; border-radius: 6px;
+    border: 1.5px solid var(--faint); background: transparent; padding: 0;
+    display: grid; place-items: center; color: transparent; font-size: 12px;
   }
-  .task.done .chk { border-color: var(--green); background: var(--green); }
+  .task.done .chk { border-color: var(--accent-deep); background: var(--accent-deep); color: #fff; }
   .task .cuerpo { flex: 1; min-width: 0; }
   .task .titulo { font-size: 0.95rem; word-break: break-word; }
   .task.done .titulo { text-decoration: line-through; color: var(--muted); }
-  .task .meta { font-size: 0.75rem; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .task .del { background: transparent; color: var(--muted); border: none; padding: 4px 6px; font-size: 0.9rem; }
-  .pri-alta { color: var(--red); } .pri-media { color: var(--yellow); } .pri-baja { color: var(--muted); }
-  .dl-vencida { color: var(--red); font-weight: 700; }
-  .dl-urgente { color: var(--yellow); font-weight: 600; }
-  .dl-normal { color: var(--muted); }
-  #toggle-done { margin-top: 18px; background: transparent; border: 1px solid var(--border); color: var(--muted); width: 100%; padding: 8px; }
-  #msg { margin-top: 10px; font-size: 0.85rem; color: var(--accent); min-height: 1.2em; }
-  .hidden { display: none; }
+  .task .meta {
+    margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .task .del {
+    background: transparent; color: var(--faint); border: none;
+    padding: 4px 6px; font-size: 0.95rem;
+  }
+  .pri-alta { color: var(--danger); } .pri-media { color: var(--warn); } .pri-baja { color: var(--faint); }
+  .dl-vencida { color: var(--danger); font-weight: 500; }
+  .dl-urgente { color: var(--warn); }
+  .dl-normal { color: var(--faint); }
+  #toggle-done {
+    margin-top: 22px; width: 100%; padding: 9px;
+    background: transparent; border: 1px dashed var(--line); color: var(--faint);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .screen-fade { animation: fade 0.25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 </style>
 </head>
 <body>
 
-<div id="view-login" class="hidden">
-  <h1>PRTS · Tareas</h1>
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Tareas</div>
   <div class="card">
     <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
-    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:8px">
-    <button id="btn-login" style="width:100%;margin-top:12px;padding:12px">Entrar</button>
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
     <div id="msg"></div>
   </div>
 </div>
 
-<div id="view-app" class="hidden">
-  <div class="topbar">
-    <div>
-      <h1>Tareas</h1>
-      <span id="resumen" class="muted"></span>
-    </div>
-    <div style="text-align:right;font-size:0.75rem">
-      <a href="index.html" class="muted">‹ gym</a> ·
-      <a href="#" id="btn-logout" class="muted">salir</a>
-    </div>
+<!-- APP -->
+<div id="view-app" class="hidden screen-fade">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Tareas</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
   </div>
+
+  <h1 class="page-title">Tareas</h1>
+  <div id="resumen" class="mono-label page-sub"></div>
 
   <!-- Captura rápida -->
   <div class="card">
@@ -101,7 +104,7 @@
         <option value="baja">Baja</option>
       </select>
       <input type="date" id="new-deadline">
-      <button id="btn-add">+</button>
+      <button id="btn-add" class="btn-primary">+</button>
     </div>
   </div>
 
@@ -110,16 +113,28 @@
   <div id="lista-done" class="hidden"></div>
 </div>
 
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+    <a class="nav-item on" href="tareas.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
+      <span>Tareas</span></a>
+  </div>
+</nav>
+
 <script>
 const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 
 const ORIGENES = {
-  escuela:  { label: "Escuela",  color: "var(--blue)" },
-  wolves:   { label: "Wolves",   color: "var(--accent)" },
-  levelup:  { label: "LevelUp",  color: "var(--green)" },
-  personal: { label: "Personal", color: "var(--purple)" },
+  escuela:  { label: "Escuela",  color: "var(--accent)" },
+  wolves:   { label: "Wolves",   color: "var(--warn)" },
+  levelup:  { label: "LevelUp",  color: "var(--ok)" },
+  personal: { label: "Personal", color: "#B49FD9" },
 };
 const PESO_PRI = { alta: 0, media: 1, baja: 2 };
 
@@ -192,13 +207,13 @@ function filaTarea(t) {
   const div = document.createElement("div");
   div.className = "task" + (done ? " done" : "");
   div.innerHTML = `
-    <button class="chk" title="${done ? "Reabrir" : "Completar"}"></button>
+    <button class="chk" title="${done ? "Reabrir" : "Completar"}">✓</button>
     <div class="cuerpo">
       <div class="titulo">${t.title.replace(/</g, "&lt;")}</div>
       <div class="meta">
-        <span style="color:${ORIGENES[t.origin].color}">● ${ORIGENES[t.origin].label}</span>
+        <span style="color:${ORIGENES[t.origin].color}">${ORIGENES[t.origin].label}</span>
         <span class="pri-${t.priority}">${t.priority}</span>
-        ${dl ? `<span class="${dl.cls}">📅 ${dl.txt}</span>` : ""}
+        ${dl ? `<span class="${dl.cls}">${dl.txt}</span>` : ""}
       </div>
     </div>
     <button class="del">${done ? "🗄" : "✕"}</button>`;
@@ -222,7 +237,8 @@ async function cargar() {
     .sort((a, b) => (b.completed_at || "").localeCompare(a.completed_at || ""));
 
   const urgentes = pend.filter(t => t.deadline && deadlineInfo(t.deadline).cls !== "dl-normal").length;
-  $("resumen").textContent = `${pend.length} pendientes` + (urgentes ? ` · ${urgentes} urgentes` : "");
+  $("resumen").textContent = `${pend.length} ${pend.length === 1 ? "PENDIENTE" : "PENDIENTES"}` +
+    (urgentes ? ` · ${urgentes} ${urgentes === 1 ? "URGENTE" : "URGENTES"}` : "");
 
   const cont = $("listas");
   cont.innerHTML = "";
@@ -231,12 +247,11 @@ async function cargar() {
     if (!grupo.length) continue;
     const h = document.createElement("div");
     h.className = "grupo-titulo";
-    h.style.color = ORIGENES[key].color;
-    h.textContent = `${ORIGENES[key].label} (${grupo.length})`;
+    h.innerHTML = `<span class="dot" style="background:${ORIGENES[key].color}"></span>${ORIGENES[key].label} · ${grupo.length}`;
     cont.appendChild(h);
     grupo.forEach(t => cont.appendChild(filaTarea(t)));
   }
-  if (!pend.length) cont.innerHTML = `<div class="card muted">Sin pendientes. 🎉</div>`;
+  if (!pend.length) cont.innerHTML = `<div class="card muted">Sin pendientes. Tu sistema, en orden.</div>`;
 
   $("toggle-done").textContent = `Completadas (${done.length})`;
   const ld = $("lista-done");
@@ -245,7 +260,11 @@ async function cargar() {
 }
 
 // ---------- ARRANQUE ----------
-function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+function show(id) {
+  $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden");
+  $(id).classList.remove("hidden");
+  $("navbar").classList.toggle("hidden", id === "view-login");
+}
 
 async function init() {
   show("view-app");

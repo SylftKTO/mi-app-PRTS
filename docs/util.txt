@@ -1,0 +1,9 @@
+supabase 
+x7PlWRP4a4xAk7A1
+
+cd C:\Users\Sylft\Desktop\Projects\mi-app-PRTS
+
+juancarloslr.kt@gmail.com
+kal98SiT
+
+npx serve app

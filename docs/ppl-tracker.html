@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#15161B">
+<title>Forja PPL — registro y progreso</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Saira:wght@500;600;700;800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#15161B;
+    --surface:#1E1F26;
+    --surface-2:#262834;
+    --surface-3:#2E3140;
+    --line:#34374480;
+    --line-solid:#343744;
+    --text:#ECECF0;
+    --muted:#9698A6;
+    --faint:#6A6C7A;
+    --ember:#FF6A33;
+    --ember-soft:#FF6A3322;
+    --steel:#54A9E2;
+    --steel-soft:#54A9E21F;
+    --ok:#5BD08A;
+    --radius:16px;
+    --tab-h:72px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Hanken Grotesk',system-ui,sans-serif;
+    font-size:16px;line-height:1.45;
+    -webkit-font-smoothing:antialiased;
+    padding-bottom:calc(var(--tab-h) + env(safe-area-inset-bottom));
+    min-height:100vh;
+  }
+  .num{font-family:'JetBrains Mono',monospace;font-variant-numeric:tabular-nums}
+  h1,h2,h3{font-family:'Saira',sans-serif;font-weight:700;letter-spacing:-.01em;margin:0}
+
+  /* ---------- App shell ---------- */
+  .app{max-width:520px;margin:0 auto;min-height:100vh}
+  .screen{display:none;padding:18px 16px 8px}
+  .screen.active{display:block;animation:fade .28s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ---------- Header ---------- */
+  .top{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:18px}
+  .top .brand{display:flex;align-items:center;gap:10px}
+  .mark{width:30px;height:30px;border-radius:8px;background:linear-gradient(145deg,var(--ember),#C8431B);
+    display:grid;place-items:center;box-shadow:0 4px 14px -4px var(--ember)}
+  .mark svg{width:18px;height:18px}
+  .brand h1{font-size:20px;line-height:1}
+  .brand .sub{font-size:11px;color:var(--faint);letter-spacing:.18em;text-transform:uppercase;
+    font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .streak{text-align:right;font-family:'JetBrains Mono',monospace}
+  .streak b{font-size:22px;color:var(--ember);font-family:'Saira',sans-serif;font-weight:700}
+  .streak span{display:block;font-size:10px;color:var(--faint);letter-spacing:.12em;text-transform:uppercase}
+
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--faint);margin:0 0 10px 2px}
+
+  /* ---------- Day selector ---------- */
+  .days{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 12px;margin:0 -16px;
+    padding-left:16px;padding-right:16px;scrollbar-width:none}
+  .days::-webkit-scrollbar{display:none}
+  .day-chip{flex:0 0 auto;border:1px solid var(--line-solid);background:var(--surface);
+    color:var(--muted);border-radius:12px;padding:9px 14px;font-weight:600;font-size:14px;
+    cursor:pointer;transition:.18s;white-space:nowrap;font-family:'Saira',sans-serif}
+  .day-chip .t{font-size:10px;display:block;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--faint);font-family:'JetBrains Mono',monospace}
+  .day-chip.on{background:var(--text);color:var(--bg);border-color:var(--text)}
+  .day-chip.on .t{color:#55565e}
+  .day-chip.next{border-color:var(--ember)}
+
+  /* ---------- Exercise card ---------- */
+  .ex{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin-bottom:12px}
+  .ex-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:10px}
+  .ex-name{font-family:'Saira',sans-serif;font-weight:600;font-size:17px;line-height:1.15}
+  .ex-target{font-size:11px;color:var(--faint);font-family:'JetBrains Mono',monospace;margin-top:2px}
+  .e1rm-chip{flex:0 0 auto;text-align:right;font-family:'JetBrains Mono',monospace}
+  .e1rm-chip .v{font-size:15px;font-weight:600}
+  .e1rm-chip .d{font-size:11px}
+  .up{color:var(--ember)} .flat{color:var(--muted)} .down{color:var(--faint)}
+
+  .set-row{display:grid;grid-template-columns:26px 1fr 1fr 60px 30px;gap:7px;align-items:center;margin-bottom:7px}
+  .set-row .n{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--faint);text-align:center}
+  .field{position:relative}
+  .field input{width:100%;background:var(--surface-2);border:1px solid transparent;border-radius:10px;
+    color:var(--text);font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:600;
+    padding:10px 8px;text-align:center;outline:none;transition:.15s}
+  .field input:focus{border-color:var(--steel);background:var(--surface-3)}
+  .field input::placeholder{color:var(--faint);font-weight:500}
+  .field .lab{position:absolute;top:-7px;left:9px;font-size:9px;letter-spacing:.08em;
+    text-transform:uppercase;color:var(--faint);background:var(--surface);padding:0 4px;
+    font-family:'JetBrains Mono',monospace}
+  .ghost{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--steel);
+    text-align:center;height:13px;opacity:.85}
+  .ghost.empty{color:var(--faint);opacity:.5}
+  .pr-flare{box-shadow:0 0 0 1px var(--ember),0 0 16px -2px var(--ember) !important;
+    border-color:var(--ember) !important;animation:flare .5s ease}
+  @keyframes flare{0%{transform:scale(.96)}55%{transform:scale(1.04)}100%{transform:scale(1)}}
+  .rm-set{background:none;border:none;color:var(--faint);font-size:20px;cursor:pointer;padding:0;line-height:1}
+  .add-set{width:100%;background:var(--surface-2);border:1px dashed var(--line-solid);color:var(--muted);
+    border-radius:10px;padding:9px;font-family:'Hanken Grotesk';font-weight:600;font-size:13px;cursor:pointer;margin-top:3px}
+  .ghost-row{display:grid;grid-template-columns:26px 1fr 1fr 60px 30px;gap:7px;margin:-2px 0 7px}
+  .ghost-row>div{grid-column:2/5}
+
+  /* ---------- Save bar ---------- */
+  .session-foot{margin:16px 0 8px;background:var(--surface);border:1px solid var(--line);
+    border-radius:var(--radius);padding:14px}
+  .stat-row{display:flex;justify-content:space-around;text-align:center;margin-bottom:12px}
+  .stat .v{font-family:'Saira',sans-serif;font-weight:700;font-size:24px;line-height:1}
+  .stat .l{font-size:10px;color:var(--faint);letter-spacing:.1em;text-transform:uppercase;
+    font-family:'JetBrains Mono',monospace;margin-top:3px}
+  .stat .v.pr{color:var(--ember)}
+  .btn{width:100%;border:none;border-radius:12px;padding:15px;font-family:'Saira',sans-serif;
+    font-weight:700;font-size:16px;letter-spacing:.02em;cursor:pointer;transition:.15s}
+  .btn-primary{background:var(--ember);color:#1a0c05}
+  .btn-primary:active{transform:scale(.985)}
+  .btn-ghost{background:var(--surface-2);color:var(--text);border:1px solid var(--line-solid)}
+
+  /* ---------- History ---------- */
+  .sess{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:14px;margin-bottom:10px;cursor:pointer}
+  .sess-top{display:flex;justify-content:space-between;align-items:center}
+  .sess-day{font-family:'Saira',sans-serif;font-weight:600;font-size:16px}
+  .sess-date{font-size:11px;color:var(--faint);font-family:'JetBrains Mono',monospace}
+  .sess-meta{display:flex;gap:16px;margin-top:8px}
+  .sess-meta .m{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted)}
+  .sess-meta .m b{color:var(--text)}
+  .sess-meta .m.pr b{color:var(--ember)}
+  .sess-detail{display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+  .sess.open .sess-detail{display:block}
+  .det-ex{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--muted);
+    display:flex;justify-content:space-between;padding:4px 0}
+  .det-ex .nm{color:var(--text);font-family:'Hanken Grotesk';font-weight:600;font-size:13px}
+  .del{margin-top:12px;background:none;border:1px solid var(--line-solid);color:var(--faint);
+    border-radius:9px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Hanken Grotesk'}
+
+  /* ---------- Progress ---------- */
+  .pick{width:100%;background:var(--surface);border:1px solid var(--line-solid);color:var(--text);
+    border-radius:12px;padding:13px;font-size:15px;font-family:'Hanken Grotesk';font-weight:600;
+    margin-bottom:16px;-webkit-appearance:none;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239698A6' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center}
+  .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .chart-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px}
+  .chart-title{font-size:11px;color:var(--faint);letter-spacing:.14em;text-transform:uppercase;font-family:'JetBrains Mono',monospace}
+  .chart-big{font-family:'Saira',sans-serif;font-weight:700;font-size:30px;line-height:1}
+  .chart-big small{font-size:14px;color:var(--muted);font-weight:600}
+  .delta-tag{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600}
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+  .stat-box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;text-align:center}
+  .stat-box .v{font-family:'Saira',sans-serif;font-weight:700;font-size:22px}
+  .stat-box .l{font-size:9px;color:var(--faint);letter-spacing:.08em;text-transform:uppercase;font-family:'JetBrains Mono',monospace;margin-top:2px}
+
+  /* ---------- Routine editor ---------- */
+  .rt-day{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px;margin-bottom:12px}
+  .rt-day h3{font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .rt-day h3 .tag{font-size:9px;font-family:'JetBrains Mono',monospace;letter-spacing:.1em;
+    background:var(--surface-3);color:var(--muted);padding:3px 7px;border-radius:6px;text-transform:uppercase}
+  .rt-ex{display:grid;grid-template-columns:1fr 52px 64px 28px;gap:7px;align-items:center;margin-bottom:7px}
+  .rt-ex input{background:var(--surface-2);border:1px solid transparent;border-radius:9px;color:var(--text);
+    padding:9px 10px;font-size:14px;font-family:'Hanken Grotesk';outline:none}
+  .rt-ex input.s{text-align:center;font-family:'JetBrains Mono',monospace}
+  .rt-ex input:focus{border-color:var(--steel)}
+
+  /* ---------- Bottom nav ---------- */
+  .tabs{position:fixed;bottom:0;left:0;right:0;height:calc(var(--tab-h) + env(safe-area-inset-bottom));
+    padding-bottom:env(safe-area-inset-bottom);background:#1A1B22F2;backdrop-filter:blur(14px);
+    border-top:1px solid var(--line-solid);display:flex;z-index:50}
+  .tabs-inner{max-width:520px;margin:0 auto;width:100%;display:flex}
+  .tab{flex:1;background:none;border:none;color:var(--faint);display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:4px;cursor:pointer;padding-top:10px;transition:.15s}
+  .tab svg{width:22px;height:22px}
+  .tab span{font-size:10px;font-weight:600;letter-spacing:.02em}
+  .tab.on{color:var(--ember)}
+
+  .empty{text-align:center;padding:48px 20px;color:var(--faint)}
+  .empty svg{width:40px;height:40px;opacity:.4;margin-bottom:12px}
+  .empty p{margin:0;font-size:14px}
+
+  /* toast */
+  .toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(var(--tab-h) + 18px);
+    background:var(--text);color:var(--bg);padding:12px 20px;border-radius:12px;font-weight:700;
+    font-family:'Saira',sans-serif;font-size:14px;opacity:0;transition:.3s;z-index:60;pointer-events:none;
+    box-shadow:0 8px 30px -6px #000a}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .toast.pr{background:var(--ember);color:#1a0c05}
+
+  @media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ===== ENTRENAR ===== -->
+  <section class="screen active" id="train">
+    <div class="top">
+      <div class="brand">
+        <div class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9v6M21 9v6M6.5 12h11"/></svg></div>
+        <div><h1>Forja PPL</h1><div class="sub">Push · Pull · Legs</div></div>
+      </div>
+      <div class="streak"><b id="weekVol" class="num">0</b><span>volumen semana (kg)</span></div>
+    </div>
+
+    <p class="eyebrow">¿Qué tocaba hoy?</p>
+    <div class="days" id="dayChips"></div>
+
+    <div id="exList"></div>
+
+    <div class="session-foot">
+      <div class="stat-row">
+        <div class="stat"><div class="v num" id="curVol">0</div><div class="l">Volumen kg</div></div>
+        <div class="stat"><div class="v num" id="curSets">0</div><div class="l">Series</div></div>
+        <div class="stat"><div class="v num pr" id="curPRs">0</div><div class="l">Récords</div></div>
+      </div>
+      <button class="btn btn-primary" id="saveBtn">Guardar sesión</button>
+    </div>
+  </section>
+
+  <!-- ===== HISTORIAL ===== -->
+  <section class="screen" id="history">
+    <div class="top"><div class="brand"><div><h1>Historial</h1><div class="sub">sesiones registradas</div></div></div></div>
+    <div id="histList"></div>
+  </section>
+
+  <!-- ===== PROGRESO ===== -->
+  <section class="screen" id="progress">
+    <div class="top"><div class="brand"><div><h1>Progreso</h1><div class="sub">e1RM estimado · sobrecarga</div></div></div></div>
+    <select class="pick" id="exPick"></select>
+    <div id="progBody"></div>
+  </section>
+
+  <!-- ===== RUTINA ===== -->
+  <section class="screen" id="routine">
+    <div class="top"><div class="brand"><div><h1>Rutina</h1><div class="sub">edita tus 6 días</div></div></div></div>
+    <div id="rtList"></div>
+    <button class="btn btn-ghost" id="resetRoutine" style="margin-top:6px">Restaurar plantilla por defecto</button>
+  </section>
+
+</div>
+
+<!-- ===== NAV ===== -->
+<nav class="tabs"><div class="tabs-inner">
+  <button class="tab on" data-go="train">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg><span>Entrenar</span></button>
+  <button class="tab" data-go="history">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4v6h6"/><path d="M3.5 10a9 9 0 1 0 2.6-5.5L3 8"/><path d="M12 7v5l3 2"/></svg><span>Historial</span></button>
+  <button class="tab" data-go="progress">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-5 3 3 5-7"/></svg><span>Progreso</span></button>
+  <button class="tab" data-go="routine">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h12M4 12h16M4 18h10"/><circle cx="19" cy="6" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg><span>Rutina</span></button>
+</div></nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   FORJA PPL — prototipo. Todo se guarda en localStorage del
+   navegador (offline). Modelo de datos en STATE.
+   ============================================================ */
+const DAYS = ["Push A","Pull A","Legs A","Push B","Pull B","Legs B"];
+const DAY_TAG = {"Push A":"empuje","Pull A":"jale","Legs A":"pierna","Push B":"empuje","Pull B":"jale","Legs B":"pierna"};
+
+const DEFAULT_ROUTINE = {
+  "Push A":[["Press de banca",4,"6-8"],["Press militar barra",3,"8-10"],["Press inclinado mancuerna",3,"8-12"],["Aperturas en polea",3,"12-15"],["Extensión tríceps cuerda",3,"12-15"],["Fondos en paralelas",3,"8-12"]],
+  "Pull A":[["Jalón al pecho",4,"8-10"],["Remo con barra",4,"6-8"],["Remo con mancuerna",3,"8-12"],["Face pull",3,"15-20"],["Curl con barra",3,"8-12"],["Curl martillo",3,"10-12"]],
+  "Legs A":[["Sentadilla",4,"5-8"],["Prensa",3,"10-12"],["Curl femoral acostado",3,"10-12"],["Extensión de cuádriceps",3,"12-15"],["Hip thrust",3,"8-12"],["Elevación de gemelos de pie",4,"12-15"]],
+  "Push B":[["Press militar barra",4,"6-8"],["Press inclinado barra",3,"8-10"],["Press plano mancuerna",3,"10-12"],["Elevaciones laterales",4,"12-20"],["Press francés",3,"10-12"],["Extensión tríceps unilateral",3,"12-15"]],
+  "Pull B":[["Peso muerto",3,"4-6"],["Jalón agarre cerrado",4,"8-12"],["Remo en T",3,"8-12"],["Pull-over en polea",3,"12-15"],["Curl predicador",3,"10-12"],["Curl inverso",3,"12-15"]],
+  "Legs B":[["Peso muerto rumano",4,"6-10"],["Sentadilla frontal",3,"8-10"],["Zancadas",3,"10-12"],["Curl femoral sentado",3,"12-15"],["Prensa pies altos",3,"12-15"],["Gemelos sentado",4,"15-20"]]
+};
+
+const KEY="forja_ppl_v1";
+let STATE = load();
+let currentDay = suggestNextDay();
+let draft = {}; // {day: [{name, sets:[{w,r}]}]}
+
+function load(){
+  try{ const s=JSON.parse(localStorage.getItem(KEY)); if(s&&s.routine&&s.sessions) return s; }catch(e){}
+  return {routine:structuredClone(DEFAULT_ROUTINE), sessions:[]};
+}
+function save(){ localStorage.setItem(KEY, JSON.stringify(STATE)); }
+
+const e1rm=(w,r)=> r>0&&w>0 ? Math.round(w*(1+r/30)) : 0;
+const fmt=n=> n>=1000 ? (n/1000).toFixed(1)+"k" : Math.round(n);
+
+/* ---- mejor e1RM histórico por ejercicio (antes de la sesión en curso) ---- */
+function bestE1RM(exName){
+  let best=0;
+  STATE.sessions.forEach(s=> s.exercises.forEach(ex=>{
+    if(ex.name===exName) ex.sets.forEach(set=>{ best=Math.max(best, e1rm(set.w,set.r)); });
+  }));
+  return best;
+}
+/* ---- última sesión que contiene ese ejercicio ---- */
+function lastSets(exName){
+  for(let i=STATE.sessions.length-1;i>=0;i--){
+    const ex=STATE.sessions[i].exercises.find(e=>e.name===exName && e.sets.length);
+    if(ex) return ex.sets;
+  }
+  return null;
+}
+function suggestNextDay(){
+  if(!STATE.sessions.length) return DAYS[0];
+  const last=STATE.sessions[STATE.sessions.length-1].day;
+  const i=DAYS.indexOf(last);
+  return DAYS[(i+1)%DAYS.length];
+}
+
+/* ============================ ENTRENAR ============================ */
+function ensureDraft(day){
+  if(!draft[day]){
+    draft[day]=STATE.routine[day].map(([name,sets])=>({
+      name, sets: Array.from({length:Math.max(1,sets)},()=>({w:"",r:""}))
+    }));
+  }
+}
+function renderDayChips(){
+  const next=suggestNextDay();
+  dayChips.innerHTML=DAYS.map(d=>`
+    <button class="day-chip ${d===currentDay?'on':''} ${d===next&&d!==currentDay?'next':''}" data-day="${d}">
+      <span class="t">${DAY_TAG[d]}</span>${d}
+    </button>`).join("");
+  dayChips.querySelectorAll(".day-chip").forEach(b=>b.onclick=()=>{currentDay=b.dataset.day;renderTrain();});
+}
+function renderTrain(){
+  renderDayChips();
+  ensureDraft(currentDay);
+  const items=draft[currentDay];
+  exList.innerHTML=items.map((ex,ei)=>{
+    const best=bestE1RM(ex.name);
+    const ghost=lastSets(ex.name);
+    const top=ex.sets.reduce((m,s)=>Math.max(m,e1rm(+s.w,+s.r)),0);
+    let chip="";
+    if(top>0){
+      const diff=best?top-best:0;
+      const cls=best===0?'flat':diff>0?'up':diff<0?'down':'flat';
+      const sign=diff>0?'+':'';
+      const lbl=best===0?'primer registro':(diff>0?sign+diff+' kg':(diff<0?diff+' kg':'igual'));
+      chip=`<div class="e1rm-chip ${cls}"><div class="v num">${top}<small style="font-size:10px"> e1RM</small></div><div class="d">${lbl}</div></div>`;
+    }
+    const target=STATE.routine[currentDay][ei] ? STATE.routine[currentDay][ei][2] : "";
+    const setsHtml=ex.sets.map((s,si)=>{
+      const g = ghost && ghost[si];
+      const gTxt = g ? `objetivo · ${g.w} × ${g.r}` : (ghost?'—':'sin referencia');
+      return `<div class="ghost-row"><div class="ghost ${g?'':'empty'}">${si===0?'↳ última vez':''}</div></div>
+      <div class="set-row">
+        <div class="n">${si+1}</div>
+        <div class="field">${si===0?'<span class="lab">kg</span>':''}
+          <input inputmode="decimal" data-ei="${ei}" data-si="${si}" data-f="w" value="${s.w}" placeholder="${g?g.w:'–'}"></div>
+        <div class="field">${si===0?'<span class="lab">reps</span>':''}
+          <input inputmode="numeric" data-ei="${ei}" data-si="${si}" data-f="r" value="${s.r}" placeholder="${g?g.r:'–'}"></div>
+        <div class="ghost" style="text-align:left;padding-left:2px">${gTxt}</div>
+        <button class="rm-set" data-rm-ei="${ei}" data-rm-si="${si}">×</button>
+      </div>`;
+    }).join("");
+    return `<div class="ex">
+      <div class="ex-head">
+        <div><div class="ex-name">${ex.name}</div><div class="ex-target">objetivo ${ex.sets.length}×${target||'?'}</div></div>
+        ${chip}
+      </div>
+      ${setsHtml}
+      <button class="add-set" data-add="${ei}">+ serie</button>
+    </div>`;
+  }).join("");
+
+  // listeners
+  exList.querySelectorAll("input").forEach(inp=>{
+    inp.oninput=e=>{
+      const {ei,si,f}=e.target.dataset;
+      draft[currentDay][ei].sets[si][f]=e.target.value;
+      // PR flare live
+      const s=draft[currentDay][ei].sets[si];
+      const best=bestE1RM(draft[currentDay][ei].name);
+      if(best>0 && e1rm(+s.w,+s.r)>best){
+        const row=e.target.closest('.set-row');
+        row.querySelectorAll('input').forEach(x=>x.classList.add('pr-flare'));
+        setTimeout(()=>row.querySelectorAll('input').forEach(x=>x.classList.remove('pr-flare')),500);
+      }
+      updateTotals();
+    };
+  });
+  exList.querySelectorAll("[data-add]").forEach(b=>b.onclick=()=>{
+    draft[currentDay][b.dataset.add].sets.push({w:"",r:""}); renderTrain();
+  });
+  exList.querySelectorAll("[data-rm-ei]").forEach(b=>b.onclick=()=>{
+    const ei=+b.dataset.rmEi, si=+b.dataset.rmSi;
+    if(draft[currentDay][ei].sets.length>1){ draft[currentDay][ei].sets.splice(si,1); renderTrain(); }
+  });
+  updateTotals();
+  weekVol.textContent=fmt(weekVolume());
+}
+function updateTotals(){
+  let vol=0,sets=0,prs=0;
+  const items=draft[currentDay]||[];
+  items.forEach(ex=>{
+    const best=bestE1RM(ex.name);
+    ex.sets.forEach(s=>{
+      const w=+s.w,r=+s.r;
+      if(w>0&&r>0){ vol+=w*r; sets++; if(best>0&&e1rm(w,r)>best) prs++; }
+    });
+  });
+  curVol.textContent=fmt(vol); curSets.textContent=sets; curPRs.textContent=prs;
+}
+function weekVolume(){
+  const now=Date.now(), wk=7*864e5; let v=0;
+  STATE.sessions.forEach(s=>{ if(now-new Date(s.date).getTime()<wk)
+    s.exercises.forEach(ex=>ex.sets.forEach(st=>{ if(st.w>0&&st.r>0) v+=st.w*st.r; })); });
+  return v;
+}
+saveBtn.onclick=()=>{
+  const items=(draft[currentDay]||[]).map(ex=>({
+    name:ex.name,
+    sets:ex.sets.filter(s=>+s.w>0&&+s.r>0).map(s=>({w:+s.w,r:+s.r}))
+  })).filter(ex=>ex.sets.length);
+  if(!items.length){ toast("Registra al menos una serie completa",false); return; }
+  let prs=0;
+  items.forEach(ex=>{ const best=bestE1RM(ex.name);
+    ex.sets.forEach(s=>{ if(best>0&&e1rm(s.w,s.r)>best) prs++; }); });
+  STATE.sessions.push({id:Date.now(),date:new Date().toISOString(),day:currentDay,exercises:items});
+  save();
+  delete draft[currentDay];
+  currentDay=suggestNextDay();
+  renderTrain(); renderHistory(); buildExPicker();
+  toast(prs>0?`¡${prs} récord${prs>1?'s':''}! Sesión guardada`:"Sesión guardada", prs>0);
+};
+
+/* ============================ HISTORIAL ============================ */
+function renderHistory(){
+  if(!STATE.sessions.length){
+    histList.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4v6h6"/><path d="M3.5 10a9 9 0 1 0 2.6-5.5L3 8"/></svg><p>Aún no hay sesiones.<br>Elige tu día y registra la primera.</p></div>`;
+    return;
+  }
+  histList.innerHTML=[...STATE.sessions].reverse().map(s=>{
+    let vol=0,sets=0,prsCount=s.prs||0;
+    s.exercises.forEach(ex=>ex.sets.forEach(st=>{vol+=st.w*st.r;sets++;}));
+    const d=new Date(s.date);
+    const fecha=d.toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'});
+    const detail=s.exercises.map(ex=>{
+      const top=ex.sets.reduce((m,st)=>Math.max(m,e1rm(st.w,st.r)),0);
+      const best=ex.sets.map(st=>`${st.w}×${st.r}`).join(', ');
+      return `<div class="det-ex"><span class="nm">${ex.name}</span><span>${best} · ${top} e1RM</span></div>`;
+    }).join("");
+    return `<div class="sess" data-id="${s.id}">
+      <div class="sess-top"><span class="sess-day">${s.day}</span><span class="sess-date">${fecha}</span></div>
+      <div class="sess-meta">
+        <span class="m">vol <b class="num">${fmt(vol)} kg</b></span>
+        <span class="m">series <b class="num">${sets}</b></span>
+      </div>
+      <div class="sess-detail">${detail}
+        <button class="del" data-del="${s.id}">Eliminar sesión</button>
+      </div>
+    </div>`;
+  }).join("");
+  histList.querySelectorAll(".sess").forEach(c=>{
+    c.onclick=e=>{ if(e.target.dataset.del) return; c.classList.toggle("open"); };
+  });
+  histList.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>{
+    const id=+b.dataset.del;
+    STATE.sessions=STATE.sessions.filter(s=>s.id!==id);
+    save(); renderHistory(); buildExPicker(); renderProgress(); renderTrain();
+    toast("Sesión eliminada",false);
+  });
+}
+
+/* ============================ PROGRESO ============================ */
+function allExercises(){
+  const set=new Set();
+  STATE.sessions.forEach(s=>s.exercises.forEach(ex=>set.add(ex.name)));
+  return [...set].sort();
+}
+function buildExPicker(){
+  const exs=allExercises();
+  exPick.innerHTML=exs.length?exs.map(e=>`<option>${e}</option>`).join("")
+    :`<option>Sin datos todavía</option>`;
+  exPick.disabled=!exs.length;
+}
+function seriesFor(exName){
+  const pts=[];
+  STATE.sessions.forEach(s=>{
+    const ex=s.exercises.find(e=>e.name===exName);
+    if(ex){ const top=ex.sets.reduce((m,st)=>Math.max(m,e1rm(st.w,st.r)),0);
+      const vol=ex.sets.reduce((a,st)=>a+st.w*st.r,0);
+      pts.push({date:s.date,e1rm:top,vol}); }
+  });
+  return pts;
+}
+function renderProgress(){
+  const exs=allExercises();
+  if(!exs.length){
+    progBody.innerHTML=`<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 3v18h18"/><path d="M7 14l4-5 3 3 5-7"/></svg><p>Registra sesiones para ver tu sobrecarga progresiva aquí.</p></div>`;
+    return;
+  }
+  const name=exPick.value&&exs.includes(exPick.value)?exPick.value:exs[0];
+  const pts=seriesFor(name);
+  const cur=pts[pts.length-1].e1rm;
+  const peak=Math.max(...pts.map(p=>p.e1rm));
+  const first=pts[0].e1rm;
+  const gain=cur-first;
+  const gainPct=first?Math.round(gain/first*100):0;
+  const delta=pts.length>1?cur-pts[pts.length-2].e1rm:0;
+  const dcls=delta>0?'up':delta<0?'down':'flat';
+
+  let body=`<div class="chart-card">
+    <div class="chart-head">
+      <div><div class="chart-title">e1RM estimado</div>
+        <div class="chart-big num">${cur}<small> kg</small></div></div>
+      <div class="delta-tag ${dcls}">${pts.length>1?(delta>0?'▲ +'+delta:delta<0?'▼ '+delta:'– 0')+' vs anterior':'1ª sesión'}</div>
+    </div>
+    ${lineChart(pts)}
+  </div>
+  <div class="stat-grid">
+    <div class="stat-box"><div class="v num">${peak}</div><div class="l">Récord kg</div></div>
+    <div class="stat-box"><div class="v num ${gain>=0?'up':'down'}" style="color:${gain>=0?'var(--ember)':'var(--muted)'}">${gain>=0?'+':''}${gain}</div><div class="l">vs 1ª sesión</div></div>
+    <div class="stat-box"><div class="v num">${pts.length}</div><div class="l">Sesiones</div></div>
+  </div>`;
+  if(pts.length<2) body+=`<p style="color:var(--faint);font-size:13px;text-align:center;margin-top:4px">Necesitas al menos 2 sesiones de este ejercicio para ver la tendencia.</p>`;
+  progBody.innerHTML=body;
+}
+function lineChart(pts){
+  const W=460,H=170,pad=16,bottom=18;
+  if(pts.length<2){
+    const y=H/2;
+    return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><circle cx="${W/2}" cy="${y}" r="5" fill="var(--ember)"/></svg>`;
+  }
+  const vals=pts.map(p=>p.e1rm);
+  const min=Math.min(...vals), max=Math.max(...vals), range=(max-min)||1;
+  const X=i=> pad + i*(W-2*pad)/(pts.length-1);
+  const Y=v=> pad + (1-(v-min)/range)*(H-pad-bottom);
+  const peak=Math.max(...vals);
+  let line="", area="", dots="";
+  pts.forEach((p,i)=>{
+    const x=X(i),y=Y(p.e1rm);
+    line+=(i?'L':'M')+x.toFixed(1)+' '+y.toFixed(1)+' ';
+    const isPeak=p.e1rm===peak && i===pts.lastIndexOf(pts.find(q=>q.e1rm===peak));
+    dots+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i===pts.length-1?4.5:3}" fill="${p.e1rm===peak?'var(--ember)':'var(--steel)'}"/>`;
+  });
+  area=line+`L ${X(pts.length-1).toFixed(1)} ${H-bottom} L ${X(0).toFixed(1)} ${H-bottom} Z`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto" preserveAspectRatio="none">
+    <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="var(--ember)" stop-opacity=".22"/>
+      <stop offset="1" stop-color="var(--ember)" stop-opacity="0"/></linearGradient></defs>
+    <path d="${area}" fill="url(#g)"/>
+    <path d="${line}" fill="none" stroke="var(--steel)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    ${dots}
+    <text x="${pad}" y="${H-4}" fill="var(--faint)" font-size="10" font-family="JetBrains Mono">${new Date(pts[0].date).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</text>
+    <text x="${W-pad}" y="${H-4}" fill="var(--faint)" font-size="10" font-family="JetBrains Mono" text-anchor="end">${new Date(pts[pts.length-1].date).toLocaleDateString('es-MX',{day:'numeric',month:'short'})}</text>
+  </svg>`;
+}
+exPick.onchange=renderProgress;
+
+/* ============================ RUTINA ============================ */
+function renderRoutine(){
+  rtList.innerHTML=DAYS.map(day=>{
+    const exs=STATE.routine[day];
+    const rows=exs.map((ex,i)=>`<div class="rt-ex">
+      <input data-d="${day}" data-i="${i}" data-k="0" value="${ex[0]}">
+      <input class="s" data-d="${day}" data-i="${i}" data-k="1" value="${ex[1]}" inputmode="numeric">
+      <input class="s" data-d="${day}" data-i="${i}" data-k="2" value="${ex[2]}">
+      <button class="rm-set" data-rt-rm="${day}|${i}">×</button>
+    </div>`).join("");
+    return `<div class="rt-day"><h3>${day}<span class="tag">${DAY_TAG[day]}</span></h3>
+      <div class="rt-ex" style="margin-bottom:9px"><div style="font-size:9px;color:var(--faint);font-family:'JetBrains Mono';align-self:end;padding-left:4px">EJERCICIO</div><div style="font-size:9px;color:var(--faint);font-family:'JetBrains Mono';text-align:center;align-self:end">SERIES</div><div style="font-size:9px;color:var(--faint);font-family:'JetBrains Mono';text-align:center;align-self:end">REPS</div><div></div></div>
+      ${rows}
+      <button class="add-set" data-rt-add="${day}">+ ejercicio</button></div>`;
+  }).join("");
+  rtList.querySelectorAll("input").forEach(inp=>inp.onchange=e=>{
+    const {d,i,k}=e.target.dataset;
+    let v=e.target.value;
+    if(k==="1") v=Math.max(1,parseInt(v)||1);
+    STATE.routine[d][i][+k]=v; save();
+    delete draft[d];
+  });
+  rtList.querySelectorAll("[data-rt-add]").forEach(b=>b.onclick=()=>{
+    STATE.routine[b.dataset.rtAdd].push(["Nuevo ejercicio",3,"8-12"]);
+    save(); delete draft[b.dataset.rtAdd]; renderRoutine();
+  });
+  rtList.querySelectorAll("[data-rt-rm]").forEach(b=>b.onclick=()=>{
+    const [d,i]=b.dataset.rtRm.split("|");
+    STATE.routine[d].splice(+i,1); save(); delete draft[d]; renderRoutine();
+  });
+}
+resetRoutine.onclick=()=>{
+  if(confirm("¿Restaurar la plantilla PPL por defecto? Se sobreescribe tu rutina actual (las sesiones guardadas no se borran).")){
+    STATE.routine=structuredClone(DEFAULT_ROUTINE); draft={}; save(); renderRoutine(); renderTrain();
+    toast("Rutina restaurada",false);
+  }
+};
+
+/* ============================ NAV + TOAST ============================ */
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));
+  document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));
+  t.classList.add("on");
+  const go=t.dataset.go;
+  document.getElementById(go).classList.add("active");
+  if(go==="history") renderHistory();
+  if(go==="progress"){ buildExPicker(); renderProgress(); }
+  if(go==="routine") renderRoutine();
+  if(go==="train") renderTrain();
+  window.scrollTo(0,0);
+});
+let toastT;
+function toast(msg,pr){
+  const el=document.getElementById("toast");
+  el.textContent=msg; el.className="toast show"+(pr?" pr":"");
+  clearTimeout(toastT); toastT=setTimeout(()=>el.className="toast",2200);
+}
+
+/* ============================ INIT ============================ */
+renderTrain();
+buildExPicker();
+</script>
+</body>
+</html>

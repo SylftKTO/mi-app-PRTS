@@ -2,127 +2,194 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>PRTS · Gym</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<title>SYLFT · Gym</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <style>
-  :root {
-    --bg: #0d1117; --card: #161b22; --border: #30363d;
-    --text: #e6edf3; --muted: #8b949e;
-    --accent: #f78166; --green: #3fb950; --blue: #58a6ff;
+  /* ---------- Selector de día ---------- */
+  .days {
+    display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+    margin: 18px -16px 0; padding: 2px 16px 4px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    max-width: 480px; margin: 0 auto; padding: 16px; padding-bottom: 60px;
+  .days::-webkit-scrollbar { display: none; }
+  .day-chip {
+    flex: 0 0 auto; background: var(--surface); border: 1px solid var(--line);
+    color: var(--muted); border-radius: 11px; padding: 8px 14px;
+    font-size: 14px; font-weight: 600; white-space: nowrap; text-align: left;
   }
-  h1 { font-size: 1.3rem; margin-bottom: 4px; }
-  .muted { color: var(--muted); font-size: 0.85rem; }
-  .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 16px; margin-top: 14px;
+  .day-chip .t {
+    display: block; font-family: var(--mono); font-size: 9px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
   }
-  input, button, select {
-    font-size: 1rem; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--text); padding: 10px;
+  .day-chip.on { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .day-chip.on .t { color: #565B68; }
+  .day-chip.today:not(.on) { border-color: var(--accent-deep); }
+  .day-tools { display: flex; justify-content: flex-end; margin-top: 10px; }
+  .day-tools input { font-size: 13px; padding: 6px 10px; font-family: var(--mono); color: var(--muted); }
+
+  /* ---------- Tarjeta de ejercicio ---------- */
+  .ex-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .ex-name { font-family: var(--serif); font-size: 19px; font-weight: 500; line-height: 1.2; }
+  .ex-target {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--faint); margin-top: 3px;
   }
-  input { width: 100%; margin-top: 8px; }
-  button {
-    cursor: pointer; background: var(--accent); color: #fff;
-    border: none; font-weight: 600; padding: 12px;
+  .stag {
+    display: inline-block; margin-left: 8px; vertical-align: 2px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--warn);
+    border: 1px solid rgba(217, 167, 99, 0.35); border-radius: 6px; padding: 2px 6px;
   }
-  button.secondary { background: var(--card); border: 1px solid var(--border); color: var(--text); }
-  button:disabled { opacity: 0.5; }
-  .w100 { width: 100%; margin-top: 12px; }
-  .ex-name { font-weight: 600; font-size: 1.05rem; }
-  .ex-target { color: var(--muted); font-size: 0.8rem; }
-  .last { font-size: 0.8rem; color: var(--blue); margin-top: 4px; }
-  .set-row { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
-  .set-row span.n { width: 22px; color: var(--muted); font-size: 0.85rem; }
-  .set-row input { margin: 0; flex: 1; text-align: center; padding: 8px; }
-  .set-row button { padding: 8px 14px; font-size: 0.9rem; }
-  .set-row.done input { border-color: var(--green); color: var(--green); }
-  .set-row.done button { background: var(--green); }
-  .topbar { display: flex; justify-content: space-between; align-items: center; }
-  .topbar select { padding: 6px 8px; font-size: 0.85rem; }
-  .badge {
-    display: inline-block; padding: 2px 10px; border-radius: 99px;
-    font-size: 0.75rem; font-weight: 700; background: var(--accent); color: #fff;
+  .e1rm { flex: 0 0 auto; text-align: right; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .e1rm b { display: block; font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--text); }
+  .e1rm.up b { color: var(--accent); }
+  .e1rm .d { color: var(--accent); }
+  .last {
+    font-family: var(--mono); font-size: 11px; color: var(--accent);
+    opacity: 0.85; margin-top: 9px;
   }
-  #msg { margin-top: 10px; font-size: 0.85rem; color: var(--accent); min-height: 1.2em; }
-  .hidden { display: none; }
-  .tabs { display: flex; gap: 8px; margin-top: 14px; }
-  .tab { flex: 1; background: var(--card); border: 1px solid var(--border); color: var(--muted); padding: 8px; }
-  .tab.active { color: var(--text); border-color: var(--accent); }
-  .stag { display: inline-block; margin-left: 6px; color: #d29922; font-size: 0.75rem; font-weight: 600; }
+  .last.empty { color: var(--faint); opacity: 0.7; }
+
+  .set-row { display: flex; gap: 8px; margin-top: 9px; align-items: center; }
+  .set-row .n {
+    width: 20px; text-align: center; font-family: var(--mono);
+    font-size: 11px; color: var(--faint);
+  }
+  .set-row input {
+    flex: 1; min-width: 0; margin: 0; text-align: center;
+    font-family: var(--mono); font-weight: 500; padding: 11px 6px;
+  }
+  .set-row button { padding: 11px 16px; font-size: 14px; min-width: 56px; }
+  .set-row.done input { border-color: rgba(133, 196, 158, 0.4); color: var(--ok); background: var(--surface); }
+  .set-row.done button { background: transparent; border-color: transparent; color: var(--ok); }
+  .set-row.pr-flare input {
+    border-color: var(--accent) !important;
+    box-shadow: 0 0 14px -3px var(--accent);
+    animation: flare 0.5s ease;
+  }
+  @keyframes flare { 0% { transform: scale(0.97); } 55% { transform: scale(1.03); } 100% { transform: scale(1); } }
+  .add-set {
+    width: 100%; margin-top: 10px; padding: 9px;
+    background: transparent; border: 1px dashed var(--line);
+    color: var(--faint); font-size: 13px; font-weight: 600;
+  }
+
+  /* ---------- Progreso ---------- */
+  #prog-ex { width: 100%; }
+  .prog-stats { margin-top: 12px; }
+
+  /* ---------- Temporizador de descanso ---------- */
   #rest-timer {
-    position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
-    width: 100%; max-width: 480px; background: var(--card);
-    border-top: 1px solid var(--border); padding: 10px 16px;
-    display: flex; justify-content: space-between; align-items: center; font-weight: 600;
+    position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 14px);
+    left: 50%; transform: translateX(-50%); z-index: 40;
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface-3); border: 1px solid var(--line);
+    border-radius: 999px; padding: 9px 10px 9px 18px;
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.7);
   }
-  #rest-timer.hidden { display: none; }
-  #rest-timer.over #rest-time { color: var(--green); }
-  #rest-timer button { padding: 4px 10px; background: transparent; border: 1px solid var(--border); color: var(--muted); }
+  #rest-timer b { color: var(--text); font-weight: 500; font-size: 15px; }
+  #rest-timer.over b { color: var(--ok); }
+  #rest-timer button {
+    background: transparent; border: 1px solid var(--line); color: var(--faint);
+    border-radius: 999px; width: 30px; height: 30px; padding: 0; font-size: 13px; line-height: 1;
+  }
+
+  .screen-fade { animation: fade 0.25s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="view-login" class="hidden">
-  <h1>PRTS · Gym</h1>
-  <p class="muted">Inicia sesión para registrar tu entrenamiento</p>
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Gym</div>
   <div class="card">
-    <input id="email" type="email" placeholder="Correo" autocomplete="username">
-    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password">
-    <button id="btn-login" class="w100">Entrar</button>
-    <button id="btn-signup" class="w100 secondary">Crear cuenta</button>
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <button id="btn-signup" class="btn-ghost w100">Crear cuenta</button>
     <div id="msg"></div>
   </div>
 </div>
 
 <!-- APP -->
 <div id="view-app" class="hidden">
-  <div class="topbar">
-    <div>
-      <h1 id="day-title">—</h1>
-      <span id="day-date" class="muted"></span>
-    </div>
-    <div style="text-align:right">
-      <select id="day-select"></select><br>
-      <input type="date" id="day-date-pick" style="margin-top:6px;padding:6px 8px;font-size:0.85rem;width:auto"><br>
-      <a href="tareas.html" class="muted" style="font-size:0.75rem">tareas ›</a> ·
-      <a href="#" id="btn-logout" class="muted" style="font-size:0.75rem">salir</a>
-    </div>
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Gym</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
   </div>
-  <div class="tabs">
-    <button id="tab-hoy" class="tab active">Hoy</button>
-    <button id="tab-prog" class="tab">Progreso</button>
+
+  <h1 id="day-title" class="page-title">—</h1>
+  <div id="day-date" class="mono-label page-sub"></div>
+
+  <!-- HOY -->
+  <div id="view-hoy" class="screen-fade">
+    <div class="days" id="day-chips"></div>
+    <div class="day-tools"><input type="date" id="day-date-pick"></div>
+
+    <div class="stat-grid" id="day-stats">
+      <div class="stat-card"><div class="l">Volumen</div><div class="v" id="st-vol">0</div><div class="s">kg hoy</div></div>
+      <div class="stat-card"><div class="l">Series</div><div class="v" id="st-sets">0</div><div class="s" id="st-sets-sub">de 0</div></div>
+      <div class="stat-card"><div class="l">Récords</div><div class="v acc" id="st-prs">0</div><div class="s">e1RM superado</div></div>
+    </div>
+
+    <div id="exercises"></div>
   </div>
-  <div id="exercises"></div>
+
+  <!-- PROGRESO -->
   <div id="progress" class="hidden">
     <div class="card">
-      <select id="prog-ex" style="width:100%"></select>
-      <canvas id="prog-chart" style="margin-top:12px"></canvas>
-      <div id="prog-info" class="muted" style="margin-top:8px"></div>
+      <select id="prog-ex"></select>
+      <canvas id="prog-chart" style="margin-top:14px"></canvas>
     </div>
+    <div class="stat-grid prog-stats">
+      <div class="stat-card"><div class="l">Peso máx</div><div class="v" id="pg-max">—</div><div class="s">kg</div></div>
+      <div class="stat-card"><div class="l">Mejor e1RM</div><div class="v acc" id="pg-e1rm">—</div><div class="s">estimado</div></div>
+      <div class="stat-card"><div class="l">Sesiones</div><div class="v" id="pg-ses">—</div><div class="s">registradas</div></div>
+    </div>
+    <div id="prog-info" class="muted" style="margin-top:12px"></div>
   </div>
 </div>
 
 <!-- Temporizador de descanso -->
 <div id="rest-timer" class="hidden">
-  <span><span id="rest-time">0:00</span> de descanso</span>
+  <span>descanso&nbsp; <b id="rest-time">0:00</b></span>
   <button id="rest-close">✕</button>
 </div>
+
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <button class="nav-item on" id="tab-hoy">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Hoy</span></button>
+    <button class="nav-item" id="tab-prog">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-5 3 3 5-7"/></svg>
+      <span>Progreso</span></button>
+    <a class="nav-item" href="tareas.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
+      <span>Tareas</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
 
 <script>
 const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
 
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const DIAS3 = ["DOM","LUN","MAR","MIÉ","JUE","VIE","SÁB"];
+const MESES3 = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
 
 // Rutina real (seed inicial; después la fuente de verdad es la BD)
 const SEED = {
@@ -135,12 +202,34 @@ const SEED = {
 };
 
 const $ = (id) => document.getElementById(id);
-const show = (id) => { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); };
+const show = (id) => {
+  $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden");
+  $(id).classList.remove("hidden");
+  $("navbar").classList.toggle("hidden", id === "view-login");
+};
+
+const e1rm = (w, r) => (w > 0 && r > 0) ? Math.round(w * (1 + r / 30)) : 0; // Epley
+const fmt = (n) => n >= 10000 ? (n / 1000).toFixed(1) + "k" : Math.round(n).toLocaleString("es-MX");
 
 function hoyMX() {
   const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); // YYYY-MM-DD
   const wd = new Date(s + "T12:00:00").getDay();
   return { fecha: s, weekday: wd };
+}
+function semanaISO(fecha) {
+  const t = new Date(fecha + "T12:00:00");
+  t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
+  const w1 = new Date(t.getFullYear(), 0, 4);
+  return 1 + Math.round(((t - w1) / 864e5 - 3 + ((w1.getDay() + 6) % 7)) / 7);
+}
+
+let toastT;
+function toast(msg, pr) {
+  const el = $("toast");
+  el.textContent = msg;
+  el.className = "toast show" + (pr ? " pr" : "");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.className = "toast", 2400);
 }
 
 // ---------- AUTH ----------
@@ -158,7 +247,6 @@ $("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signO
 async function seedSiVacio() {
   const { count } = await sb.from("routine_days").select("*", { count: "exact", head: true });
   if (count > 0) return;
-  // catálogo de ejercicios únicos
   const nombres = [...new Set(Object.values(SEED).flatMap(d => d.ex.map(e => e[0])))];
   const { data: exs } = await sb.from("exercises").insert(nombres.map(name => ({ name }))).select();
   const exId = Object.fromEntries(exs.map(e => [e.name, e.id]));
@@ -174,142 +262,219 @@ async function seedSiVacio() {
 // ---------- VISTA ----------
 let sessionId = null;
 let routineDays = [];
+let todaySets = [];        // sets registrados en la fecha mostrada
+let bestHist = {};         // mejor e1RM histórico por exercise_id (antes de la fecha)
+let targetTotal = 0;       // series objetivo del día
 
 async function init() {
   show("view-app");
   await seedSiVacio();
   const { data } = await sb.from("routine_days").select("*").order("weekday");
   routineDays = data;
-  const { weekday, fecha } = hoyMX();
-  $("day-select").innerHTML = DIAS.map((d, i) => {
-    const rd = routineDays.find(r => r.weekday === i);
-    return `<option value="${i}" ${i === weekday ? "selected" : ""}>${d.slice(0,3)} · ${rd ? rd.name : "Descanso"}</option>`;
-  }).join("");
-  $("day-date-pick").value = fecha;
-  // cambiar de día mueve la fecha dentro de la misma semana
-  $("day-select").onchange = () => {
-    const base = new Date($("day-date-pick").value + "T12:00:00");
-    base.setDate(base.getDate() + (+$("day-select").value - base.getDay()));
-    $("day-date-pick").value = base.toISOString().slice(0, 10);
-    renderDia();
-  };
+  $("day-date-pick").value = hoyMX().fecha;
   $("day-date-pick").onchange = () => renderDia();
   renderDia();
+}
+
+function renderChips(weekday) {
+  const hoy = hoyMX().weekday;
+  $("day-chips").innerHTML = DIAS.map((d, i) => {
+    const rd = routineDays.find(r => r.weekday === i);
+    return `<button class="day-chip ${i === weekday ? "on" : ""} ${i === hoy ? "today" : ""}" data-wd="${i}">
+      <span class="t">${DIAS3[i]}</span>${rd ? rd.name : "Descanso"}
+    </button>`;
+  }).join("");
+  $("day-chips").querySelectorAll(".day-chip").forEach(b => b.onclick = () => {
+    // cambiar de día mueve la fecha dentro de la misma semana
+    const base = new Date($("day-date-pick").value + "T12:00:00");
+    base.setDate(base.getDate() + (+b.dataset.wd - base.getDay()));
+    $("day-date-pick").value = base.toISOString().slice(0, 10);
+    renderDia();
+  });
+  const on = $("day-chips").querySelector(".day-chip.on");
+  if (on) on.scrollIntoView({ inline: "center", block: "nearest" });
+}
+
+function updateStats() {
+  let vol = 0, prs = 0;
+  todaySets.forEach(s => {
+    vol += +s.weight_kg * s.reps;
+    const best = bestHist[s.exercise_id] || 0;
+    if (best > 0 && e1rm(+s.weight_kg, s.reps) > best) prs++;
+  });
+  $("st-vol").textContent = fmt(vol);
+  $("st-sets").textContent = todaySets.length;
+  $("st-sets-sub").textContent = `de ${targetTotal}`;
+  $("st-prs").textContent = prs;
 }
 
 async function renderDia() {
   const fecha = $("day-date-pick").value;
   const weekday = new Date(fecha + "T12:00:00").getDay();
-  $("day-select").value = weekday;
+  renderChips(weekday);
   const rd = routineDays.find(r => r.weekday === weekday);
+  const d = new Date(fecha + "T12:00:00");
   $("day-title").textContent = rd ? rd.name : "Descanso";
-  $("day-date").textContent = `${DIAS[weekday]} · ${fecha}`;
+  $("day-date").textContent = `${DIAS3[weekday]} ${d.getDate()} ${MESES3[d.getMonth()]} · SEMANA ${semanaISO(fecha)}`;
+
   const cont = $("exercises");
   cont.innerHTML = "";
-  if (!rd) { cont.innerHTML = `<div class="card muted">Hoy toca descansar. 😴</div>`; return; }
+  todaySets = []; bestHist = {}; targetTotal = 0;
+  if (!rd) {
+    $("day-stats").classList.add("hidden");
+    cont.innerHTML = `<div class="card muted">Hoy toca descansar.</div>`;
+    return;
+  }
+  $("day-stats").classList.remove("hidden");
 
-  // sesión de hoy (si existe)
+  // sesión del día (si existe)
   const { data: ses } = await sb.from("workout_sessions").select("id").eq("session_date", fecha).maybeSingle();
   sessionId = ses?.id ?? null;
 
   const { data: rex } = await sb.from("routine_exercises")
     .select("*, exercises(name)").eq("routine_day_id", rd.id).order("position");
 
-  // sets ya registrados hoy
-  let setsHoy = [];
+  // sets ya registrados en la fecha
   if (sessionId) {
     const { data } = await sb.from("workout_sets").select("*").eq("session_id", sessionId);
-    setsHoy = data;
+    todaySets = data || [];
   }
 
-  for (const re of rex) {
-    // última sesión anterior a la fecha mostrada (por fecha de entrenamiento)
-    const { data: hist } = await sb.from("workout_sets")
-      .select("weight_kg, reps, set_number, workout_sessions!inner(session_date)")
-      .eq("exercise_id", re.exercise_id)
-      .lt("workout_sessions.session_date", fecha)
-      .limit(60);
+  // historial de todos los ejercicios del día en una sola consulta
+  const exIds = [...new Set(rex.map(r => r.exercise_id))];
+  const { data: histAll } = await sb.from("workout_sets")
+    .select("exercise_id, weight_kg, reps, set_number, workout_sessions!inner(session_date)")
+    .in("exercise_id", exIds)
+    .lt("workout_sessions.session_date", fecha)
+    .limit(4000);
 
-    let lastTxt = "Sin historial todavía";
-    let estancado = false;
-    if (hist?.length) {
+  targetTotal = rex.reduce((a, re) => a + re.target_sets, 0);
+
+  for (const re of rex) {
+    const hist = (histAll || []).filter(h => h.exercise_id === re.exercise_id);
+
+    // mejor e1RM histórico
+    bestHist[re.exercise_id] = hist.reduce((m, h) => Math.max(m, e1rm(+h.weight_kg, h.reps)), 0);
+
+    // última sesión con este ejercicio
+    let lastTxt = "Sin historial todavía", ghost = [], estancado = false;
+    if (hist.length) {
       const lastDate = hist.map(h => h.workout_sessions.session_date).sort().pop();
-      const sets = hist.filter(h => h.workout_sessions.session_date === lastDate)
+      ghost = hist.filter(h => h.workout_sessions.session_date === lastDate)
         .sort((a, b) => a.set_number - b.set_number);
-      lastTxt = `Última vez (${lastDate}): ` + sets.map(s => `${+s.weight_kg}×${s.reps}`).join(" · ");
+      const dl = new Date(lastDate + "T12:00:00");
+      lastTxt = `ÚLTIMA VEZ · ${dl.getDate()} ${MESES3[dl.getMonth()]} — ` +
+        ghost.map(s => `${+s.weight_kg}×${s.reps}`).join(" · ");
 
       // estancamiento: ≥4 sesiones y el máximo de los últimos 21 días no supera al anterior
       const porFecha = {};
       hist.forEach(h => {
-        const d = h.workout_sessions.session_date;
-        porFecha[d] = Math.max(porFecha[d] || 0, +h.weight_kg);
+        const f = h.workout_sessions.session_date;
+        porFecha[f] = Math.max(porFecha[f] || 0, +h.weight_kg);
       });
       const fechasEx = Object.keys(porFecha).sort();
       if (fechasEx.length >= 4) {
         const corte = new Date(fecha + "T12:00:00");
         corte.setDate(corte.getDate() - 21);
         const corteStr = corte.toISOString().slice(0, 10);
-        const rec = fechasEx.filter(d => d >= corteStr);
-        const ant = fechasEx.filter(d => d < corteStr);
+        const rec = fechasEx.filter(f => f >= corteStr);
+        const ant = fechasEx.filter(f => f < corteStr);
         if (rec.length >= 2 && ant.length >= 1) {
-          estancado = Math.max(...rec.map(d => porFecha[d])) <= Math.max(...ant.map(d => porFecha[d]));
+          estancado = Math.max(...rec.map(f => porFecha[f])) <= Math.max(...ant.map(f => porFecha[f]));
         }
       }
     }
 
     const card = document.createElement("div");
     card.className = "card";
+    const best = bestHist[re.exercise_id];
     card.innerHTML = `
-      <div class="ex-name">${re.exercises.name}${estancado ? '<span class="stag">⚠ 3+ sem sin progresar</span>' : ""}</div>
-      <div class="ex-target">${re.target_sets} series · ${re.rep_min}–${re.rep_max} reps</div>
-      <div class="last">${lastTxt}</div>`;
+      <div class="ex-head">
+        <div>
+          <div class="ex-name">${re.exercises.name}${estancado ? '<span class="stag">3+ sem sin progresar</span>' : ""}</div>
+          <div class="ex-target">${re.target_sets} series · ${re.rep_min}–${re.rep_max} reps</div>
+        </div>
+        ${best > 0 ? `<div class="e1rm" data-e1rm>mejor e1RM<b>${best}</b></div>` : ""}
+      </div>
+      <div class="last ${hist.length ? "" : "empty"}">${lastTxt}</div>
+      <div data-rows></div>
+      <button class="add-set">+ serie</button>`;
 
-    for (let n = 1; n <= re.target_sets; n++) {
-      const done = setsHoy.find(s => s.exercise_id === re.exercise_id && s.set_number === n);
-      const row = document.createElement("div");
-      row.className = "set-row" + (done ? " done" : "");
-      row.innerHTML = `
-        <span class="n">${n}</span>
-        <input type="number" inputmode="decimal" placeholder="kg" value="${done ? done.weight_kg : ""}" ${done ? "disabled" : ""}>
-        <input type="number" inputmode="numeric" placeholder="reps" value="${done ? done.reps : ""}" ${done ? "disabled" : ""}>
-        <button ${done ? "disabled" : ""}>${done ? "✓" : "OK"}</button>`;
-      const [kg, reps] = row.querySelectorAll("input");
-      row.querySelector("button").onclick = async (ev) => {
-        if (!kg.value || !reps.value) return;
-        ev.target.disabled = true;
-        if (!sessionId) {
-          const { data: s } = await sb.from("workout_sessions")
-            .insert({ routine_day_id: rd.id, session_date: fecha }).select().single();
-          sessionId = s.id;
-        }
-        const { error } = await sb.from("workout_sets").insert({
-          session_id: sessionId, exercise_id: re.exercise_id,
-          set_number: n, weight_kg: +kg.value, reps: +reps.value,
-        });
-        if (error) { ev.target.disabled = false; alert(error.message); return; }
-        row.classList.add("done");
-        kg.disabled = reps.disabled = true;
-        ev.target.textContent = "✓";
-        startRest();
-      };
-      card.appendChild(row);
-    }
+    const rows = card.querySelector("[data-rows]");
+    const maxDone = todaySets.filter(s => s.exercise_id === re.exercise_id)
+      .reduce((m, s) => Math.max(m, s.set_number), 0);
+    const total = Math.max(re.target_sets, maxDone);
+    for (let n = 1; n <= total; n++) rows.appendChild(buildSetRow(re, n, ghost, card));
+    card.querySelector(".add-set").onclick = () => {
+      const next = rows.children.length + 1;
+      rows.appendChild(buildSetRow(re, next, ghost, card));
+    };
     cont.appendChild(card);
   }
+  updateStats();
+}
+
+function buildSetRow(re, n, ghost, card) {
+  const done = todaySets.find(s => s.exercise_id === re.exercise_id && s.set_number === n);
+  const g = ghost[n - 1];
+  const row = document.createElement("div");
+  row.className = "set-row" + (done ? " done" : "");
+  row.innerHTML = `
+    <span class="n">${n}</span>
+    <input type="number" inputmode="decimal" placeholder="${g ? +g.weight_kg : "kg"}" value="${done ? +done.weight_kg : ""}" ${done ? "disabled" : ""} aria-label="kg serie ${n}">
+    <input type="number" inputmode="numeric" placeholder="${g ? g.reps : "reps"}" value="${done ? done.reps : ""}" ${done ? "disabled" : ""} aria-label="reps serie ${n}">
+    <button class="btn-primary" ${done ? "disabled" : ""}>${done ? "✓" : "OK"}</button>`;
+  const [kg, reps] = row.querySelectorAll("input");
+  row.querySelector("button").onclick = async (ev) => {
+    if (!kg.value || !reps.value) return;
+    ev.target.disabled = true;
+    const fecha = $("day-date-pick").value;
+    const rd = routineDays.find(r => r.weekday === new Date(fecha + "T12:00:00").getDay());
+    if (!sessionId) {
+      const { data: s } = await sb.from("workout_sessions")
+        .insert({ routine_day_id: rd.id, session_date: fecha }).select().single();
+      sessionId = s.id;
+    }
+    const set = { session_id: sessionId, exercise_id: re.exercise_id, set_number: n, weight_kg: +kg.value, reps: +reps.value };
+    const { error } = await sb.from("workout_sets").insert(set);
+    if (error) { ev.target.disabled = false; alert(error.message); return; }
+    todaySets.push(set);
+    row.classList.add("done");
+    kg.disabled = reps.disabled = true;
+    ev.target.textContent = "✓";
+    // ¿récord? comparar contra el mejor e1RM histórico
+    const best = bestHist[re.exercise_id] || 0;
+    const nuevo = e1rm(+kg.value, +reps.value);
+    if (best > 0 && nuevo > best) {
+      row.classList.add("pr-flare");
+      const chip = card.querySelector("[data-e1rm]");
+      if (chip) { chip.classList.add("up"); chip.innerHTML = `mejor e1RM<b>${nuevo}</b><span class="d">+${nuevo - best} kg</span>`; }
+      toast(`Récord · ${re.exercises.name} ${nuevo} e1RM (+${nuevo - best})`, true);
+    }
+    updateStats();
+    startRest();
+  };
+  return row;
 }
 
 // ---------- TABS ----------
 $("tab-hoy").onclick = () => switchTab("hoy");
 $("tab-prog").onclick = () => switchTab("prog");
 function switchTab(t) {
-  $("tab-hoy").classList.toggle("active", t === "hoy");
-  $("tab-prog").classList.toggle("active", t === "prog");
-  $("exercises").classList.toggle("hidden", t !== "hoy");
+  $("tab-hoy").classList.toggle("on", t === "hoy");
+  $("tab-prog").classList.toggle("on", t === "prog");
+  $("view-hoy").classList.toggle("hidden", t !== "hoy");
   $("progress").classList.toggle("hidden", t !== "prog");
   if (t === "prog") initProgreso();
+  window.scrollTo(0, 0);
 }
 
 // ---------- PROGRESO ----------
+Chart.defaults.color = "#767D92";
+Chart.defaults.borderColor = "#1E2330";
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+
 let chart = null, progExLoaded = false;
 async function initProgreso() {
   if (!progExLoaded) {
@@ -326,35 +491,46 @@ async function renderProgreso() {
     .select("weight_kg, reps, workout_sessions!inner(session_date)")
     .eq("exercise_id", $("prog-ex").value).limit(1000);
   const por = {};
+  let maxKg = 0, maxE1 = 0;
   (sets || []).forEach(s => {
     const d = s.workout_sessions.session_date;
     por[d] = por[d] || { max: 0, vol: 0 };
     por[d].max = Math.max(por[d].max, +s.weight_kg);
     por[d].vol += +s.weight_kg * s.reps;
+    maxKg = Math.max(maxKg, +s.weight_kg);
+    maxE1 = Math.max(maxE1, e1rm(+s.weight_kg, s.reps));
   });
   const fechas = Object.keys(por).sort();
   if (chart) chart.destroy();
   chart = new Chart($("prog-chart"), {
     type: "line",
     data: {
-      labels: fechas,
+      labels: fechas.map(f => {
+        const d = new Date(f + "T12:00:00");
+        return `${d.getDate()} ${MESES3[d.getMonth()].toLowerCase()}`;
+      }),
       datasets: [
-        { label: "Peso máx (kg)", data: fechas.map(d => por[d].max), borderColor: "#f78166", backgroundColor: "#f78166", yAxisID: "y", tension: 0.2 },
-        { label: "Volumen (kg)", data: fechas.map(d => por[d].vol), borderColor: "#58a6ff", backgroundColor: "#58a6ff", yAxisID: "y1", tension: 0.2 },
+        { label: "Peso máx (kg)", data: fechas.map(d => por[d].max),
+          borderColor: "#8FAEDC", backgroundColor: "rgba(143,174,220,0.12)",
+          fill: true, yAxisID: "y", tension: 0.3, borderWidth: 2, pointRadius: 2.5, pointBackgroundColor: "#8FAEDC" },
+        { label: "Volumen (kg)", data: fechas.map(d => por[d].vol),
+          borderColor: "#62687A", borderDash: [4, 4], yAxisID: "y1",
+          tension: 0.3, borderWidth: 1.5, pointRadius: 0 },
       ],
     },
     options: {
       scales: {
-        y:  { position: "left",  ticks: { color: "#8b949e" }, grid: { color: "#30363d" } },
-        y1: { position: "right", ticks: { color: "#8b949e" }, grid: { drawOnChartArea: false } },
-        x:  { ticks: { color: "#8b949e" }, grid: { color: "#30363d" } },
+        y:  { position: "left", grid: { color: "#1E2330" } },
+        y1: { position: "right", grid: { drawOnChartArea: false } },
+        x:  { grid: { display: false } },
       },
-      plugins: { legend: { labels: { color: "#e6edf3" } } },
+      plugins: { legend: { labels: { color: "#9AA1B3", boxWidth: 14, boxHeight: 2 } } },
     },
   });
-  $("prog-info").textContent = fechas.length
-    ? `${fechas.length} sesiones con este ejercicio`
-    : "Sin datos para este ejercicio todavía";
+  $("pg-max").textContent = fechas.length ? +maxKg.toFixed(1) : "—";
+  $("pg-e1rm").textContent = fechas.length ? maxE1 : "—";
+  $("pg-ses").textContent = fechas.length || "—";
+  $("prog-info").textContent = fechas.length ? "" : "Sin datos para este ejercicio todavía.";
 }
 
 // ---------- TEMPORIZADOR DE DESCANSO ----------
