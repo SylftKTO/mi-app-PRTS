@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · Apuntes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  .tools { display: flex; gap: 8px; margin-top: 14px; }
+  .tools input[type="search"] { flex: 1; min-width: 0; }
+  .tools button { white-space: nowrap; padding: 10px 16px; }
+
+  .regla {
+    margin-top: 12px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: var(--radius);
+    font-size: 0.78rem; color: var(--faint); line-height: 1.45;
+  }
+  .regla b { color: var(--muted); font-weight: 500; }
+
+  /* lista */
+  .note-card { cursor: pointer; }
+  .note-card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .note-card .tema { font-family: var(--serif); font-size: 17px; }
+  .note-card .fecha { font-family: var(--mono); font-size: 10px; color: var(--faint); white-space: nowrap; }
+  .note-card .materia { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin-top: 2px; }
+  .note-card .resumen { font-size: 0.85rem; color: var(--muted); margin-top: 8px; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+  /* editor */
+  .ed-meta { display: flex; gap: 8px; margin-top: 14px; }
+  .ed-meta input { flex: 1; min-width: 0; }
+  .ed-meta input[type="date"] { flex: 0 0 130px; }
+  .campo { margin-top: 14px; }
+  .campo .mono-label { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .campo textarea {
+    width: 100%; min-height: 84px; resize: vertical;
+    font-size: 15px; font-family: var(--sans); line-height: 1.5;
+    border-radius: 10px; border: 1px solid var(--line);
+    background: var(--surface-2); color: var(--text); padding: 11px 12px; outline: none;
+  }
+  .campo textarea:focus { border-color: var(--accent-deep); }
+  .campo textarea.mono-f { font-family: var(--mono); font-size: 13.5px; }
+  #ed-estado { font-family: var(--mono); font-size: 10px; color: var(--faint); }
+  #ed-estado.ok { color: var(--ok); }
+  .ed-head { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+  .ed-head a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); text-decoration: none; }
+  .btn-del { margin-top: 18px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Apuntes</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- LISTA -->
+<div id="view-lista" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Apuntes</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+
+  <h1 class="page-title">Apuntes</h1>
+  <div class="mono-label page-sub" id="contador">—</div>
+
+  <div class="tools">
+    <input type="search" id="buscar" placeholder="Buscar por tema, materia o contenido…">
+    <button class="btn-primary" id="btn-nuevo">+ Nuevo</button>
+  </div>
+
+  <div class="regla"><b>Regla de los 10 minutos:</b> llena la plantilla justo al salir de clase, mientras el contexto sigue fresco. Cinco campos, sin perfeccionismo.</div>
+
+  <div id="lista"></div>
+</div>
+
+<!-- EDITOR -->
+<div id="view-editor" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Apuntes</small></div>
+    <div class="links"><a href="#" id="btn-volver">‹ Volver</a></div>
+  </div>
+
+  <div class="ed-head">
+    <h1 class="page-title" style="font-size:24px">Apunte</h1>
+    <span id="ed-estado">—</span>
+  </div>
+
+  <div class="ed-meta">
+    <input type="text" id="ed-subject" placeholder="Materia" list="materias">
+    <datalist id="materias"></datalist>
+    <input type="date" id="ed-date">
+  </div>
+  <div class="ed-meta">
+    <input type="text" id="ed-topic" placeholder="Tema de la clase">
+  </div>
+
+  <div class="campo">
+    <div class="mono-label">Conceptos clave</div>
+    <textarea id="ed-key" placeholder="Los 3–5 conceptos centrales de la clase…"></textarea>
+  </div>
+  <div class="campo">
+    <div class="mono-label">Fórmulas</div>
+    <textarea id="ed-formulas" class="mono-f" placeholder="Fórmulas, definiciones formales, unidades…"></textarea>
+  </div>
+  <div class="campo">
+    <div class="mono-label">Dudas pendientes</div>
+    <textarea id="ed-doubts" placeholder="¿Qué no quedó claro? Preguntar al profe o investigar…"></textarea>
+  </div>
+  <div class="campo">
+    <div class="mono-label">Conexiones</div>
+    <textarea id="ed-connections" placeholder="¿Con qué otros temas o materias se relaciona?"></textarea>
+  </div>
+  <div class="campo">
+    <div class="mono-label">Resumen en 3 líneas</div>
+    <textarea id="ed-summary" placeholder="Si tuvieras que explicarlo en 3 líneas…"></textarea>
+  </div>
+
+  <button class="btn-ghost w100 btn-del" id="btn-borrar">Eliminar apunte</button>
+</div>
+
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span>Inicio</span></a>
+    <a class="nav-item" href="gym.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+    <a class="nav-item" href="tareas.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
+      <span>Tareas</span></a>
+    <a class="nav-item" href="dieta.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v7a2.5 2.5 0 0 0 5 0V3"/><path d="M9.5 3v18"/><path d="M17 3c-1.5 2-2 4-2 6 0 2.5 1 3 2 3v9"/></svg>
+      <span>Dieta</span></a>
+    <a class="nav-item on" href="apuntes.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>Apuntes</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+
+let notaActual = null;
+let timerSave = null;
+
+function hoyMX() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+}
+function toast(txt) {
+  const t = $("toast");
+  t.textContent = txt; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+function show(id) {
+  ["view-login", "view-lista", "view-editor"].forEach(v => $(v).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+  $("navbar").classList.toggle("hidden", id === "view-editor");
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- LISTA ----------
+async function cargarLista() {
+  const q = $("buscar").value.trim();
+  let query = sb.from("notes").select("*").order("note_date", { ascending: false }).order("created_at", { ascending: false }).limit(100);
+  if (q) query = query.or(
+    `topic.ilike.%${q}%,subject.ilike.%${q}%,summary.ilike.%${q}%,key_concepts.ilike.%${q}%,doubts.ilike.%${q}%`
+  );
+  const { data: notas, error } = await query;
+  if (error) { alert(error.message); return; }
+
+  $("contador").textContent = `${notas.length} apunte${notas.length === 1 ? "" : "s"}${q ? " encontrados" : ""}`;
+  const cont = $("lista");
+  cont.innerHTML = "";
+  if (!notas.length) {
+    cont.innerHTML = `<div class="card muted">${q ? "Nada coincide con la búsqueda." : "Aún no hay apuntes. El primero toma 10 minutos."}</div>`;
+    return;
+  }
+  // datalist de materias
+  const materias = [...new Set(notas.map(n => n.subject).filter(Boolean))];
+  $("materias").innerHTML = materias.map(m => `<option value="${m.replace(/"/g, "&quot;")}">`).join("");
+
+  for (const n of notas) {
+    const card = document.createElement("div");
+    card.className = "card note-card";
+    card.innerHTML = `
+      <div class="top">
+        <div class="tema">${(n.topic || "Sin tema").replace(/</g, "&lt;")}</div>
+        <div class="fecha">${n.note_date}</div>
+      </div>
+      <div class="materia">${(n.subject || "—").replace(/</g, "&lt;")}</div>
+      ${n.summary ? `<div class="resumen">${n.summary.replace(/</g, "&lt;")}</div>` : ""}`;
+    card.onclick = () => abrirEditor(n);
+    cont.appendChild(card);
+  }
+}
+
+$("buscar").oninput = () => { clearTimeout(timerSave); timerSave = setTimeout(cargarLista, 350); };
+
+// ---------- EDITOR ----------
+const CAMPOS = {
+  "ed-subject": "subject", "ed-topic": "topic", "ed-date": "note_date",
+  "ed-key": "key_concepts", "ed-formulas": "formulas", "ed-doubts": "doubts",
+  "ed-connections": "connections", "ed-summary": "summary",
+};
+
+function abrirEditor(nota) {
+  notaActual = nota;
+  $("ed-subject").value = nota.subject || "";
+  $("ed-topic").value = nota.topic || "";
+  $("ed-date").value = nota.note_date;
+  $("ed-key").value = nota.key_concepts || "";
+  $("ed-formulas").value = nota.formulas || "";
+  $("ed-doubts").value = nota.doubts || "";
+  $("ed-connections").value = nota.connections || "";
+  $("ed-summary").value = nota.summary || "";
+  $("ed-estado").textContent = "guardado";
+  $("ed-estado").className = "ok";
+  show("view-editor");
+}
+
+async function guardar() {
+  if (!notaActual) return;
+  const payload = { updated_at: new Date().toISOString() };
+  for (const [el, col] of Object.entries(CAMPOS)) payload[col] = $(el).value;
+  if (!payload.note_date) payload.note_date = hoyMX();
+  const { error } = await sb.from("notes").update(payload).eq("id", notaActual.id);
+  $("ed-estado").textContent = error ? "error al guardar" : "guardado";
+  $("ed-estado").className = error ? "" : "ok";
+}
+
+// autoguardado con debounce
+for (const el of Object.keys(CAMPOS)) {
+  $(el).addEventListener("input", () => {
+    $("ed-estado").textContent = "escribiendo…";
+    $("ed-estado").className = "";
+    clearTimeout(timerSave);
+    timerSave = setTimeout(guardar, 800);
+  });
+}
+
+$("btn-nuevo").onclick = async () => {
+  const { data, error } = await sb.from("notes").insert({ note_date: hoyMX() }).select().single();
+  if (error) { alert(error.message); return; }
+  abrirEditor(data);
+  $("ed-subject").focus();
+};
+
+$("btn-volver").onclick = async (e) => {
+  e.preventDefault();
+  clearTimeout(timerSave);
+  await guardar();
+  // descartar apuntes vacíos recién creados
+  if (notaActual && !$("ed-topic").value.trim() && !$("ed-key").value.trim() &&
+      !$("ed-summary").value.trim() && !$("ed-subject").value.trim()) {
+    await sb.from("notes").delete().eq("id", notaActual.id);
+  }
+  notaActual = null;
+  show("view-lista");
+  cargarLista();
+};
+
+$("btn-borrar").onclick = async () => {
+  if (!confirm("¿Eliminar este apunte definitivamente?")) return;
+  await sb.from("notes").delete().eq("id", notaActual.id);
+  notaActual = null;
+  toast("Apunte eliminado");
+  show("view-lista");
+  cargarLista();
+};
+
+// ---------- ARRANQUE ----------
+async function init() {
+  show("view-lista");
+  cargarLista();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
