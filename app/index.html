@@ -6,232 +6,274 @@
 <meta name="theme-color" content="#0B0D12">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<title>SYLFT · Gym</title>
+<title>PRTS · Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <style>
-  /* ---------- Selector de día ---------- */
-  .days {
-    display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
-    margin: 18px -16px 0; padding: 2px 16px 4px;
+  :root {
+    --bg: #0B0D12; --panel: #10131B; --panel2: #141823; --border: #1D2230;
+    --text: #E8EAF0; --muted: #8A93A6; --dim: #5A6275;
+    --blue: #7DA2D8; --green: #5FB97E; --yellow: #D2A547; --red: #D87070;
   }
-  .days::-webkit-scrollbar { display: none; }
-  .day-chip {
-    flex: 0 0 auto; background: var(--surface); border: 1px solid var(--line);
-    color: var(--muted); border-radius: 11px; padding: 8px 14px;
-    font-size: 14px; font-weight: 600; white-space: nowrap; text-align: left;
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Inter", -apple-system, sans-serif; font-size: 15px;
+    display: flex; min-height: 100vh;
   }
-  .day-chip .t {
-    display: block; font-family: var(--mono); font-size: 9px;
-    letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint);
+  a { color: inherit; text-decoration: none; }
+  .mono {
+    font-family: "JetBrains Mono", monospace; font-size: 0.68rem;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--dim);
   }
-  .day-chip.on { background: var(--text); border-color: var(--text); color: var(--bg); }
-  .day-chip.on .t { color: #565B68; }
-  .day-chip.today:not(.on) { border-color: var(--accent-deep); }
-  .day-tools { display: flex; justify-content: flex-end; margin-top: 10px; }
-  .day-tools input { font-size: 13px; padding: 6px 10px; font-family: var(--mono); color: var(--muted); }
+  .serif { font-family: "Source Serif 4", serif; }
 
-  /* ---------- Tarjeta de ejercicio ---------- */
-  .ex-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-  .ex-name { font-family: var(--serif); font-size: 19px; font-weight: 500; line-height: 1.2; }
-  .ex-target {
-    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
-    text-transform: uppercase; color: var(--faint); margin-top: 3px;
+  /* ---------- SIDEBAR ---------- */
+  aside {
+    width: 230px; min-width: 230px; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 20px 14px; gap: 4px;
   }
-  .stag {
-    display: inline-block; margin-left: 8px; vertical-align: 2px;
-    font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--warn);
-    border: 1px solid rgba(217, 167, 99, 0.35); border-radius: 6px; padding: 2px 6px;
+  .brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 18px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .brand .logo {
+    width: 42px; height: 42px; border-radius: 10px; background: #F4F2EC;
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
   }
-  .e1rm { flex: 0 0 auto; text-align: right; font-family: var(--mono); font-size: 11px; color: var(--faint); }
-  .e1rm b { display: block; font-family: var(--serif); font-size: 19px; font-weight: 500; color: var(--text); }
-  .e1rm.up b { color: var(--accent); }
-  .e1rm .d { color: var(--accent); }
-  .last {
-    font-family: var(--mono); font-size: 11px; color: var(--accent);
-    opacity: 0.85; margin-top: 9px;
+  .brand .logo img { width: 100%; height: 100%; object-fit: contain; }
+  .brand .logo .fallback { display: none; font-family: "Source Serif 4", serif; font-size: 1.5rem; color: #1d3354; font-weight: 600; }
+  .brand h1 { font-size: 1rem; letter-spacing: 0.22em; }
+  .brand small { display: block; color: var(--dim); font-size: 0.7rem; letter-spacing: 0.04em; margin-top: 2px; }
+  .nav-label { padding: 14px 8px 6px; }
+  .nav-link {
+    display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+    border-radius: 8px; color: var(--muted); font-size: 0.9rem;
   }
-  .last.empty { color: var(--faint); opacity: 0.7; }
+  .nav-link svg { width: 17px; height: 17px; }
+  .nav-link:hover { background: var(--panel2); color: var(--text); }
+  .nav-link.on { background: var(--panel2); color: var(--text); font-weight: 500; }
+  .nav-link.soon { pointer-events: none; opacity: 0.45; justify-content: space-between; }
+  .nav-link.soon .tag { font-family: "JetBrains Mono", monospace; font-size: 0.55rem; letter-spacing: 0.15em; color: var(--dim); }
+  .side-foot { margin-top: auto; border-top: 1px solid var(--border); padding: 14px 8px 0; display: flex; align-items: center; gap: 10px; }
+  .side-foot .avatar {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--panel2);
+    border: 1px solid var(--border); display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; color: var(--muted); font-weight: 600;
+  }
+  .side-foot .who { flex: 1; min-width: 0; }
+  .side-foot .who div { font-size: 0.85rem; }
+  .side-foot a { font-size: 0.7rem; color: var(--dim); }
+  .side-foot a:hover { color: var(--red); }
 
-  .set-row { display: flex; gap: 8px; margin-top: 9px; align-items: center; }
-  .set-row .n {
-    width: 20px; text-align: center; font-family: var(--mono);
-    font-size: 11px; color: var(--faint);
+  /* ---------- MAIN ---------- */
+  main { flex: 1; padding: 22px 28px 40px; overflow-y: auto; }
+  .map-head { text-align: center; margin-bottom: 10px; }
+  .map-head .muted { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+  #map-wrap {
+    position: relative; border: 1px solid var(--border); border-radius: 14px;
+    background: radial-gradient(ellipse at center, #0E1119 0%, var(--bg) 75%);
+    height: 46vh; min-height: 330px;
   }
-  .set-row input {
-    flex: 1; min-width: 0; margin: 0; text-align: center;
-    font-family: var(--mono); font-weight: 500; padding: 11px 6px;
-  }
-  .set-row button { padding: 11px 16px; font-size: 14px; min-width: 56px; }
-  .set-row.done input { border-color: rgba(133, 196, 158, 0.4); color: var(--ok); background: var(--surface); }
-  .set-row.done button { background: transparent; border-color: transparent; color: var(--ok); }
-  .set-row.pr-flare input {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 14px -3px var(--accent);
-    animation: flare 0.5s ease;
-  }
-  @keyframes flare { 0% { transform: scale(0.97); } 55% { transform: scale(1.03); } 100% { transform: scale(1); } }
-  .add-set {
-    width: 100%; margin-top: 10px; padding: 9px;
-    background: transparent; border: 1px dashed var(--line);
-    color: var(--faint); font-size: 13px; font-weight: 600;
-  }
-
-  /* ---------- Progreso ---------- */
-  #prog-ex { width: 100%; }
-  .prog-stats { margin-top: 12px; }
-
-  /* ---------- Temporizador de descanso ---------- */
-  #rest-timer {
-    position: fixed; bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 14px);
-    left: 50%; transform: translateX(-50%); z-index: 40;
-    display: flex; align-items: center; gap: 12px;
-    background: var(--surface-3); border: 1px solid var(--line);
-    border-radius: 999px; padding: 9px 10px 9px 18px;
-    font-family: var(--mono); font-size: 13px; color: var(--muted);
-    box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.7);
-  }
-  #rest-timer b { color: var(--text); font-weight: 500; font-size: 15px; }
-  #rest-timer.over b { color: var(--ok); }
-  #rest-timer button {
-    background: transparent; border: 1px solid var(--line); color: var(--faint);
-    border-radius: 999px; width: 30px; height: 30px; padding: 0; font-size: 13px; line-height: 1;
+  #map { width: 100%; height: 100%; display: block; cursor: default; }
+  #map-tip {
+    position: absolute; pointer-events: none; background: var(--panel2);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
+    font-size: 0.75rem; color: var(--text); opacity: 0; transition: opacity 0.15s;
+    transform: translate(-50%, -130%); white-space: nowrap;
   }
 
-  .screen-fade { animation: fade 0.25s ease; }
-  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  /* ---------- PANELES ---------- */
+  .grid { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; margin-top: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; }
+  .panel-head a { font-size: 0.72rem; color: var(--blue); }
+  .stack { display: flex; flex-direction: column; gap: 16px; }
+
+  /* briefing PRTS (contenedor para Fase 4) */
+  #prts-panel { border-color: #232A3D; background: linear-gradient(135deg, #11141d 0%, #10131B 100%); }
+  #prts-briefing { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
+  #prts-briefing .serif { color: var(--text); font-size: 1.02rem; }
+  .pulse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); margin-right: 8px; animation: pulse 2.4s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
+
+  /* tareas */
+  .trow { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
+  .trow:last-child { border-bottom: none; }
+  .trow .chk {
+    width: 19px; height: 19px; min-width: 19px; border-radius: 6px;
+    border: 1.5px solid var(--dim); background: transparent; cursor: pointer; padding: 0;
+  }
+  .trow.done .chk { background: var(--blue); border-color: var(--blue); }
+  .trow .t { flex: 1; font-size: 0.92rem; }
+  .trow.done .t { text-decoration: line-through; color: var(--dim); }
+  .trow .badge { font-family: "JetBrains Mono", monospace; font-size: 0.62rem; letter-spacing: 0.12em; text-transform: uppercase; }
+  .empty { color: var(--dim); font-size: 0.85rem; padding: 8px 0; }
+
+  /* progreso */
+  .prow { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .prow label { width: 110px; font-size: 0.82rem; color: var(--muted); }
+  .bar { flex: 1; height: 5px; background: var(--panel2); border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--blue); border-radius: 3px; transition: width 0.6s; }
+  .prow span { font-family: "JetBrains Mono", monospace; font-size: 0.7rem; color: var(--muted); min-width: 36px; text-align: right; }
+
+  /* clases (contenedor futuro) */
+  .future-note { color: var(--dim); font-size: 0.8rem; line-height: 1.5; }
+
+  /* ---------- LOGIN ---------- */
+  #view-login { margin: auto; width: min(360px, 90vw); }
+  #view-login .panel { padding: 26px; }
+  #view-login input {
+    width: 100%; margin-top: 10px; padding: 11px; font-size: 1rem;
+    border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  }
+  #view-login button {
+    width: 100%; margin-top: 14px; padding: 12px; border: none; border-radius: 8px;
+    background: var(--blue); color: #0B0D12; font-weight: 600; font-size: 1rem; cursor: pointer;
+  }
+  #msg { margin-top: 10px; font-size: 0.85rem; color: var(--red); min-height: 1.2em; }
+  .hidden { display: none !important; }
+
+  @media (max-width: 900px) {
+    aside { display: none; }
+    .grid { grid-template-columns: 1fr; }
+    main { padding: 16px; }
+  }
 </style>
 </head>
 <body>
 
 <!-- LOGIN -->
-<div id="view-login" class="hidden login-wrap">
-  <div class="logo">Sylft</div>
-  <div class="mono-label" style="margin-top:6px">Sistema personal · Gym</div>
-  <div class="card">
-    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
-    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
-    <button id="btn-login" class="btn-primary w100">Entrar</button>
-    <button id="btn-signup" class="btn-ghost w100">Crear cuenta</button>
+<div id="view-login" class="hidden">
+  <div class="panel">
+    <div class="mono" style="margin-bottom:8px">PRTS · Acceso</div>
+    <input id="email" type="email" placeholder="Correo" autocomplete="username">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button id="btn-login">Entrar</button>
     <div id="msg"></div>
   </div>
 </div>
 
-<!-- APP -->
-<div id="view-app" class="hidden">
-  <div class="brand-row">
-    <div class="brand">Sylft <small>· Gym</small></div>
-    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+<!-- SIDEBAR -->
+<aside id="sidebar" class="hidden">
+  <div class="brand">
+    <div class="logo">
+      <img src="logo.png" alt="" onerror="this.remove(); this.parentElement.querySelector('.fallback').style.display='flex'">
+      <span class="fallback">S</span>
+    </div>
+    <div>
+      <h1>PRTS</h1>
+      <small>Sistema personal</small>
+    </div>
   </div>
 
-  <h1 id="day-title" class="page-title">—</h1>
-  <div id="day-date" class="mono-label page-sub"></div>
+  <div class="nav-label mono">Principal</div>
+  <a class="nav-link on" href="index.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+    Dashboard</a>
+  <a class="nav-link" href="tareas.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
+    Tareas</a>
+  <a class="nav-link soon" href="#"><span>Semana</span><span class="tag">pronto</span></a>
+  <a class="nav-link soon" href="#"><span>Proyectos</span><span class="tag">pronto</span></a>
 
-  <!-- HOY -->
-  <div id="view-hoy" class="screen-fade">
-    <div class="days" id="day-chips"></div>
-    <div class="day-tools"><input type="date" id="day-date-pick"></div>
+  <div class="nav-label mono">Estudio &amp; academias</div>
+  <a class="nav-link soon" href="#"><span>Apuntes</span><span class="tag">pronto</span></a>
+  <a class="nav-link soon" href="#"><span>Alumnos</span><span class="tag">pronto</span></a>
+  <a class="nav-link soon" href="#"><span>Contenido</span><span class="tag">pronto</span></a>
 
-    <div class="stat-grid" id="day-stats">
-      <div class="stat-card"><div class="l">Volumen</div><div class="v" id="st-vol">0</div><div class="s">kg hoy</div></div>
-      <div class="stat-card"><div class="l">Series</div><div class="v" id="st-sets">0</div><div class="s" id="st-sets-sub">de 0</div></div>
-      <div class="stat-card"><div class="l">Récords</div><div class="v acc" id="st-prs">0</div><div class="s">e1RM superado</div></div>
+  <div class="nav-label mono">Salud &amp; finanzas</div>
+  <a class="nav-link" href="gym.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+    Gimnasio</a>
+  <a class="nav-link soon" href="#"><span>Hábitos</span><span class="tag">pronto</span></a>
+  <a class="nav-link soon" href="#"><span>Dieta</span><span class="tag">pronto</span></a>
+  <a class="nav-link soon" href="#"><span>Finanzas</span><span class="tag">pronto</span></a>
+
+  <div class="side-foot">
+    <div class="avatar" id="avatar">·</div>
+    <div class="who">
+      <div id="who-name">—</div>
+      <a href="#" id="btn-logout">salir</a>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main id="view-app" class="hidden">
+  <div class="map-head">
+    <div class="mono" style="color:var(--blue)">Mapa del sistema</div>
+    <div class="muted">Red de módulos · pasa el cursor para explorar · clic para navegar</div>
+  </div>
+  <div id="map-wrap">
+    <canvas id="map"></canvas>
+    <div id="map-tip"></div>
+  </div>
+
+  <div class="grid">
+    <div class="stack">
+      <!-- Contenedor PRTS: briefing diario (Fase 4) -->
+      <div class="panel" id="prts-panel">
+        <div class="panel-head">
+          <span class="mono" style="color:var(--blue)"><span class="pulse-dot"></span>PRTS · Briefing del día</span>
+          <span class="mono" id="fecha-hoy"></span>
+        </div>
+        <div id="prts-briefing">
+          <div class="serif">Pronto. En espera de datos suficientes.</div>
+          
+          Este panel mostrará el resumen diario: tareas críticas, rutina del día y alertas.
+        </div>
+      </div>
+
+      <!-- Tareas de hoy -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono">Tareas prioritarias</span>
+          <a href="tareas.html">ver todas ›</a>
+        </div>
+        <div id="lista-tareas"><div class="empty">Cargando…</div></div>
+      </div>
     </div>
 
-    <div id="exercises"></div>
-  </div>
+    <div class="stack">
+      <!-- Hoy en el gym -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono">Gimnasio · hoy</span>
+          <a href="gym.html">abrir ›</a>
+        </div>
+        <div id="gym-hoy" class="future-note">Cargando…</div>
+      </div>
 
-  <!-- PROGRESO -->
-  <div id="progress" class="hidden">
-    <div class="card">
-      <select id="prog-ex"></select>
-      <canvas id="prog-chart" style="margin-top:14px"></canvas>
+      <!-- Progreso semanal -->
+      <div class="panel">
+        <div class="panel-head"><span class="mono">Progreso semanal</span></div>
+        <div class="prow"><label>Gym</label><div class="bar"><i id="bar-gym" style="width:0%"></i></div><span id="txt-gym">—</span></div>
+        <div class="prow"><label>Tareas</label><div class="bar"><i id="bar-tareas" style="width:0%"></i></div><span id="txt-tareas">—</span></div>
+        <div class="prow"><label>Hábitos</label><div class="bar"><i style="width:0%"></i></div><span class="mono" style="min-width:auto">pronto</span></div>
+      </div>
+
+      <!-- Contenedor futuro: próximas clases (módulo Alumnos) -->
+      <div class="panel" id="panel-clases">
+        <div class="panel-head"><span class="mono">Próximas clases</span></div>
+        <div class="future-note">Disponible cuando se construya el módulo <b>Alumnos</b></div>
+      </div>
     </div>
-    <div class="stat-grid prog-stats">
-      <div class="stat-card"><div class="l">Peso máx</div><div class="v" id="pg-max">—</div><div class="s">kg</div></div>
-      <div class="stat-card"><div class="l">Mejor e1RM</div><div class="v acc" id="pg-e1rm">—</div><div class="s">estimado</div></div>
-      <div class="stat-card"><div class="l">Sesiones</div><div class="v" id="pg-ses">—</div><div class="s">registradas</div></div>
-    </div>
-    <div id="prog-info" class="muted" style="margin-top:12px"></div>
   </div>
-</div>
+</main>
 
-<!-- Temporizador de descanso -->
-<div id="rest-timer" class="hidden">
-  <span>descanso&nbsp; <b id="rest-time">0:00</b></span>
-  <button id="rest-close">✕</button>
-</div>
-
-<!-- Nav inferior -->
-<nav class="navbar" id="navbar">
-  <div class="nav-inner">
-    <button class="nav-item on" id="tab-hoy">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
-      <span>Hoy</span></button>
-    <button class="nav-item" id="tab-prog">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-5 3 3 5-7"/></svg>
-      <span>Progreso</span></button>
-    <a class="nav-item" href="tareas.html">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 12l2.2 2.2L15.5 9.5"/></svg>
-      <span>Tareas</span></a>
-  </div>
-</nav>
-
-<div class="toast" id="toast"></div>
+<div id="rest"></div>
 
 <script>
 const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
-
-const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-const DIAS3 = ["DOM","LUN","MAR","MIÉ","JUE","VIE","SÁB"];
-const MESES3 = ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"];
-
-// Rutina real (seed inicial; después la fuente de verdad es la BD)
-const SEED = {
-  0: { name: "Leg A",  ex: [["Abductores",3,6,10],["Extensiones",3,6,10],["Péndulo / Hack",2,6,10],["Femoral",2,6,10],["Peso muerto",3,6,10],["Hip thrust",3,6,10],["Pantorrilla",3,10,15]] },
-  1: { name: "Push A", ex: [["Fondos",3,6,10],["Pushdowns",3,6,10],["Overhead",3,6,10],["Peck Deck (negra)",3,6,10],["Press pecho alto",3,6,10],["Militar",2,8,15],["Elevaciones",2,8,15],["Hombro posterior",3,8,15]] },
-  2: { name: "Pull A", ex: [["Predicador",3,6,10],["Martillo",3,6,10],["Jalón al pecho",3,6,10],["Jalón cerrado",2,6,10],["Remo T",3,6,10],["Gatitos",3,6,10]] },
-  3: { name: "Leg B",  ex: [["Abductores",4,6,10],["Extensiones",4,6,10],["Péndulo / Hack",4,6,10],["Pantorrilla",4,6,10]] },
-  4: { name: "Push B", ex: [["Fondos",3,6,10],["Pushdowns",3,6,10],["Overhead",3,6,10],["Peck Deck (negra)",3,6,10],["Press pecho alto",3,6,10],["Militar",2,8,15],["Elevaciones",2,8,15],["Hombro posterior",3,8,15]] },
-  5: { name: "Pull B", ex: [["Predicador",3,6,10],["Martillo",3,6,10],["Jalón al pecho",3,6,10],["Jalón cerrado",2,6,10],["Remo T",3,6,10],["Gatitos",3,6,10]] },
-};
-
 const $ = (id) => document.getElementById(id);
-const show = (id) => {
-  $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden");
-  $(id).classList.remove("hidden");
-  $("navbar").classList.toggle("hidden", id === "view-login");
-};
-
-const e1rm = (w, r) => (w > 0 && r > 0) ? Math.round(w * (1 + r / 30)) : 0; // Epley
-const fmt = (n) => n >= 10000 ? (n / 1000).toFixed(1) + "k" : Math.round(n).toLocaleString("es-MX");
+const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
 function hoyMX() {
-  const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); // YYYY-MM-DD
-  const wd = new Date(s + "T12:00:00").getDay();
-  return { fecha: s, weekday: wd };
-}
-function semanaISO(fecha) {
-  const t = new Date(fecha + "T12:00:00");
-  t.setDate(t.getDate() + 3 - ((t.getDay() + 6) % 7));
-  const w1 = new Date(t.getFullYear(), 0, 4);
-  return 1 + Math.round(((t - w1) / 864e5 - 3 + ((w1.getDay() + 6) % 7)) / 7);
-}
-
-let toastT;
-function toast(msg, pr) {
-  const el = $("toast");
-  el.textContent = msg;
-  el.className = "toast show" + (pr ? " pr" : "");
-  clearTimeout(toastT);
-  toastT = setTimeout(() => el.className = "toast", 2400);
+  const s = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  return { fecha: s, weekday: new Date(s + "T12:00:00").getDay() };
 }
 
 // ---------- AUTH ----------
@@ -239,328 +281,222 @@ $("btn-login").onclick = async () => {
   const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
   if (error) $("msg").textContent = error.message; else init();
 };
-$("btn-signup").onclick = async () => {
-  const { error } = await sb.auth.signUp({ email: $("email").value, password: $("password").value });
-  $("msg").textContent = error ? error.message : "Cuenta creada. Si pide confirmación, revisa tu correo.";
-};
-$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); show("view-login"); };
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
 
-// ---------- SEED ----------
-async function seedSiVacio() {
-  const { count } = await sb.from("routine_days").select("*", { count: "exact", head: true });
-  if (count > 0) return;
-  const nombres = [...new Set(Object.values(SEED).flatMap(d => d.ex.map(e => e[0])))];
-  const { data: exs } = await sb.from("exercises").insert(nombres.map(name => ({ name }))).select();
-  const exId = Object.fromEntries(exs.map(e => [e.name, e.id]));
-  for (const [wd, d] of Object.entries(SEED)) {
-    const { data: day } = await sb.from("routine_days").insert({ weekday: +wd, name: d.name }).select().single();
-    await sb.from("routine_exercises").insert(d.ex.map((e, i) => ({
-      routine_day_id: day.id, exercise_id: exId[e[0]], position: i,
-      target_sets: e[1], rep_min: e[2], rep_max: e[3],
-    })));
+// ---------- MAPA DEL SISTEMA ----------
+// El nodo central es PRTS, la capa de IA que conecta todos los módulos.
+const NODOS = [
+  { id: "prts",      label: "PRTS",      sub: "Asistente · IA",      x: 0.50, y: 0.44, r: 30, core: true },
+  { id: "dashboard", label: "Dashboard", sub: "Vista general",       x: 0.50, y: 0.13, r: 17, href: "index.html", on: true },
+  { id: "semana",    label: "Semana",    sub: "Bloques de tiempo",   x: 0.26, y: 0.20, r: 15 },
+  { id: "tareas",    label: "Tareas",    sub: "Pendientes del día",  x: 0.74, y: 0.20, r: 17, href: "tareas.html", on: true },
+  { id: "alumnos",   label: "Alumnos",   sub: "Wolves · LevelUp",    x: 0.20, y: 0.42, r: 15 },
+  { id: "proyectos", label: "Proyectos", sub: "Semestre actual",     x: 0.78, y: 0.46, r: 15 },
+  { id: "dieta",     label: "Dieta",     sub: "Superávit +200",      x: 0.92, y: 0.50, r: 13 },
+  { id: "contenido", label: "Contenido", sub: "Instagram",           x: 0.12, y: 0.66, r: 13 },
+  { id: "finanzas",  label: "Finanzas",  sub: "Ingresos · Gastos",   x: 0.30, y: 0.70, r: 14 },
+  { id: "recursos",  label: "Recursos",  sub: "Biblioteca digital",  x: 0.43, y: 0.78, r: 13 },
+  { id: "retro",     label: "Retro",     sub: "Revisión mensual",    x: 0.55, y: 0.83, r: 12 },
+  { id: "apuntes",   label: "Apuntes",   sub: "Plantilla 5 campos",  x: 0.62, y: 0.66, r: 15 },
+  { id: "gym",       label: "Gimnasio",  sub: "Rutina 5 días",       x: 0.80, y: 0.72, r: 17, href: "gym.html", on: true },
+  { id: "habitos",   label: "Hábitos",   sub: "Tracker semanal",     x: 0.93, y: 0.76, r: 13 },
+];
+const ENLACES = [
+  ["prts","dashboard"],["prts","semana"],["prts","tareas"],["prts","alumnos"],
+  ["prts","proyectos"],["prts","finanzas"],["prts","recursos"],["prts","apuntes"],
+  ["prts","gym"],["prts","retro"],["prts","contenido"],
+  ["gym","habitos"],["gym","dieta"],["alumnos","contenido"],["alumnos","finanzas"],
+  ["tareas","proyectos"],["apuntes","recursos"],["semana","tareas"],["proyectos","dieta"],
+];
+const nodo = (id) => NODOS.find(n => n.id === id);
+
+let canvas, ctx, W, H, dpr, hovered = null;
+const particulas = ENLACES.map((e, i) => ({ e, t: Math.random(), v: 0.0012 + Math.random() * 0.002 }));
+
+function resizeMap() {
+  const wrap = $("map-wrap");
+  dpr = window.devicePixelRatio || 1;
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function drawMap(time) {
+  ctx.clearRect(0, 0, W, H);
+  const px = (n) => ({ x: n.x * W, y: n.y * H });
+
+  // enlaces
+  ctx.lineWidth = 1;
+  for (const [a, b] of ENLACES) {
+    const A = px(nodo(a)), B = px(nodo(b));
+    ctx.strokeStyle = "rgba(125,162,216,0.10)";
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
   }
+  // partículas
+  for (const p of particulas) {
+    p.t += p.v; if (p.t > 1) p.t = 0;
+    const A = px(nodo(p.e[0])), B = px(nodo(p.e[1]));
+    const x = A.x + (B.x - A.x) * p.t, y = A.y + (B.y - A.y) * p.t;
+    ctx.fillStyle = "rgba(125,162,216,0.5)";
+    ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill();
+  }
+  // nodos
+  for (const n of NODOS) {
+    const P = px(n);
+    const pulso = n.core ? 1 + 0.06 * Math.sin(time / 600) : 1;
+    const r = n.r * pulso;
+    const activo = n.core || n.on;
+    const hover = hovered === n;
+
+    const g = ctx.createRadialGradient(P.x, P.y, r * 0.2, P.x, P.y, r * (n.core ? 2.2 : 1.8));
+    g.addColorStop(0, n.core ? "rgba(125,162,216,0.55)" : activo ? "rgba(125,162,216,0.35)" : "rgba(125,162,216,0.12)");
+    g.addColorStop(1, "rgba(125,162,216,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(P.x, P.y, r * (n.core ? 2.2 : 1.8), 0, 7); ctx.fill();
+
+    ctx.fillStyle = n.core ? "#22324C" : activo ? "#1B2536" : "#151A26";
+    ctx.strokeStyle = hover ? "#A9C4E8" : activo ? "rgba(125,162,216,0.65)" : "rgba(125,162,216,0.22)";
+    ctx.lineWidth = hover ? 1.8 : 1.2;
+    ctx.beginPath(); ctx.arc(P.x, P.y, r, 0, 7); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = activo ? "#E8EAF0" : "#8A93A6";
+    ctx.font = `${n.core ? 600 : 500} ${n.core ? 12 : 10.5}px Inter, sans-serif`;
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(n.label, P.x, P.y);
+    ctx.fillStyle = "rgba(138,147,166,0.75)";
+    ctx.font = "9px Inter, sans-serif";
+    ctx.fillText(n.sub, P.x, P.y + r + 13);
+  }
+  requestAnimationFrame(drawMap);
 }
 
-// ---------- VISTA ----------
-let sessionId = null;
-let routineDays = [];
-let todaySets = [];        // sets registrados en la fecha mostrada
-let bestHist = {};         // mejor e1RM histórico por exercise_id (antes de la fecha)
-let targetTotal = 0;       // series objetivo del día
-
-async function init() {
-  show("view-app");
-  await seedSiVacio();
-  const { data } = await sb.from("routine_days").select("*").order("weekday");
-  routineDays = data;
-  $("day-date-pick").value = hoyMX().fecha;
-  $("day-date-pick").onchange = () => renderDia();
-  renderDia();
+function nodoEn(mx, my) {
+  for (const n of NODOS) {
+    const dx = mx - n.x * W, dy = my - n.y * H;
+    if (Math.hypot(dx, dy) <= n.r + 6) return n;
+  }
+  return null;
 }
 
-function renderChips(weekday) {
-  const hoy = hoyMX().weekday;
-  $("day-chips").innerHTML = DIAS.map((d, i) => {
-    const rd = routineDays.find(r => r.weekday === i);
-    return `<button class="day-chip ${i === weekday ? "on" : ""} ${i === hoy ? "today" : ""}" data-wd="${i}">
-      <span class="t">${DIAS3[i]}</span>${rd ? rd.name : "Descanso"}
-    </button>`;
-  }).join("");
-  $("day-chips").querySelectorAll(".day-chip").forEach(b => b.onclick = () => {
-    // cambiar de día mueve la fecha dentro de la misma semana
-    const base = new Date($("day-date-pick").value + "T12:00:00");
-    base.setDate(base.getDate() + (+b.dataset.wd - base.getDay()));
-    $("day-date-pick").value = base.toISOString().slice(0, 10);
-    renderDia();
+function initMapa() {
+  canvas = $("map"); ctx = canvas.getContext("2d");
+  resizeMap();
+  new ResizeObserver(resizeMap).observe($("map-wrap"));
+  canvas.addEventListener("mousemove", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    hovered = nodoEn(e.clientX - rect.left, e.clientY - rect.top);
+    canvas.style.cursor = hovered && (hovered.href || hovered.core) ? "pointer" : "default";
+    const tip = $("map-tip");
+    if (hovered) {
+      tip.style.left = hovered.x * W + "px";
+      tip.style.top = hovered.y * H + "px";
+      tip.textContent = hovered.core ? "PRTS — capa de IA (Fase 4)" :
+        hovered.href ? `${hovered.label} — abrir` : `${hovered.label} — próximamente`;
+      tip.style.opacity = 1;
+    } else tip.style.opacity = 0;
   });
-  const on = $("day-chips").querySelector(".day-chip.on");
-  if (on) on.scrollIntoView({ inline: "center", block: "nearest" });
+  canvas.addEventListener("mouseleave", () => { hovered = null; $("map-tip").style.opacity = 0; });
+  canvas.addEventListener("click", () => { if (hovered?.href) location.href = hovered.href; });
+  requestAnimationFrame(drawMap);
 }
 
-function updateStats() {
-  let vol = 0, prs = 0;
-  todaySets.forEach(s => {
-    vol += +s.weight_kg * s.reps;
-    const best = bestHist[s.exercise_id] || 0;
-    if (best > 0 && e1rm(+s.weight_kg, s.reps) > best) prs++;
-  });
-  $("st-vol").textContent = fmt(vol);
-  $("st-sets").textContent = todaySets.length;
-  $("st-sets-sub").textContent = `de ${targetTotal}`;
-  $("st-prs").textContent = prs;
+// ---------- DATOS ----------
+function deadlineBadge(dl, fecha) {
+  if (!dl) return ["", "var(--dim)"];
+  const dias = Math.round((new Date(dl + "T12:00") - new Date(fecha + "T12:00")) / 864e5);
+  if (dias < 0) return [`vencida`, "var(--red)"];
+  if (dias === 0) return ["hoy", "var(--red)"];
+  if (dias === 1) return ["mañana", "var(--yellow)"];
+  if (dias <= 2) return [`${dias} días`, "var(--yellow)"];
+  return [new Date(dl + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }), "var(--dim)"];
 }
 
-async function renderDia() {
-  const fecha = $("day-date-pick").value;
-  const weekday = new Date(fecha + "T12:00:00").getDay();
-  renderChips(weekday);
-  const rd = routineDays.find(r => r.weekday === weekday);
-  const d = new Date(fecha + "T12:00:00");
-  $("day-title").textContent = rd ? rd.name : "Descanso";
-  $("day-date").textContent = `${DIAS3[weekday]} ${d.getDate()} ${MESES3[d.getMonth()]} · SEMANA ${semanaISO(fecha)}`;
-
-  const cont = $("exercises");
+async function cargarTareas(fecha) {
+  const { data: tasks } = await sb.from("tasks")
+    .select("*").eq("status", "pendiente")
+    .order("deadline", { ascending: true, nullsFirst: false }).limit(6);
+  const cont = $("lista-tareas");
   cont.innerHTML = "";
-  todaySets = []; bestHist = {}; targetTotal = 0;
-  if (!rd) {
-    $("day-stats").classList.add("hidden");
-    cont.innerHTML = `<div class="card muted">Hoy toca descansar.</div>`;
-    return;
-  }
-  $("day-stats").classList.remove("hidden");
-
-  // sesión del día (si existe)
-  const { data: ses } = await sb.from("workout_sessions").select("id").eq("session_date", fecha).maybeSingle();
-  sessionId = ses?.id ?? null;
-
-  const { data: rex } = await sb.from("routine_exercises")
-    .select("*, exercises(name)").eq("routine_day_id", rd.id).order("position");
-
-  // sets ya registrados en la fecha
-  if (sessionId) {
-    const { data } = await sb.from("workout_sets").select("*").eq("session_id", sessionId);
-    todaySets = data || [];
-  }
-
-  // historial de todos los ejercicios del día en una sola consulta
-  const exIds = [...new Set(rex.map(r => r.exercise_id))];
-  const { data: histAll } = await sb.from("workout_sets")
-    .select("exercise_id, weight_kg, reps, set_number, workout_sessions!inner(session_date)")
-    .in("exercise_id", exIds)
-    .lt("workout_sessions.session_date", fecha)
-    .limit(4000);
-
-  targetTotal = rex.reduce((a, re) => a + re.target_sets, 0);
-
-  for (const re of rex) {
-    const hist = (histAll || []).filter(h => h.exercise_id === re.exercise_id);
-
-    // mejor e1RM histórico
-    bestHist[re.exercise_id] = hist.reduce((m, h) => Math.max(m, e1rm(+h.weight_kg, h.reps)), 0);
-
-    // última sesión con este ejercicio
-    let lastTxt = "Sin historial todavía", ghost = [], estancado = false;
-    if (hist.length) {
-      const lastDate = hist.map(h => h.workout_sessions.session_date).sort().pop();
-      ghost = hist.filter(h => h.workout_sessions.session_date === lastDate)
-        .sort((a, b) => a.set_number - b.set_number);
-      const dl = new Date(lastDate + "T12:00:00");
-      lastTxt = `ÚLTIMA VEZ · ${dl.getDate()} ${MESES3[dl.getMonth()]} — ` +
-        ghost.map(s => `${+s.weight_kg}×${s.reps}`).join(" · ");
-
-      // estancamiento: ≥4 sesiones y el máximo de los últimos 21 días no supera al anterior
-      const porFecha = {};
-      hist.forEach(h => {
-        const f = h.workout_sessions.session_date;
-        porFecha[f] = Math.max(porFecha[f] || 0, +h.weight_kg);
-      });
-      const fechasEx = Object.keys(porFecha).sort();
-      if (fechasEx.length >= 4) {
-        const corte = new Date(fecha + "T12:00:00");
-        corte.setDate(corte.getDate() - 21);
-        const corteStr = corte.toISOString().slice(0, 10);
-        const rec = fechasEx.filter(f => f >= corteStr);
-        const ant = fechasEx.filter(f => f < corteStr);
-        if (rec.length >= 2 && ant.length >= 1) {
-          estancado = Math.max(...rec.map(f => porFecha[f])) <= Math.max(...ant.map(f => porFecha[f]));
-        }
-      }
-    }
-
-    const card = document.createElement("div");
-    card.className = "card";
-    const best = bestHist[re.exercise_id];
-    card.innerHTML = `
-      <div class="ex-head">
-        <div>
-          <div class="ex-name">${re.exercises.name}${estancado ? '<span class="stag">3+ sem sin progresar</span>' : ""}</div>
-          <div class="ex-target">${re.target_sets} series · ${re.rep_min}–${re.rep_max} reps</div>
-        </div>
-        ${best > 0 ? `<div class="e1rm" data-e1rm>mejor e1RM<b>${best}</b></div>` : ""}
-      </div>
-      <div class="last ${hist.length ? "" : "empty"}">${lastTxt}</div>
-      <div data-rows></div>
-      <button class="add-set">+ serie</button>`;
-
-    const rows = card.querySelector("[data-rows]");
-    const maxDone = todaySets.filter(s => s.exercise_id === re.exercise_id)
-      .reduce((m, s) => Math.max(m, s.set_number), 0);
-    const total = Math.max(re.target_sets, maxDone);
-    for (let n = 1; n <= total; n++) rows.appendChild(buildSetRow(re, n, ghost, card));
-    card.querySelector(".add-set").onclick = () => {
-      const next = rows.children.length + 1;
-      rows.appendChild(buildSetRow(re, next, ghost, card));
+  if (!tasks?.length) { cont.innerHTML = `<div class="empty">Sin pendientes. El día es tuyo.</div>`; return; }
+  for (const t of tasks) {
+    const [txt, color] = deadlineBadge(t.deadline, fecha);
+    const div = document.createElement("div");
+    div.className = "trow";
+    div.innerHTML = `
+      <button class="chk" title="Completar"></button>
+      <span class="t">${t.title.replace(/</g, "&lt;")}</span>
+      ${txt ? `<span class="badge" style="color:${color}">${txt}</span>` : ""}
+      <span class="badge">${t.origin}</span>`;
+    div.querySelector(".chk").onclick = async () => {
+      div.classList.add("done");
+      await sb.from("tasks").update({ status: "completada", completed_at: new Date().toISOString() }).eq("id", t.id);
+      setTimeout(() => cargarTareas(fecha), 600);
     };
-    cont.appendChild(card);
+    cont.appendChild(div);
   }
-  updateStats();
 }
 
-function buildSetRow(re, n, ghost, card) {
-  const done = todaySets.find(s => s.exercise_id === re.exercise_id && s.set_number === n);
-  const g = ghost[n - 1];
-  const row = document.createElement("div");
-  row.className = "set-row" + (done ? " done" : "");
-  row.innerHTML = `
-    <span class="n">${n}</span>
-    <input type="number" inputmode="decimal" placeholder="${g ? +g.weight_kg : "kg"}" value="${done ? +done.weight_kg : ""}" ${done ? "disabled" : ""} aria-label="kg serie ${n}">
-    <input type="number" inputmode="numeric" placeholder="${g ? g.reps : "reps"}" value="${done ? done.reps : ""}" ${done ? "disabled" : ""} aria-label="reps serie ${n}">
-    <button class="btn-primary" ${done ? "disabled" : ""}>${done ? "✓" : "OK"}</button>`;
-  const [kg, reps] = row.querySelectorAll("input");
-  row.querySelector("button").onclick = async (ev) => {
-    if (!kg.value || !reps.value) return;
-    ev.target.disabled = true;
-    const fecha = $("day-date-pick").value;
-    const rd = routineDays.find(r => r.weekday === new Date(fecha + "T12:00:00").getDay());
-    if (!sessionId) {
-      const { data: s } = await sb.from("workout_sessions")
-        .insert({ routine_day_id: rd.id, session_date: fecha }).select().single();
-      sessionId = s.id;
-    }
-    const set = { session_id: sessionId, exercise_id: re.exercise_id, set_number: n, weight_kg: +kg.value, reps: +reps.value };
-    const { error } = await sb.from("workout_sets").insert(set);
-    if (error) { ev.target.disabled = false; alert(error.message); return; }
-    todaySets.push(set);
-    row.classList.add("done");
-    kg.disabled = reps.disabled = true;
-    ev.target.textContent = "✓";
-    // ¿récord? comparar contra el mejor e1RM histórico
-    const best = bestHist[re.exercise_id] || 0;
-    const nuevo = e1rm(+kg.value, +reps.value);
-    if (best > 0 && nuevo > best) {
-      row.classList.add("pr-flare");
-      const chip = card.querySelector("[data-e1rm]");
-      if (chip) { chip.classList.add("up"); chip.innerHTML = `mejor e1RM<b>${nuevo}</b><span class="d">+${nuevo - best} kg</span>`; }
-      toast(`Récord · ${re.exercises.name} ${nuevo} e1RM (+${nuevo - best})`, true);
-    }
-    updateStats();
-    startRest();
-  };
-  return row;
-}
-
-// ---------- TABS ----------
-$("tab-hoy").onclick = () => switchTab("hoy");
-$("tab-prog").onclick = () => switchTab("prog");
-function switchTab(t) {
-  $("tab-hoy").classList.toggle("on", t === "hoy");
-  $("tab-prog").classList.toggle("on", t === "prog");
-  $("view-hoy").classList.toggle("hidden", t !== "hoy");
-  $("progress").classList.toggle("hidden", t !== "prog");
-  if (t === "prog") initProgreso();
-  window.scrollTo(0, 0);
-}
-
-// ---------- PROGRESO ----------
-Chart.defaults.color = "#767D92";
-Chart.defaults.borderColor = "#1E2330";
-Chart.defaults.font.family = "'JetBrains Mono', monospace";
-Chart.defaults.font.size = 10;
-
-let chart = null, progExLoaded = false;
-async function initProgreso() {
-  if (!progExLoaded) {
-    const { data: exs } = await sb.from("exercises").select("id, name").order("name");
-    $("prog-ex").innerHTML = exs.map(e => `<option value="${e.id}">${e.name}</option>`).join("");
-    $("prog-ex").onchange = renderProgreso;
-    progExLoaded = true;
+async function cargarGym(fecha, weekday) {
+  const { data: rd } = await sb.from("routine_days").select("*").eq("weekday", weekday).maybeSingle();
+  const { data: ses } = await sb.from("workout_sessions").select("id").eq("session_date", fecha).maybeSingle();
+  let setsHoy = 0;
+  if (ses) {
+    const { count } = await sb.from("workout_sets").select("*", { count: "exact", head: true }).eq("session_id", ses.id);
+    setsHoy = count || 0;
   }
-  renderProgreso();
+  $("gym-hoy").innerHTML = rd
+    ? `<div class="serif" style="font-size:1.3rem;color:var(--text)">${rd.name}</div>
+       <div style="margin-top:4px">${DIAS[weekday]} · ${setsHoy ? `${setsHoy} sets registrados` : "sin registrar todavía"}</div>`
+    : `<div class="serif" style="font-size:1.3rem;color:var(--text)">Descanso</div><div style="margin-top:4px">${DIAS[weekday]}</div>`;
 }
 
-async function renderProgreso() {
-  const { data: sets } = await sb.from("workout_sets")
-    .select("weight_kg, reps, workout_sessions!inner(session_date)")
-    .eq("exercise_id", $("prog-ex").value).limit(1000);
-  const por = {};
-  let maxKg = 0, maxE1 = 0;
-  (sets || []).forEach(s => {
-    const d = s.workout_sessions.session_date;
-    por[d] = por[d] || { max: 0, vol: 0 };
-    por[d].max = Math.max(por[d].max, +s.weight_kg);
-    por[d].vol += +s.weight_kg * s.reps;
-    maxKg = Math.max(maxKg, +s.weight_kg);
-    maxE1 = Math.max(maxE1, e1rm(+s.weight_kg, s.reps));
-  });
-  const fechas = Object.keys(por).sort();
-  if (chart) chart.destroy();
-  chart = new Chart($("prog-chart"), {
-    type: "line",
-    data: {
-      labels: fechas.map(f => {
-        const d = new Date(f + "T12:00:00");
-        return `${d.getDate()} ${MESES3[d.getMonth()].toLowerCase()}`;
-      }),
-      datasets: [
-        { label: "Peso máx (kg)", data: fechas.map(d => por[d].max),
-          borderColor: "#8FAEDC", backgroundColor: "rgba(143,174,220,0.12)",
-          fill: true, yAxisID: "y", tension: 0.3, borderWidth: 2, pointRadius: 2.5, pointBackgroundColor: "#8FAEDC" },
-        { label: "Volumen (kg)", data: fechas.map(d => por[d].vol),
-          borderColor: "#62687A", borderDash: [4, 4], yAxisID: "y1",
-          tension: 0.3, borderWidth: 1.5, pointRadius: 0 },
-      ],
-    },
-    options: {
-      scales: {
-        y:  { position: "left", grid: { color: "#1E2330" } },
-        y1: { position: "right", grid: { drawOnChartArea: false } },
-        x:  { grid: { display: false } },
-      },
-      plugins: { legend: { labels: { color: "#9AA1B3", boxWidth: 14, boxHeight: 2 } } },
-    },
-  });
-  $("pg-max").textContent = fechas.length ? +maxKg.toFixed(1) : "—";
-  $("pg-e1rm").textContent = fechas.length ? maxE1 : "—";
-  $("pg-ses").textContent = fechas.length || "—";
-  $("prog-info").textContent = fechas.length ? "" : "Sin datos para este ejercicio todavía.";
+async function cargarProgreso(fecha, weekday) {
+  // semana actual desde el domingo (tu semana de rutina inicia en Dom)
+  const ini = new Date(fecha + "T12:00:00");
+  ini.setDate(ini.getDate() - weekday);
+  const iniStr = ini.toISOString().slice(0, 10);
+
+  const { count: sesiones } = await sb.from("workout_sessions")
+    .select("*", { count: "exact", head: true }).gte("session_date", iniStr);
+  const { count: hechas } = await sb.from("tasks")
+    .select("*", { count: "exact", head: true }).eq("status", "completada").gte("completed_at", iniStr);
+  const { count: pendientes } = await sb.from("tasks")
+    .select("*", { count: "exact", head: true }).eq("status", "pendiente");
+
+  const gymPct = Math.min(100, (sesiones / 6) * 100);
+  $("bar-gym").style.width = gymPct + "%";
+  $("txt-gym").textContent = `${sesiones}/6`;
+  const total = hechas + pendientes;
+  $("bar-tareas").style.width = (total ? (hechas / total) * 100 : 0) + "%";
+  $("txt-tareas").textContent = `${hechas}/${total}`;
 }
 
-// ---------- TEMPORIZADOR DE DESCANSO ----------
-let restInt = null, restStart = null;
-function startRest() {
-  restStart = Date.now();
-  $("rest-timer").classList.remove("hidden", "over");
-  clearInterval(restInt);
-  restInt = setInterval(() => {
-    const s = Math.floor((Date.now() - restStart) / 1000);
-    $("rest-time").textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-    if (s >= 90) $("rest-timer").classList.add("over");
-  }, 500);
-}
-$("rest-close").onclick = () => { clearInterval(restInt); $("rest-timer").classList.add("hidden"); };
+// ---------- ARRANQUE ----------
+async function init() {
+  $("view-login").classList.add("hidden");
+  $("sidebar").classList.remove("hidden");
+  $("view-app").classList.remove("hidden");
 
-// arranque
+  const { data: { user } } = await sb.auth.getUser();
+  if (user?.email) {
+    $("who-name").textContent = user.email.split("@")[0];
+    $("avatar").textContent = user.email.slice(0, 2).toUpperCase();
+  }
+  const { fecha, weekday } = hoyMX();
+  $("fecha-hoy").textContent = new Date(fecha + "T12:00").toLocaleDateString("es-MX", { weekday: "long", day: "numeric", month: "long" });
+
+  initMapa();
+  cargarTareas(fecha);
+  cargarGym(fecha, weekday);
+  cargarProgreso(fecha, weekday);
+}
+
 (async () => {
-  if (PRTS_CONFIG.SUPABASE_URL.includes("TU-PROYECTO")) {
-    show("view-login");
-    $("msg").textContent = "Falta configurar config.js con los datos de tu proyecto Supabase.";
-    return;
-  }
   const { data: { session } } = await sb.auth.getSession();
-  session ? init() : show("view-login");
+  if (session) init(); else $("view-login").classList.remove("hidden");
 })();
 
-// PWA: registrar service worker
+// PWA
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 </script>
 </body>
