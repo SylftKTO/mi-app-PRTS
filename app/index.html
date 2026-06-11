@@ -79,6 +79,7 @@
     </div>
     <div style="text-align:right">
       <select id="day-select"></select><br>
+      <input type="date" id="day-date-pick" style="margin-top:6px;padding:6px 8px;font-size:0.85rem;width:auto"><br>
       <a href="#" id="btn-logout" class="muted" style="font-size:0.75rem">salir</a>
     </div>
   </div>
@@ -152,11 +153,22 @@ async function init() {
     const rd = routineDays.find(r => r.weekday === i);
     return `<option value="${i}" ${i === weekday ? "selected" : ""}>${d.slice(0,3)} · ${rd ? rd.name : "Descanso"}</option>`;
   }).join("");
-  $("day-select").onchange = () => renderDia(+$("day-select").value, fecha);
-  renderDia(weekday, fecha);
+  $("day-date-pick").value = fecha;
+  // cambiar de día mueve la fecha dentro de la misma semana
+  $("day-select").onchange = () => {
+    const base = new Date($("day-date-pick").value + "T12:00:00");
+    base.setDate(base.getDate() + (+$("day-select").value - base.getDay()));
+    $("day-date-pick").value = base.toISOString().slice(0, 10);
+    renderDia();
+  };
+  $("day-date-pick").onchange = () => renderDia();
+  renderDia();
 }
 
-async function renderDia(weekday, fecha) {
+async function renderDia() {
+  const fecha = $("day-date-pick").value;
+  const weekday = new Date(fecha + "T12:00:00").getDay();
+  $("day-select").value = weekday;
   const rd = routineDays.find(r => r.weekday === weekday);
   $("day-title").textContent = rd ? rd.name : "Descanso";
   $("day-date").textContent = `${DIAS[weekday]} · ${fecha}`;
@@ -179,16 +191,20 @@ async function renderDia(weekday, fecha) {
   }
 
   for (const re of rex) {
-    // última carga registrada para este ejercicio (antes de hoy)
-    const { data: last } = await sb.from("workout_sets")
-      .select("weight_kg, reps, created_at, workout_sessions!inner(session_date)")
+    // última sesión anterior a la fecha mostrada (por fecha de entrenamiento)
+    const { data: hist } = await sb.from("workout_sets")
+      .select("weight_kg, reps, set_number, workout_sessions!inner(session_date)")
       .eq("exercise_id", re.exercise_id)
-      .neq("workout_sessions.session_date", fecha)
-      .order("created_at", { ascending: false }).limit(re.target_sets);
+      .lt("workout_sessions.session_date", fecha)
+      .limit(60);
 
-    const lastTxt = last?.length
-      ? "Última vez: " + last.reverse().map(s => `${s.weight_kg}×${s.reps}`).join(" · ")
-      : "Sin historial todavía";
+    let lastTxt = "Sin historial todavía";
+    if (hist?.length) {
+      const lastDate = hist.map(h => h.workout_sessions.session_date).sort().pop();
+      const sets = hist.filter(h => h.workout_sessions.session_date === lastDate)
+        .sort((a, b) => a.set_number - b.set_number);
+      lastTxt = `Última vez (${lastDate}): ` + sets.map(s => `${+s.weight_kg}×${s.reps}`).join(" · ");
+    }
 
     const card = document.createElement("div");
     card.className = "card";
