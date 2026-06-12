@@ -1,0 +1,6 @@
+{"text": "PRTS, pon música para estudiar", "expect": {"intent": "open"}}
+{"text": "hola PRTS, qué tal el clima de hoy", "expect": {"intent": "weather"}}
+{"text": "PRTS, crea una tarea de estudiar para el examen de potencia el viernes", "expect": {"intent": "create_task"}}
+{"text": "PRTS, hoy pesé 78.5 kilos", "expect": {"intent": "log_weight", "params": {"weight_kg": 78.5}}}
+{"text": "PRTS, abre el módulo de dieta", "expect": {"intent": "navigate", "params": {"view": "dieta"}}}
+{"text": "PRTS, cuántas estrellas tiene la galaxia", "expect": {"intent": "unknown"}}

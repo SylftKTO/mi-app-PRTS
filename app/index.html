@@ -12,6 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="ai/actions.js"></script>
+<script src="ai/voice.js"></script>
 <style>
   :root {
     --bg: #0B0D12; --panel: #10131B; --panel2: #141823; --border: #1D2230;
@@ -292,6 +294,52 @@
   .cap-item .del { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 0.85rem; padding: 2px 5px; }
   .cap-item .del:hover { color: var(--red); }
   #cap-lista { margin-top: 6px; }
+  .cap-mic.listening { color: var(--red); border-color: var(--red); box-shadow: 0 0 14px rgba(216, 113, 113, 0.3); }
+  .cap-proc {
+    margin-top: 10px; width: 100%; padding: 7px; background: transparent; cursor: pointer;
+    border: 1px solid rgba(125, 162, 216, 0.45); border-radius: 8px; color: var(--blue);
+    font-family: "JetBrains Mono", monospace; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .cap-proc:disabled { opacity: 0.5; cursor: default; }
+  .sug-card {
+    margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(125, 162, 216, 0.35);
+    border-radius: 10px; background: rgba(125, 162, 216, 0.06);
+  }
+  .sug-card .sug-mod {
+    font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--blue);
+  }
+  .sug-card .sug-sum { margin-top: 4px; font-size: 0.88rem; color: var(--text); }
+  .sug-card .sug-raw { margin-top: 2px; font-size: 0.75rem; color: var(--dim); }
+  .sug-card .sug-actions { margin-top: 8px; display: flex; gap: 6px; }
+  .sug-card .sug-actions button {
+    padding: 5px 10px; border-radius: 7px; cursor: pointer; background: transparent;
+    border: 1px solid var(--border); color: var(--muted);
+    font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .sug-card .sug-actions .ok { border-color: var(--green); color: var(--green); }
+  .sug-card .sug-actions .no:hover { border-color: var(--red); color: var(--red); }
+  .sug-card.auto { border-color: rgba(111, 181, 174, 0.45); background: rgba(111, 181, 174, 0.06); }
+  .sug-card.auto .sug-mod { color: var(--green); }
+  .auto-cfg { margin-top: 10px; }
+  .auto-cfg summary {
+    cursor: pointer; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim);
+  }
+  .auto-cfg-body { padding: 8px 2px 2px; display: flex; flex-direction: column; gap: 8px; }
+  #auto-mods { display: flex; flex-wrap: wrap; gap: 10px; }
+  #auto-mods label {
+    display: flex; align-items: center; gap: 5px; cursor: pointer;
+    font-family: "JetBrains Mono", monospace; font-size: 0.62rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .ins-item { padding: 8px 2px; border-bottom: 1px solid var(--border); }
+  .ins-item:last-child { border-bottom: none; }
+  .ins-item .k {
+    font-family: "JetBrains Mono", monospace; font-size: 0.56rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--blue);
+  }
+  .ins-item .t { font-size: 0.9rem; color: var(--text); margin-top: 2px; }
+  .ins-item .d { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
 
   /* --- Tareas --- */
   .torigin-head {
@@ -450,8 +498,18 @@
           <button id="cap-add" class="f-btn">Capturar</button>
         </div>
         <div id="cap-lista"></div>
+        <div id="cap-sugerencias"></div>
+        <button id="cap-procesar" class="cap-proc">Procesar con PRTS</button>
+        <details class="auto-cfg">
+          <summary class="mono">Automático (Fase 4.3)</summary>
+          <div class="auto-cfg-body">
+            <div class="muted" style="font-size:0.78rem">Módulos que PRTS aplica sin confirmar cuando la confianza es alta. Actívalos solo donde el acierto medido sea bueno.</div>
+            <div id="auto-mods"></div>
+            <div id="auto-acc" class="muted" style="font-size:0.75rem"></div>
+          </div>
+        </details>
         <div class="future-note" id="cap-note" style="margin-top:10px">
-          PRTS procesará estas capturas y completará el registro en el módulo correspondiente (Fase 4).
+          PRTS clasifica tus capturas y tú confirmas antes de escribir en cada módulo.
         </div>
       </div>
 
@@ -472,6 +530,16 @@
         <div class="panel-head"><span class="mono">Progreso semanal</span></div>
         <div class="prow"><label>Gym</label><div class="bar"><i id="bar-gym" style="width:0%"></i></div><span id="txt-gym">—</span></div>
         <div class="prow"><label>Tareas</label><div class="bar"><i id="bar-tareas" style="width:0%"></i></div><span id="txt-tareas">—</span></div>
+      </div>
+
+      <!-- PRTS: insights (Fase 4.4) -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono" style="color:var(--blue)">PRTS · Insights</span>
+          <span class="mono" id="ins-periodo"></span>
+        </div>
+        <div id="ins-lista" class="future-note">Patrones de tus últimas 4 semanas (gym, peso, dieta, tareas).</div>
+        <button id="ins-generar" class="cap-proc">Analizar patrones</button>
       </div>
 
       <!-- Tareas de hoy -->
@@ -872,6 +940,12 @@ async function cargarDashboard() {
 async function addCaptura() {
   const txt = $("cap-text").value.trim();
   if (!txt) return;
+  // "PRTS, …" escrito a mano también es un comando (Fase 4.2)
+  if (/^(hola\s+)?prts\b/i.test(txt)) {
+    $("cap-text").value = "";
+    ejecutarComando(txt);
+    return;
+  }
   $("cap-add").disabled = true;
   const { error } = await sb.from("inbox_entries").insert({ raw_text: txt });
   $("cap-add").disabled = false;
@@ -909,6 +983,242 @@ async function cargarInbox() {
   }
   if (!data.length) cont.innerHTML = `<div class="empty">Sin capturas pendientes.</div>`;
 }
+
+// --- Fase 4.1: procesar inbox con PRTS (sugerir-y-confirmar) ---
+// La Edge Function solo SUGIERE; aquí se confirma y el cliente escribe (RLS).
+const MOD_LABEL = { tareas: "Tarea", recordatorio: "Recordatorio", dieta: "Dieta", apuntes: "Apunte",
+                    proyectos: "Proyecto", gym: "Gym", semana: "Semana", desconocido: "Sin clasificar" };
+const MOD_EDIT_NAV = { tareas: "#tareas", recordatorio: "#tareas", proyectos: "#proyectos",
+                       dieta: "dieta.html", apuntes: "apuntes.html", gym: "gym.html" };
+
+function notaPRTS(msg) {
+  const note = $("cap-note");
+  if (!notaPRTS.original) notaPRTS.original = note.textContent;
+  note.textContent = msg || notaPRTS.original;
+  note.style.color = msg ? "var(--blue)" : "";
+  clearTimeout(notaPRTS.t);
+  if (msg) notaPRTS.t = setTimeout(() => notaPRTS(""), 6000);
+}
+
+// Fase 4.3: configuración de auto-aplicación (módulos de alta confianza)
+const AUTO_MODULOS = ["tareas", "recordatorio", "dieta", "apuntes", "proyectos"];
+let aiCfg = { auto_modules: {}, auto_threshold: 0.9 };
+
+async function cargarAICfg() {
+  const { data } = await sb.from("ai_settings").select("auto_modules, auto_threshold").maybeSingle();
+  if (data) aiCfg = { auto_modules: data.auto_modules || {}, auto_threshold: Number(data.auto_threshold) || 0.9 };
+  renderAutoCfg();
+}
+
+async function renderAutoCfg() {
+  $("auto-mods").innerHTML = AUTO_MODULOS.map((m) =>
+    `<label><input type="checkbox" data-mod="${m}" ${aiCfg.auto_modules[m] ? "checked" : ""}>${MOD_LABEL[m]}</label>`).join("");
+  $("auto-mods").querySelectorAll("input").forEach((chk) => {
+    chk.onchange = async () => {
+      aiCfg.auto_modules[chk.dataset.mod] = chk.checked;
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await sb.from("ai_settings").upsert({ user_id: user.id, auto_modules: aiCfg.auto_modules });
+      if (error) notaPRTS("No pude guardar la configuración: " + error.message);
+    };
+  });
+  // Acierto medido (datos de 4.1): base para decidir qué automatizar
+  const { data: acc } = await sb.rpc("ai_inbox_accuracy");
+  if (acc && acc.length) {
+    $("auto-acc").textContent = "Acierto: " + acc.map((a) => {
+      const tot = Number(a.confirmadas) + Number(a.rechazadas);
+      return `${MOD_LABEL[a.module] || a.module} ${a.confirmadas}/${tot}`;
+    }).join(" · ");
+  } else {
+    $("auto-acc").textContent = "Sin datos de acierto todavía; confirma sugerencias primero.";
+  }
+}
+
+async function procesarInbox() {
+  const btn = $("cap-procesar");
+  btn.disabled = true; btn.textContent = "Procesando…";
+  try {
+    const { data, error } = await sb.functions.invoke("process-inbox", { body: {} });
+    if (error) throw error;
+    if (data.status === "degraded") { notaPRTS("IA en pausa (tope mensual). Procesa a mano por ahora."); return; }
+    await renderSugerencias(data.suggestions || []);
+    if (!(data.suggestions || []).length) notaPRTS("Sin capturas pendientes que procesar.");
+  } catch (err) {
+    notaPRTS("PRTS no respondió; tus capturas siguen pendientes (camino manual).");
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = "Procesar con PRTS";
+  }
+}
+
+async function renderSugerencias(items) {
+  const cont = $("cap-sugerencias");
+  cont.innerHTML = "";
+  for (const it of items) {
+    const div = document.createElement("div");
+    div.className = "sug-card";
+    const s = it.suggestion;
+    if (it.status !== "ok" || !s) {
+      div.innerHTML = `<div class="sug-mod">Sin sugerencia</div>
+        <div class="sug-raw">${esc(it.raw_text)}</div>
+        <div class="sug-sum">No pude clasificarla; procésala a mano.</div>`;
+      cont.appendChild(div); continue;
+    }
+
+    // Fase 4.3: auto-aplicar si el módulo está habilitado y la confianza supera el umbral
+    if (s.action === "create" && aiCfg.auto_modules[s.module] && s.confidence >= aiCfg.auto_threshold) {
+      const res = await aplicarSugerencia(it.id, s);
+      if (!res.error) {
+        div.className = "sug-card auto";
+        div.innerHTML = `
+          <div class="sug-mod">Auto · ${MOD_LABEL[s.module]} · ${(s.confidence * 100).toFixed(0)}%</div>
+          <div class="sug-sum">${esc(s.summary)}</div>
+          <div class="sug-raw">${esc(it.raw_text)}</div>
+          <div class="sug-actions"><button class="no">Deshacer</button></div>`;
+        div.querySelector(".no").onclick = () => deshacerAplicacion(it.id, res, div);
+        cont.appendChild(div);
+        continue;
+      }
+      // si falla la inserción automática, cae a la tarjeta de confirmación
+    }
+
+    const confiable = s.confidence >= 0.8 && s.action === "create";
+    div.innerHTML = `
+      <div class="sug-mod">${MOD_LABEL[s.module] || s.module} · ${(s.confidence * 100).toFixed(0)}%</div>
+      <div class="sug-sum">PRTS interpretó: ${esc(s.summary)}</div>
+      <div class="sug-raw">${esc(it.raw_text)}</div>
+      <div class="sug-actions">
+        ${confiable ? `<button class="ok">Confirmar</button>` : ""}
+        ${MOD_EDIT_NAV[s.module] ? `<button class="ed">Editar</button>` : ""}
+        <button class="no">Descartar</button>
+      </div>`;
+    div.querySelector(".ok")?.addEventListener("click", async () => {
+      const res = await aplicarSugerencia(it.id, s);
+      if (res.error) { notaPRTS("Error al crear: " + res.error); return; }
+      div.remove();
+      notaPRTS(`Listo: ${MOD_LABEL[s.module]} creado.`);
+      cargarInbox(); cargarDashboard(); renderAutoCfg();
+    });
+    div.querySelector(".ed")?.addEventListener("click", () => {
+      // Editar = completar a mano en el módulo; la captura queda pendiente
+      const dest = MOD_EDIT_NAV[s.module];
+      dest.startsWith("#") ? switchView(dest.slice(1)) : (location.href = dest);
+    });
+    div.querySelector(".no").addEventListener("click", async () => {
+      // Rechazo de sugerencia: se guarda el módulo sugerido para medir acierto (4.3)
+      await sb.from("inbox_entries").update({
+        status: "descartada",
+        result: { suggested_module: s.module, summary: s.summary, rejected: true },
+      }).eq("id", it.id);
+      div.remove(); cargarInbox(); renderAutoCfg();
+    });
+    cont.appendChild(div);
+  }
+}
+
+// Inserción por módulo (whitelist cerrada: nada fuera de este switch).
+// Devuelve { error } o { table, targetId, modulo } para poder deshacer.
+const MOD_TABLA = { tareas: "tasks", recordatorio: "tasks", dieta: "meal_logs", apuntes: "notes", proyectos: "projects" };
+async function aplicarSugerencia(id, s) {
+  let res, modulo = s.module;
+  const p = s.payload || {};
+  switch (s.module) {
+    case "tareas":
+      res = await sb.from("tasks").insert({ title: p.title, origin: p.origin, priority: p.priority, deadline: p.deadline ?? null }).select("id").single();
+      break;
+    case "recordatorio":
+      modulo = "tareas";
+      res = await sb.from("tasks").insert({ title: p.title, origin: "personal", priority: "media", deadline: p.deadline ?? null }).select("id").single();
+      break;
+    case "dieta":
+      res = await sb.from("meal_logs").insert({ meal: p.meal, name: p.name, kcal: p.kcal, protein_g: p.protein_g, carbs_g: p.carbs_g, fat_g: p.fat_g }).select("id").single();
+      break;
+    case "apuntes":
+      res = await sb.from("notes").insert({ subject: p.subject, topic: p.topic, summary: p.summary }).select("id").single();
+      break;
+    case "proyectos":
+      res = await sb.from("projects").insert({ name: p.name, due_date: p.due_date ?? null }).select("id").single();
+      break;
+    default:
+      return { error: "Ese módulo aún no acepta escritura automática." };
+  }
+  if (res.error) return { error: res.error.message };
+  // Reversibilidad: la captura guarda qué se creó (módulo, id destino, resumen)
+  await sb.from("inbox_entries").update({
+    status: "procesada", processed_at: new Date().toISOString(),
+    result: { module: modulo, target_id: res.data.id, summary: s.summary },
+  }).eq("id", id);
+  cargarInbox();
+  return { table: MOD_TABLA[s.module], targetId: res.data.id, modulo };
+}
+
+// Deshacer una aplicación automática: borra el registro creado y la captura vuelve a pendiente
+async function deshacerAplicacion(entryId, res, card) {
+  const { error } = await sb.from(res.table).delete().eq("id", res.targetId);
+  if (error) { notaPRTS("No pude deshacer: " + error.message); return; }
+  await sb.from("inbox_entries").update({ status: "pendiente", processed_at: null, result: null }).eq("id", entryId);
+  card.remove();
+  notaPRTS("Deshecho; la captura vuelve a pendientes.");
+  cargarInbox(); cargarDashboard();
+}
+
+// ---------- INSIGHTS (Fase 4.4: patrones sobre ~4 semanas) ----------
+function renderInsights(row) {
+  $("ins-periodo").textContent = row ? `${row.period_start} → ${row.period_end}` : "";
+  if (!row || !row.items?.length) return;
+  $("ins-lista").className = "";
+  $("ins-lista").innerHTML = row.items.map((i) => `
+    <div class="ins-item">
+      <div class="k">${esc(i.kind)}</div>
+      <div class="t">${esc(i.title)}</div>
+      <div class="d">${esc(i.detail)}</div>
+    </div>`).join("");
+}
+
+async function cargarInsights() {
+  const { data } = await sb.from("ai_insights")
+    .select("items, period_start, period_end")
+    .order("period_end", { ascending: false }).limit(1).maybeSingle();
+  if (data) renderInsights(data);
+}
+
+async function generarInsights() {
+  const btn = $("ins-generar");
+  btn.disabled = true; btn.textContent = "Analizando…";
+  try {
+    const { data, error } = await sb.functions.invoke("generate-insights", { body: { force: true } });
+    if (error) throw error;
+    if (data.status === "ok") renderInsights(data.insight);
+    else if (data.status === "insufficient") notaPRTS(data.reason);
+    else if (data.status === "degraded") notaPRTS("IA en pausa (tope mensual).");
+    else throw new Error(data.reason || "error");
+  } catch (err) {
+    notaPRTS("No pude generar el análisis; intenta más tarde.");
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = "Analizar patrones";
+  }
+}
+
+// --- Fase 4.2: comandos (voz/texto) — router híbrido ---
+// Patrones locales sin LLM; solo lo freeform va a interpret-command.
+async function ejecutarComando(texto) {
+  const local = PRTS_AI.routeLocal(texto);
+  if (local) { await PRTS_AI.executeIntent(local); return; }
+  notaPRTS("PRTS pensando…");
+  try {
+    const { data, error } = await sb.functions.invoke("interpret-command", { body: { text: texto } });
+    if (error) throw error;
+    if (data.status !== "ok" || !data.intent || data.intent.intent === "unknown") throw new Error(data.reason || "unknown");
+    await PRTS_AI.executeIntent(data.intent);
+  } catch {
+    // Degradación: el texto no se pierde — se vuelca a captura normal
+    await sb.from("inbox_entries").insert({ raw_text: texto });
+    notaPRTS("No entendí el comando; lo guardé como captura.");
+    cargarInbox();
+  }
+}
+
+const ES_COMANDO = /^(hola\s+)?prts\b|^(abre|abrir|ve a|muestra|muéstrame|resume|resumen|pon (la )?música|crea(r)? tarea|peso|clima|qué tal el clima)/i;
 
 // ---------- SEMANA (plantilla de bloques) ----------
 // weekday: convención JS getDay() → 0=Dom … 6=Sáb. Se muestra Lun→Dom.
@@ -1419,13 +1729,33 @@ async function init() {
   // captura universal
   $("cap-add").onclick = addCaptura;
   $("cap-text").onkeydown = (e) => { if (e.key === "Enter") addCaptura(); };
-  $("cap-voz").onclick = () => {
-    const note = $("cap-note");
-    const original = note.textContent;
-    note.textContent = "🎙 Captura por voz — disponible cuando se integre PRTS (Fase 4).";
-    note.style.color = "var(--blue)";
-    setTimeout(() => { note.textContent = original; note.style.color = ""; }, 2600);
-  };
+  $("cap-procesar").onclick = procesarInbox;
+  $("ins-generar").onclick = generarInsights;
+  cargarAICfg();
+  cargarInsights();
+
+  // Fase 4.2: ejecutor de intenciones + voz push-to-talk (solo escritorio Chromium)
+  PRTS_AI.initActions({ sb, switchView, notify: notaPRTS, refresh: cargarDashboard });
+  const vozOk = PRTS_AI.initVoice({
+    button: $("cap-voz"),
+    input: $("cap-text"),
+    onFinal: (transcripcion) => {
+      // Comando ("PRTS, …" o patrón conocido) → router; si no → dictado a captura
+      if (ES_COMANDO.test(transcripcion)) ejecutarComando(transcripcion);
+      else { $("cap-text").value = transcripcion; addCaptura(); }
+    },
+    onState: (st, msg) => {
+      if (st === "listening") notaPRTS("Escuchando… suelta para enviar.");
+      else if (st === "error") notaPRTS(msg || "Error de voz.");
+      else notaPRTS("");
+    },
+  });
+  if (vozOk) {
+    $("cap-voz").title = "Mantén presionado para hablar (es-MX)";
+  } else {
+    // Degradación: sin Web Speech / en móvil → se oculta el botón, captura por texto
+    $("cap-voz").classList.add("hidden");
+  }
 
   // controles Tareas
   $("tarea-origin").innerHTML = Object.entries(ORIGENES_T)

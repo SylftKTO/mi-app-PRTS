@@ -6,9 +6,18 @@ toca el cliente: se queda en los *secrets* de Supabase.
 ```
 _shared/
   llm.ts                 # cliente LLM (Anthropic por defecto) + reintentos + costo
+  schemas.ts             # validación de salidas del LLM (vocabularios cerrados)
   prompts/briefing.v1.ts # prompt versionado del briefing
+  prompts/inbox.v1.ts    # prompt del clasificador de capturas (Fase 4.1)
+  prompts/command.v1.ts  # prompt del intérprete de comandos (Fase 4.2)
 generate-briefing/
   index.ts               # genera el briefing diario y lo guarda en daily_briefings
+process-inbox/
+  index.ts               # clasifica capturas pendientes → SUGERENCIAS (el cliente confirma e inserta)
+interpret-command/
+  index.ts               # comando freeform → intención del vocabulario cerrado (el cliente ejecuta)
+generate-insights/
+  index.ts               # agrega ~4 semanas (gym/peso/dieta/tareas) → hallazgos en ai_insights
 ```
 
 > **Proveedor por defecto:** Anthropic (Claude, tier económico). Para cambiarlo se
@@ -29,9 +38,9 @@ Supabase automáticamente en las Edge Functions — **no** hay que setearlos.
 ```bash
 supabase secrets set LLM_API_KEY=sk-...            # obligatorio
 supabase secrets set LLM_MODEL=claude-haiku-4-5-20251001   # opcional (default tier económico)
-# Tarifas para el registro de costo (verificar precios vigentes del modelo):
-supabase secrets set LLM_PRICE_IN=0.80            # USD por 1M tokens de entrada (ejemplo)
-supabase secrets set LLM_PRICE_OUT=4.00           # USD por 1M tokens de salida (ejemplo)
+# Tarifas para el registro de costo — Claude Haiku 4.5 (vigentes a 2026-06-12):
+supabase secrets set LLM_PRICE_IN=1.00            # USD por 1M tokens de entrada
+supabase secrets set LLM_PRICE_OUT=5.00           # USD por 1M tokens de salida
 ```
 
 > Si no fijas `LLM_PRICE_*`, el costo se registra como `0` (el tope mensual no
@@ -41,7 +50,13 @@ supabase secrets set LLM_PRICE_OUT=4.00           # USD por 1M tokens de salida 
 
 ```bash
 supabase functions deploy generate-briefing
+supabase functions deploy process-inbox
+supabase functions deploy interpret-command
+supabase functions deploy generate-insights
 ```
+
+> `process-inbox` e `interpret-command` actúan con el **JWT del usuario** (RLS protege);
+> se invocan desde el cliente con `sb.functions.invoke(...)`. No usan service role.
 
 ## 4. Probar manualmente
 

@@ -1,0 +1,11 @@
+{"raw_text": "entregar reporte de control digital el viernes", "expect": {"module": "tareas", "action": "create"}}
+{"raw_text": "examen de electrónica de potencia el 20 de junio, prioridad alta", "expect": {"module": "tareas", "action": "create", "payload": {"origin": "escuela", "priority": "alta"}}}
+{"raw_text": "preparar material de la clase de robótica para los wolves", "expect": {"module": "tareas", "action": "create", "payload": {"origin": "wolves"}}}
+{"raw_text": "planear actividades de inglés intermedio para levelup", "expect": {"module": "tareas", "action": "create", "payload": {"origin": "levelup"}}}
+{"raw_text": "recordarme comprar creatina mañana", "expect": {"module": "recordatorio", "action": "create"}}
+{"raw_text": "desayuné 3 huevos con 2 tortillas y café", "expect": {"module": "dieta", "action": "create", "payload": {"meal": "desayuno"}}}
+{"raw_text": "cena: pechuga asada 200g con arroz", "expect": {"module": "dieta", "action": "create", "payload": {"meal": "cena"}}}
+{"raw_text": "apunte de control: el lugar de las raíces muestra la estabilidad en lazo cerrado", "expect": {"module": "apuntes", "action": "create"}}
+{"raw_text": "nuevo proyecto: brazo robótico para la demo de wolves, entrega fin de mes", "expect": {"module": "proyectos", "action": "create"}}
+{"raw_text": "hoy hice press banca 80kg 3x8", "expect": {"module": "gym", "action": "none"}}
+{"raw_text": "asdf qwerty 123", "expect": {"module": "desconocido", "action": "none"}}

@@ -30,10 +30,20 @@ export function costUsd(inTok: number, outTok: number): number {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// --- Circuit breaker (§10.5): N fallos consecutivos → pausa temporal ---
+// Estado en memoria del isolate (se reinicia en cold start, suficiente para
+// evitar martillar al proveedor durante una caída). Mientras está abierto,
+// callLLM lanza de inmediato y el llamador degrada a manual.
+const BREAKER_MAX_FAILS = 3;
+const BREAKER_PAUSE_MS = 5 * 60 * 1000;
+let consecutiveFails = 0;
+let breakerOpenUntil = 0;
+
 /**
- * Llama al LLM con reintentos + backoff exponencial en 429/5xx.
- * Lanza si agota reintentos o ante un 4xx no reintentable. El llamador
- * decide la degradación (registrar 'error' y seguir manual).
+ * Llama al LLM con reintentos + backoff exponencial en 429/5xx y circuit
+ * breaker ante fallos consecutivos. Lanza si agota reintentos, ante un 4xx
+ * no reintentable o con el breaker abierto. El llamador decide la
+ * degradación (registrar 'error' y seguir manual).
  */
 export async function callLLM(opts: {
   system: string;
@@ -41,6 +51,9 @@ export async function callLLM(opts: {
   maxTokens?: number;
 }): Promise<LLMResult> {
   if (!API_KEY) throw new Error("LLM_API_KEY no configurada");
+  if (Date.now() < breakerOpenUntil) {
+    throw new Error("circuit breaker abierto: IA en pausa temporal tras fallos repetidos");
+  }
 
   const body = {
     model: MODEL,
@@ -79,6 +92,7 @@ export async function callLLM(opts: {
         .join("")
         .trim();
 
+      consecutiveFails = 0;
       return {
         text,
         inputTokens: data.usage?.input_tokens ?? 0,
@@ -90,6 +104,10 @@ export async function callLLM(opts: {
       if ((err as { fatal?: boolean })?.fatal) break;
       if (attempt < backoff.length) await sleep(backoff[attempt]);
     }
+  }
+  if (++consecutiveFails >= BREAKER_MAX_FAILS) {
+    breakerOpenUntil = Date.now() + BREAKER_PAUSE_MS;
+    consecutiveFails = 0;
   }
   throw lastErr instanceof Error ? lastErr : new Error("LLM falló tras reintentos");
 }
