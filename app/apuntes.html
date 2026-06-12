@@ -12,6 +12,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script src="config.js"></script>
 <style>
   .tools { display: flex; gap: 8px; margin-top: 14px; }
@@ -49,6 +52,34 @@
   .campo textarea.mono-f { font-family: var(--mono); font-size: 13.5px; }
   #ed-estado { font-family: var(--mono); font-size: 10px; color: var(--faint); }
   #ed-estado.ok { color: var(--ok); }
+
+  /* preview LaTeX + enlaces */
+  .math-preview, .links-preview {
+    margin-top: 8px; padding: 10px 12px; border-radius: 10px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-size: 14px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    color: var(--muted); min-height: 0;
+  }
+  .math-preview:empty, .links-preview:empty { display: none; }
+  .math-preview .katex { color: var(--text); }
+  .preview-label { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); margin: 10px 0 4px; }
+  .wikilink { color: var(--accent); text-decoration: none; cursor: pointer; border-bottom: 1px solid var(--accent-deep); }
+  .wikilink.missing { color: var(--warn); border-bottom-color: var(--warn); }
+  #ed-backlinks { margin-top: 4px; }
+  .backlink {
+    display: inline-block; margin: 4px 6px 0 0; padding: 5px 11px;
+    background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px;
+    color: var(--muted); font-size: 0.8rem; font-family: var(--sans); font-weight: 500;
+  }
+  .backlink:active { border-color: var(--accent-deep); }
+
+  /* mini-mapa de apuntes */
+  #grafo-wrap { margin-top: 14px; }
+  #grafo {
+    width: 100%; display: block; border: 1px solid var(--line); border-radius: var(--radius);
+    background: radial-gradient(ellipse at center, #0E1119 0%, var(--bg) 80%); cursor: pointer;
+  }
+  .grafo-info { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-top: 8px; text-align: center; }
   .ed-head { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
   .ed-head a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); text-decoration: none; }
   .btn-del { margin-top: 18px; }
@@ -79,11 +110,17 @@
   <div class="mono-label page-sub" id="contador">—</div>
 
   <div class="tools">
-    <input type="search" id="buscar" placeholder="Buscar por tema, materia o contenido…">
+    <input type="search" id="buscar" placeholder="Buscar en todo el contenido…">
+    <button class="btn-ghost" id="btn-mapa" title="Mapa de enlaces">Mapa</button>
     <button class="btn-primary" id="btn-nuevo">+ Nuevo</button>
   </div>
 
-  <div class="regla"><b>Regla de los 10 minutos:</b> llena la plantilla justo al salir de clase, mientras el contexto sigue fresco. Cinco campos, sin perfeccionismo.</div>
+  <div class="regla"><b>Regla de los 10 minutos:</b> llena la plantilla justo al salir de clase, mientras el contexto sigue fresco. Enlaza temas con <b>[[doble corchete]]</b> y usa <b>$LaTeX$</b> en las fórmulas.</div>
+
+  <div id="grafo-wrap" class="hidden">
+    <canvas id="grafo"></canvas>
+    <div class="grafo-info" id="grafo-info">enlaza apuntes escribiendo [[Tema]] en cualquier campo</div>
+  </div>
 
   <div id="lista"></div>
 </div>
@@ -114,21 +151,26 @@
     <textarea id="ed-key" placeholder="Los 3–5 conceptos centrales de la clase…"></textarea>
   </div>
   <div class="campo">
-    <div class="mono-label">Fórmulas</div>
-    <textarea id="ed-formulas" class="mono-f" placeholder="Fórmulas, definiciones formales, unidades…"></textarea>
+    <div class="mono-label">Fórmulas <span style="color:var(--faint)">· $LaTeX$ y $$bloque$$</span></div>
+    <textarea id="ed-formulas" class="mono-f" placeholder="Ej: $E = mc^2$ o  $$\int_a^b f(x)\,dx$$"></textarea>
+    <div class="preview-label" id="ed-formulas-lbl"></div>
+    <div class="math-preview" id="ed-formulas-preview"></div>
   </div>
   <div class="campo">
     <div class="mono-label">Dudas pendientes</div>
     <textarea id="ed-doubts" placeholder="¿Qué no quedó claro? Preguntar al profe o investigar…"></textarea>
   </div>
   <div class="campo">
-    <div class="mono-label">Conexiones</div>
-    <textarea id="ed-connections" placeholder="¿Con qué otros temas o materias se relaciona?"></textarea>
+    <div class="mono-label">Conexiones <span style="color:var(--faint)">· enlaza con [[Tema]]</span></div>
+    <textarea id="ed-connections" placeholder="Relaciona con otros temas: [[Derivadas]], [[Límites]]…"></textarea>
+    <div class="links-preview" id="ed-connections-preview"></div>
   </div>
   <div class="campo">
     <div class="mono-label">Resumen en 3 líneas</div>
     <textarea id="ed-summary" placeholder="Si tuvieras que explicarlo en 3 líneas…"></textarea>
   </div>
+
+  <div id="ed-backlinks"></div>
 
   <button class="btn-ghost w100 btn-del" id="btn-borrar">Eliminar apunte</button>
 </div>
@@ -157,9 +199,67 @@
 const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 let notaActual = null;
 let timerSave = null;
+let todasNotas = [];        // caché completa para enlaces, backlinks y mapa
+
+// ---------- LaTeX (KaTeX) ----------
+function renderMath(el) {
+  if (!window.renderMathInElement) return;
+  try {
+    renderMathInElement(el, {
+      delimiters: [
+        { left: "$$", right: "$$", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\(", right: "\\)", display: false },
+        { left: "\\[", right: "\\]", display: true },
+      ],
+      throwOnError: false,
+    });
+  } catch (e) { /* fórmula incompleta mientras se escribe */ }
+}
+
+// ---------- Enlaces bidireccionales [[Tema]] ----------
+const LINK_RE = /\[\[([^\]]+)\]\]/g;
+function linksDe(nota) {
+  const txt = [nota.connections, nota.key_concepts, nota.summary, nota.doubts, nota.formulas].join("\n");
+  const out = new Set();
+  let m;
+  LINK_RE.lastIndex = 0;
+  while ((m = LINK_RE.exec(txt)) !== null) out.add(m[1].trim());
+  return [...out].filter(Boolean);
+}
+function resolverNota(topic) {
+  const t = topic.trim().toLowerCase();
+  return todasNotas.find(n => (n.topic || "").trim().toLowerCase() === t);
+}
+function linkify(text) {
+  return esc(text).replace(/\[\[([^\]]+)\]\]/g, (_, t) => {
+    const topic = t.trim();
+    const found = resolverNota(topic);
+    return `<a class="wikilink ${found ? "" : "missing"}" data-topic="${esc(topic).replace(/"/g, "&quot;")}">${esc(topic)}</a>`;
+  }).replace(/\n/g, "<br>");
+}
+async function irALink(topic) {
+  await guardar();
+  await cargarTodas();
+  let n = resolverNota(topic);
+  if (!n) {
+    if (!confirm(`No existe un apunte "${topic}". ¿Crearlo?`)) return;
+    const { data, error } = await sb.from("notes").insert({ topic, note_date: hoyMX() }).select().single();
+    if (error) { alert(error.message); return; }
+    n = data; await cargarTodas();
+  }
+  abrirEditor(n);
+}
+
+async function cargarTodas() {
+  const { data } = await sb.from("notes").select("*");
+  todasNotas = data || [];
+}
 
 function hoyMX() {
   return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
@@ -185,12 +285,23 @@ $("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signO
 // ---------- LISTA ----------
 async function cargarLista() {
   const q = $("buscar").value.trim();
-  let query = sb.from("notes").select("*").order("note_date", { ascending: false }).order("created_at", { ascending: false }).limit(100);
-  if (q) query = query.or(
-    `topic.ilike.%${q}%,subject.ilike.%${q}%,summary.ilike.%${q}%,key_concepts.ilike.%${q}%,doubts.ilike.%${q}%`
-  );
-  const { data: notas, error } = await query;
-  if (error) { alert(error.message); return; }
+  let notas = [];
+  if (q) {
+    // Full-text en español vía RPC; respaldo a ilike amplio si no hay match o falla.
+    const { data, error } = await sb.rpc("search_notes", { q });
+    if (!error && data) notas = data;
+    if (error || !notas.length) {
+      const { data: d2 } = await sb.from("notes").select("*")
+        .or(`topic.ilike.%${q}%,subject.ilike.%${q}%,summary.ilike.%${q}%,key_concepts.ilike.%${q}%,formulas.ilike.%${q}%,doubts.ilike.%${q}%,connections.ilike.%${q}%`)
+        .order("note_date", { ascending: false }).limit(100);
+      if (d2 && d2.length) notas = d2;
+    }
+  } else {
+    const { data, error } = await sb.from("notes").select("*")
+      .order("note_date", { ascending: false }).order("created_at", { ascending: false }).limit(100);
+    if (error) { alert(error.message); return; }
+    notas = data || [];
+  }
 
   $("contador").textContent = `${notas.length} apunte${notas.length === 1 ? "" : "s"}${q ? " encontrados" : ""}`;
   const cont = $("lista");
@@ -240,6 +351,43 @@ function abrirEditor(nota) {
   $("ed-estado").textContent = "guardado";
   $("ed-estado").className = "ok";
   show("view-editor");
+  actualizarPreviews();
+  window.scrollTo(0, 0);
+}
+
+function previewFormulas() {
+  const fp = $("ed-formulas-preview");
+  const v = $("ed-formulas").value.trim();
+  $("ed-formulas-lbl").textContent = v ? "Vista previa" : "";
+  fp.textContent = v;
+  renderMath(fp);
+}
+function previewConexiones() {
+  const cp = $("ed-connections-preview");
+  cp.innerHTML = linkify($("ed-connections").value);
+  renderMath(cp);
+  cp.querySelectorAll(".wikilink").forEach(a => a.onclick = () => irALink(a.dataset.topic));
+}
+function renderBacklinks() {
+  const box = $("ed-backlinks");
+  const topic = ($("ed-topic").value || "").trim();
+  if (!topic || !notaActual) { box.innerHTML = ""; return; }
+  const re = new RegExp("\\[\\[\\s*" + escRe(topic) + "\\s*\\]\\]", "i");
+  const refs = todasNotas.filter(n => n.id !== notaActual.id &&
+    re.test([n.connections, n.key_concepts, n.summary, n.doubts, n.formulas].join("\n")));
+  if (!refs.length) { box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="preview-label">Mencionado en (${refs.length})</div>` +
+    refs.map(n => `<button class="backlink" data-id="${n.id}">${esc(n.topic || "Sin tema")}</button>`).join("");
+  box.querySelectorAll(".backlink").forEach(b => b.onclick = async () => {
+    await guardar();
+    const n = todasNotas.find(x => x.id === b.dataset.id);
+    if (n) abrirEditor(n);
+  });
+}
+function actualizarPreviews() {
+  previewFormulas();
+  previewConexiones();
+  renderBacklinks();
 }
 
 async function guardar() {
@@ -250,6 +398,12 @@ async function guardar() {
   const { error } = await sb.from("notes").update(payload).eq("id", notaActual.id);
   $("ed-estado").textContent = error ? "error al guardar" : "guardado";
   $("ed-estado").className = error ? "" : "ok";
+  if (!error) {
+    Object.assign(notaActual, payload);
+    const idx = todasNotas.findIndex(n => n.id === notaActual.id);
+    if (idx >= 0) Object.assign(todasNotas[idx], payload); else todasNotas.push({ ...notaActual });
+    renderBacklinks();
+  }
 }
 
 // autoguardado con debounce
@@ -257,6 +411,8 @@ for (const el of Object.keys(CAMPOS)) {
   $(el).addEventListener("input", () => {
     $("ed-estado").textContent = "escribiendo…";
     $("ed-estado").className = "";
+    if (el === "ed-formulas") previewFormulas();
+    if (el === "ed-connections") previewConexiones();
     clearTimeout(timerSave);
     timerSave = setTimeout(guardar, 800);
   });
@@ -265,6 +421,7 @@ for (const el of Object.keys(CAMPOS)) {
 $("btn-nuevo").onclick = async () => {
   const { data, error } = await sb.from("notes").insert({ note_date: hoyMX() }).select().single();
   if (error) { alert(error.message); return; }
+  todasNotas.push(data);
   abrirEditor(data);
   $("ed-subject").focus();
 };
@@ -277,24 +434,112 @@ $("btn-volver").onclick = async (e) => {
   if (notaActual && !$("ed-topic").value.trim() && !$("ed-key").value.trim() &&
       !$("ed-summary").value.trim() && !$("ed-subject").value.trim()) {
     await sb.from("notes").delete().eq("id", notaActual.id);
+    todasNotas = todasNotas.filter(n => n.id !== notaActual.id);
   }
   notaActual = null;
   show("view-lista");
+  resetListaView();
+  await cargarTodas();
   cargarLista();
 };
 
 $("btn-borrar").onclick = async () => {
   if (!confirm("¿Eliminar este apunte definitivamente?")) return;
   await sb.from("notes").delete().eq("id", notaActual.id);
+  todasNotas = todasNotas.filter(n => n.id !== notaActual.id);
   notaActual = null;
   toast("Apunte eliminado");
   show("view-lista");
+  resetListaView();
   cargarLista();
 };
 
+// ---------- MINI-MAPA DE ENLACES (estilo Obsidian) ----------
+let grafoPos = [];
+$("btn-mapa").onclick = async () => {
+  const wrap = $("grafo-wrap");
+  const abriendo = wrap.classList.contains("hidden");
+  wrap.classList.toggle("hidden", !abriendo);
+  $("lista").classList.toggle("hidden", abriendo);
+  $("btn-mapa").textContent = abriendo ? "Lista" : "Mapa";
+  if (abriendo) { await cargarTodas(); dibujarGrafo(); }
+};
+window.addEventListener("resize", () => {
+  if (!$("grafo-wrap").classList.contains("hidden")) dibujarGrafo();
+});
+
+function dibujarGrafo() {
+  const canvas = $("grafo");
+  const nodes = todasNotas.filter(n => (n.topic || "").trim());
+  const W = canvas.clientWidth || 480;
+  const H = Math.max(320, Math.min(540, nodes.length * 24 + 140));
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr; canvas.height = H * dpr; canvas.style.height = H + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+
+  if (!nodes.length) { $("grafo-info").textContent = "Aún no hay apuntes con tema para enlazar."; grafoPos = []; return; }
+
+  const byTopic = {};
+  nodes.forEach(n => byTopic[(n.topic || "").trim().toLowerCase()] = n);
+  const grado = {}, edges = [];
+  nodes.forEach(n => {
+    linksDe(n).forEach(t => {
+      const m = byTopic[t.toLowerCase()];
+      if (m && m !== n) { edges.push([n, m]); grado[n.id] = (grado[n.id] || 0) + 1; grado[m.id] = (grado[m.id] || 0) + 1; }
+    });
+  });
+
+  const cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 48;
+  const single = nodes.length === 1;
+  grafoPos = nodes.map((n, i) => {
+    const a = (i / nodes.length) * Math.PI * 2 - Math.PI / 2;
+    return { n, x: single ? cx : cx + R * Math.cos(a), y: single ? cy : cy + R * Math.sin(a), r: 5 + Math.min(9, (grado[n.id] || 0) * 2) };
+  });
+  const pos = Object.fromEntries(grafoPos.map(p => [p.n.id, p]));
+
+  ctx.lineWidth = 1;
+  edges.forEach(([a, b]) => {
+    const A = pos[a.id], B = pos[b.id];
+    ctx.strokeStyle = "rgba(143,174,220,0.3)";
+    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+  });
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  grafoPos.forEach(p => {
+    const conectado = grado[p.n.id] > 0;
+    ctx.fillStyle = conectado ? "#8FAEDC" : "#4A5163";
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+    ctx.fillStyle = conectado ? "#E8EAF1" : "#9AA1B3";
+    ctx.font = "11px Inter, sans-serif";
+    const t = (p.n.topic || "").length > 16 ? p.n.topic.slice(0, 15) + "…" : p.n.topic;
+    ctx.fillText(t, p.x, p.y + p.r + 11);
+  });
+  $("grafo-info").textContent = `${nodes.length} apuntes · ${edges.length} enlaces · toca un nodo para abrir`;
+}
+
+$("grafo").addEventListener("click", (e) => {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  let hit = null, best = 1e9;
+  for (const p of grafoPos) {
+    const d = Math.hypot(mx - p.x, my - p.y);
+    if (d <= p.r + 10 && d < best) { best = d; hit = p; }
+  }
+  if (hit) abrirEditor(hit.n);
+});
+
 // ---------- ARRANQUE ----------
+function resetListaView() {
+  $("grafo-wrap").classList.add("hidden");
+  $("lista").classList.remove("hidden");
+  $("btn-mapa").textContent = "Mapa";
+}
+
 async function init() {
   show("view-lista");
+  resetListaView();
+  await cargarTodas();
   cargarLista();
 }
 

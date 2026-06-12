@@ -123,6 +123,23 @@
   #prts-briefing .serif { color: var(--text); font-size: 1.02rem; }
   .pulse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); margin-right: 8px; animation: pulse 2.4s infinite; }
   @keyframes pulse { 0%,100% { opacity: 0.35 } 50% { opacity: 1 } }
+  #prts-briefing b { color: var(--text); font-weight: 600; }
+  #prts-briefing .lead { color: var(--text); font-size: 1.02rem; font-family: "Source Serif 4", serif; display: block; margin-bottom: 6px; }
+
+  /* indicadores de alerta */
+  #prts-alertas { margin-top: 14px; display: flex; flex-direction: column; gap: 7px; }
+  #prts-alertas:empty { display: none; }
+  .alerta {
+    display: flex; align-items: center; gap: 10px; padding: 8px 11px; border-radius: 9px;
+    background: var(--panel2); border-left: 3px solid var(--yellow);
+    font-size: 0.84rem; color: var(--text);
+  }
+  .alerta.red { border-left-color: var(--red); }
+  .alerta.green { border-left-color: var(--green); }
+  .alerta .ico { width: 15px; height: 15px; flex: 0 0 auto; color: var(--yellow); }
+  .alerta.red .ico { color: var(--red); }
+  .alerta.green .ico { color: var(--green); }
+  .alerta .tag { margin-left: auto; font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
 
   /* tareas */
   .trow { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--border); }
@@ -201,8 +218,13 @@
     position: absolute; left: 3px; right: 3px; border-radius: 5px;
     padding: 3px 6px; overflow: hidden; font-size: 0.68rem; line-height: 1.25;
     border-left: 3px solid; color: var(--text);
+    cursor: grab; touch-action: none; user-select: none;
   }
   .wg-block small { display: block; font-family: "JetBrains Mono", monospace; font-size: 0.55rem; color: var(--muted); }
+  .wg-block.dragging { cursor: grabbing; opacity: 0.9; z-index: 6; box-shadow: 0 8px 22px rgba(0,0,0,0.55); }
+  .wg-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; }
+  .wg-col.drop-target { background-color: rgba(125, 162, 216, 0.13) !important; box-shadow: inset 0 0 0 1px rgba(125,162,216,0.4); }
+  .sem-hint { margin-top: 8px; font-family: "JetBrains Mono", monospace; font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
   .leyenda { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
   .leyenda span {
     display: flex; align-items: center; gap: 5px;
@@ -410,9 +432,9 @@
           <span class="mono" id="fecha-hoy"></span>
         </div>
         <div id="prts-briefing">
-          <div class="serif">Pronto. En espera de datos suficientes.</div>
-          Este panel mostrará el resumen diario: tareas críticas, rutina del día y alertas.
+          <span class="lead">Cargando el día…</span>
         </div>
+        <div id="prts-alertas"></div>
       </div>
 
       <!-- PRTS: captura universal -->
@@ -474,6 +496,7 @@
     <div>
       <div id="week-grid"></div>
       <div class="leyenda" id="sem-leyenda"></div>
+      <div class="sem-hint">Arrastra para mover · borde inferior para redimensionar · suelta sobre otro día para reprogramar</div>
     </div>
     <div class="panel">
       <div class="panel-head">
@@ -558,7 +581,7 @@ function switchView(v) {
     $("tab-" + t).classList.toggle("hidden", t !== v);
     document.querySelector(`.nav-link[data-view="${t}"]`)?.classList.toggle("on", t === v);
   }
-  if (v === "dashboard") { cargarTareas(HOY.fecha); cargarProgreso(HOY.fecha, HOY.weekday); cargarInbox(); }
+  if (v === "dashboard") { cargarDashboard(); cargarInbox(); }
   if (v === "semana") cargarSemana();
   if (v === "proyectos") cargarProyectos();
   if (v === "tareas") cargarTareasView();
@@ -605,6 +628,7 @@ const ENLACES = [
 const nodo = (id) => NODOS.find(n => n.id === id);
 
 let canvas, ctx, W, H, dpr, hovered = null;
+let HEAT = {};   // id de módulo → nº de pendientes (calor del mapa)
 const particulas = ENLACES.map((e, i) => ({ e, t: Math.random(), v: 0.0012 + Math.random() * 0.002 }));
 
 function resizeMap() {
@@ -658,6 +682,20 @@ function drawMap(time) {
       ctx.strokeStyle = hover ? "rgba(169,196,232,0.55)" : "rgba(125,162,216,0.22)";
       ctx.lineWidth = 1;
       ctx.beginPath(); ctx.arc(P.x, P.y, r + 4.5, 0, 7); ctx.stroke();
+    }
+    // calor: los módulos con pendientes irradian en ámbar
+    const calor = (activo && !n.core) ? Math.min(HEAT[n.id] || 0, 4) : 0;
+    if (calor > 0) {
+      const osc = Math.sin(time / 380 + n.x * 9);
+      const k = 0.16 + 0.085 * calor + 0.05 * osc;
+      const hg = ctx.createRadialGradient(P.x, P.y, r * 0.9, P.x, P.y, r * 2.7);
+      hg.addColorStop(0, `rgba(210,165,71,${Math.max(0, k)})`);
+      hg.addColorStop(1, "rgba(210,165,71,0)");
+      ctx.fillStyle = hg;
+      ctx.beginPath(); ctx.arc(P.x, P.y, r * 2.7, 0, 7); ctx.fill();
+      ctx.strokeStyle = `rgba(210,165,71,${0.38 + 0.2 * osc})`;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath(); ctx.arc(P.x, P.y, r + 7.5, 0, 7); ctx.stroke();
     }
     // doble arco orbital giratorio en el núcleo
     if (n.core) {
@@ -727,64 +765,101 @@ function deadlineBadge(dl, fecha) {
   return [new Date(dl + "T12:00").toLocaleDateString("es-MX", { day: "numeric", month: "short" }), "var(--dim)"];
 }
 
-async function cargarTareas(fecha) {
-  const { data: tasks } = await sb.from("tasks")
-    .select("*").eq("status", "pendiente")
-    .order("deadline", { ascending: true, nullsFirst: false }).limit(6);
+// ---------- DASHBOARD (capa agregada: un solo round-trip a dashboard_brief) ----------
+const ICO_ALERTA = {
+  reloj: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  pesa: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>',
+  entrega: '<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2.5h8a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+};
+
+function frasesBriefing(d) {
+  const f = [];
+  const g = d.gym;
+  if (g.has_routine_today) {
+    f.push(g.logged_today
+      ? `Hoy es <b>${esc(g.routine)}</b> y ya registraste ${g.sets_today} ${g.sets_today === 1 ? "serie" : "series"}.`
+      : `Hoy toca <b>${esc(g.routine)}</b> en el gym; aún sin registrar.`);
+  } else {
+    f.push(`Hoy es <b>día de descanso</b> en el gym.`);
+  }
+  const t = d.tasks;
+  f.push(t.pending
+    ? `${t.pending} ${t.pending === 1 ? "tarea pendiente" : "tareas pendientes"}` +
+      (t.urgent.length ? `, <b>${t.urgent.length} ${t.urgent.length === 1 ? "urgente" : "urgentes"}</b>.` : ".")
+    : `Sin tareas pendientes: el día es tuyo.`);
+  if (d.projects.due_soon.length)
+    f.push(`${d.projects.due_soon.length} ${d.projects.due_soon.length === 1 ? "proyecto" : "proyectos"} por entregar esta semana.`);
+  if (d.week_today.length)
+    f.push(`${d.week_today.length} ${d.week_today.length === 1 ? "bloque" : "bloques"} en tu agenda de hoy.`);
+  if (!d.diet.logged) f.push(`Aún sin comidas registradas.`);
+  return f;
+}
+
+function renderAlertas(d) {
+  const out = [];
+  for (const t of d.tasks.urgent.slice(0, 4)) {
+    const [txt, color] = deadlineBadge(t.deadline, d.fecha);
+    const red = color === "var(--red)";
+    out.push(`<div class="alerta ${red ? "red" : ""}">${ICO_ALERTA.reloj}
+      <span>${esc(t.title)}</span><span class="tag">${txt} · ${t.origin}</span></div>`);
+  }
+  for (const p of d.projects.due_soon) {
+    const dl = deadlineProj(p.due_date);
+    if (dl && dl.cls === "dlv")
+      out.push(`<div class="alerta red">${ICO_ALERTA.entrega}
+        <span>${esc(p.name)}</span><span class="tag">${dl.txt}</span></div>`);
+  }
+  if (d.gym.streak_at_risk)
+    out.push(`<div class="alerta">${ICO_ALERTA.pesa}
+      <span>${esc(d.gym.routine)} sin registrar</span><span class="tag">racha en riesgo</span></div>`);
+  $("prts-alertas").innerHTML = out.join("");
+}
+
+function renderTareasDash(tasks, fecha) {
   const cont = $("lista-tareas");
   cont.innerHTML = "";
-  if (!tasks?.length) { cont.innerHTML = `<div class="empty">Sin pendientes. El día es tuyo.</div>`; return; }
+  if (!tasks.length) { cont.innerHTML = `<div class="empty">Sin pendientes. El día es tuyo.</div>`; return; }
   for (const t of tasks) {
     const [txt, color] = deadlineBadge(t.deadline, fecha);
     const div = document.createElement("div");
     div.className = "trow";
     div.innerHTML = `
       <button class="chk" title="Completar"></button>
-      <span class="t">${t.title.replace(/</g, "&lt;")}</span>
+      <span class="t">${esc(t.title)}</span>
       ${txt ? `<span class="badge" style="color:${color}">${txt}</span>` : ""}
       <span class="badge">${t.origin}</span>`;
     div.querySelector(".chk").onclick = async () => {
       div.classList.add("done");
       await sb.from("tasks").update({ status: "completada", completed_at: new Date().toISOString() }).eq("id", t.id);
-      setTimeout(() => cargarTareas(fecha), 600);
+      setTimeout(cargarDashboard, 400);
     };
     cont.appendChild(div);
   }
 }
 
-async function cargarGym(fecha, weekday) {
-  const { data: rd } = await sb.from("routine_days").select("*").eq("weekday", weekday).maybeSingle();
-  const { data: ses } = await sb.from("workout_sessions").select("id").eq("session_date", fecha).maybeSingle();
-  let setsHoy = 0;
-  if (ses) {
-    const { count } = await sb.from("workout_sets").select("*", { count: "exact", head: true }).eq("session_id", ses.id);
-    setsHoy = count || 0;
+async function cargarDashboard() {
+  const { data: d, error } = await sb.rpc("dashboard_brief");
+  if (error || !d) {
+    $("prts-briefing").innerHTML = `<span class="lead">No pude calcular el día.</span>${error ? esc(error.message) : ""}`;
+    return;
   }
-  $("gym-hoy").innerHTML = rd
-    ? `<div class="serif" style="font-size:1.3rem;color:var(--text)">${rd.name}</div>
-       <div style="margin-top:4px">${DIAS[weekday]} · ${setsHoy ? `${setsHoy} sets registrados` : "sin registrar todavía"}</div>`
-    : `<div class="serif" style="font-size:1.3rem;color:var(--text)">Descanso</div><div style="margin-top:4px">${DIAS[weekday]}</div>`;
-}
+  const frases = frasesBriefing(d);
+  $("prts-briefing").innerHTML = `<span class="lead">${DIAS[d.weekday]}. ${frases[0]}</span>${frases.slice(1).join(" ")}`;
+  renderAlertas(d);
 
-async function cargarProgreso(fecha, weekday) {
-  // semana actual desde el domingo (tu semana de rutina inicia en Dom)
-  const ini = new Date(fecha + "T12:00:00");
-  ini.setDate(ini.getDate() - weekday);
-  const iniStr = ini.toISOString().slice(0, 10);
+  $("gym-hoy").innerHTML = d.gym.has_routine_today
+    ? `<div class="serif" style="font-size:1.3rem;color:var(--text)">${esc(d.gym.routine)}</div>
+       <div style="margin-top:4px">${DIAS[d.weekday]} · ${d.gym.sets_today ? `${d.gym.sets_today} sets registrados` : "sin registrar todavía"}</div>`
+    : `<div class="serif" style="font-size:1.3rem;color:var(--text)">Descanso</div><div style="margin-top:4px">${DIAS[d.weekday]}</div>`;
 
-  const { count: sesiones } = await sb.from("workout_sessions")
-    .select("*", { count: "exact", head: true }).gte("session_date", iniStr);
-  const { count: hechas } = await sb.from("tasks")
-    .select("*", { count: "exact", head: true }).eq("status", "completada").gte("completed_at", iniStr);
-  const { count: pendientes } = await sb.from("tasks")
-    .select("*", { count: "exact", head: true }).eq("status", "pendiente");
-
-  const gymPct = Math.min(100, (sesiones / 6) * 100);
-  $("bar-gym").style.width = gymPct + "%";
-  $("txt-gym").textContent = `${sesiones}/6`;
-  const total = hechas + pendientes;
+  $("bar-gym").style.width = Math.min(100, (d.gym.sessions_week / 6) * 100) + "%";
+  $("txt-gym").textContent = `${d.gym.sessions_week}/6`;
+  const hechas = d.tasks.completed_week, total = hechas + d.tasks.pending;
   $("bar-tareas").style.width = (total ? (hechas / total) * 100 : 0) + "%";
   $("txt-tareas").textContent = `${hechas}/${total}`;
+
+  renderTareasDash(d.tasks.next, d.fecha);
+  HEAT = d.heat || {};
 }
 
 // ---------- CAPTURA UNIVERSAL (inbox para la capa IA, Fase 4) ----------
@@ -881,6 +956,7 @@ function renderSemana() {
   for (const d of ORDEN_SEM) {
     const col = document.createElement("div");
     col.className = "wg-col" + (d === semDia ? " on" : "");
+    col.dataset.wd = d;
     col.style.height = altoCol + "px";
     col.onclick = () => { semDia = d; renderSemana(); };
     for (const b of semBloques.filter(x => x.weekday === d)) {
@@ -892,12 +968,77 @@ function renderSemana() {
       el.style.cssText = `top:${(ini - SEM_HI * 60) / 60 * SEM_PXH}px;` +
         `height:${Math.max(14, (fin - ini) / 60 * SEM_PXH - 2)}px;` +
         `background:${c}22;border-left-color:${c}`;
-      el.innerHTML = `${esc(b.label)}<small>${hhmm(b.start_time)}–${hhmm(b.end_time)}</small>`;
+      el.innerHTML = `${esc(b.label)}<small>${hhmm(b.start_time)}–${hhmm(b.end_time)}</small><div class="wg-resize"></div>`;
+      hacerBloqueInteractivo(el, b);
       col.appendChild(el);
     }
     grid.appendChild(col);
   }
   renderSemDia();
+}
+
+// ---------- Semana: arrastrar / soltar / redimensionar ----------
+const toHM = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+const SNAP = 15;                       // imán de 15 min
+const PXMIN = SEM_PXH / 60;
+const snap = (m) => Math.round(m / SNAP) * SNAP;
+
+function hacerBloqueInteractivo(el, b) {
+  const dur = mins(b.end_time) - mins(b.start_time);
+  el.addEventListener("click", (e) => e.stopPropagation());  // no cambiar de día al tocar un bloque
+
+  el.addEventListener("pointerdown", (ev) => {
+    if (ev.button != null && ev.button !== 0) return;
+    const resize = ev.target.classList.contains("wg-resize");
+    ev.stopPropagation();
+    ev.preventDefault();
+    el.setPointerCapture(ev.pointerId);
+    el.classList.add("dragging");
+
+    const startY = ev.clientY;
+    const oStart = mins(b.start_time), oEnd = mins(b.end_time);
+    let moved = false, ns = oStart, ne = oEnd, wd = b.weekday, lastCol = null;
+
+    const onMove = (e) => {
+      const dy = e.clientY - startY;
+      if (Math.abs(dy) > 3) moved = true;
+      const dmin = snap(dy / PXMIN);
+
+      if (resize) {
+        ne = Math.min(SEM_HF * 60, Math.max(oStart + SNAP, oEnd + dmin));
+        el.style.height = Math.max(14, (ne - ns) * PXMIN - 2) + "px";
+      } else {
+        ns = Math.max(SEM_HI * 60, Math.min(SEM_HF * 60 - dur, oStart + dmin));
+        ne = ns + dur;
+        el.style.top = (ns - SEM_HI * 60) * PXMIN + "px";
+        // ¿sobre otra columna? → cambiar de día
+        const under = document.elementFromPoint(e.clientX, e.clientY);
+        const colEl = under && under.closest(".wg-col");
+        if (lastCol && lastCol !== colEl) lastCol.classList.remove("drop-target");
+        if (colEl && +colEl.dataset.wd !== b.weekday) { colEl.classList.add("drop-target"); lastCol = colEl; wd = +colEl.dataset.wd; }
+        else { wd = b.weekday; lastCol = null; }
+      }
+      const lbl = el.querySelector("small");
+      if (lbl) lbl.textContent = `${toHM(ns)}–${toHM(ne)}`;
+    };
+
+    const onUp = async () => {
+      el.removeEventListener("pointermove", onMove);
+      el.removeEventListener("pointerup", onUp);
+      el.classList.remove("dragging");
+      if (lastCol) lastCol.classList.remove("drop-target");
+      if (!moved) { editarLabelSem(b); return; }      // toque sin mover = editar
+      if (ns === oStart && ne === oEnd && wd === b.weekday) { renderSemana(); return; }
+      const { error } = await sb.from("week_blocks")
+        .update({ start_time: toHM(ns), end_time: toHM(ne), weekday: wd }).eq("id", b.id);
+      if (error) alert(error.message);
+      if (wd !== b.weekday) semDia = wd;
+      cargarSemana();
+    };
+
+    el.addEventListener("pointermove", onMove);
+    el.addEventListener("pointerup", onUp);
+  });
 }
 
 function renderSemDia() {
@@ -1301,9 +1442,6 @@ async function init() {
   $("proj-toggle").onclick = () => $("proj-done").classList.toggle("hidden");
 
   initMapa();
-  cargarTareas(fecha);
-  cargarGym(fecha, weekday);
-  cargarProgreso(fecha, weekday);
   switchView(location.hash.slice(1) || "dashboard");
 }
 

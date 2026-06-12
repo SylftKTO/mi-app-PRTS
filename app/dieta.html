@@ -12,6 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <style>
   .day-tools { margin-top: 14px; }
@@ -58,6 +59,32 @@
   .form-foot label { font-size: 0.78rem; color: var(--muted); display: flex; align-items: center; gap: 6px; flex: 1; }
   .form-foot input[type="checkbox"] { accent-color: var(--accent-deep); width: 16px; height: 16px; }
   .form-foot button { padding: 9px 22px; }
+
+  /* sub-tabs */
+  .dtabs { display: flex; gap: 8px; margin-top: 14px; }
+  .dtab {
+    flex: 1; padding: 9px; font-size: 13px; font-weight: 600;
+    background: var(--surface); border: 1px solid var(--line); color: var(--muted); border-radius: 11px;
+  }
+  .dtab.on { background: var(--text); border-color: var(--text); color: var(--bg); }
+
+  /* comparativo target vs real */
+  .cmp-row { display: grid; grid-template-columns: 64px 1fr 96px; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .cmp-row:last-child { border-bottom: none; }
+  .cmp-row .lab { display: flex; align-items: center; gap: 7px; font-size: 0.86rem; }
+  .cmp-row .dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .dot.ok { background: var(--ok); } .dot.warn { background: var(--warn); } .dot.over { background: var(--danger); } .dot.none { background: var(--faint); }
+  .cmp-bar { height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; position: relative; }
+  .cmp-bar i { display: block; height: 100%; border-radius: 4px; transition: width 0.5s; }
+  .cmp-bar i.ok { background: var(--ok); } .cmp-bar i.warn { background: var(--warn); } .cmp-bar i.over { background: var(--danger); } .cmp-bar i.none { background: var(--faint); }
+  .cmp-num { font-family: var(--mono); font-size: 11px; color: var(--muted); text-align: right; white-space: nowrap; }
+  .cmp-num b { color: var(--text); font-weight: 500; }
+  .cmp-num .diff { display: block; font-size: 9.5px; color: var(--faint); margin-top: 1px; }
+  .v.ok { color: var(--ok); } .v.warn { color: var(--warn); } .v.over { color: var(--danger); }
+  .peso-form { display: flex; gap: 6px; margin-top: 10px; }
+  .peso-form input[type="number"] { flex: 1; min-width: 0; text-align: center; }
+  .peso-form input[type="date"] { flex: 0 0 130px; }
+  .v.up { color: var(--danger); } .v.down { color: var(--ok); }
 </style>
 </head>
 <body>
@@ -84,17 +111,59 @@
   <h1 class="page-title">Dieta</h1>
   <div class="mono-label page-sub">Superávit +200 kcal · 4 comidas</div>
 
-  <div class="day-tools"><input type="date" id="day-date-pick"></div>
-
-  <!-- Totales del día con semáforo -->
-  <div class="stat-grid macros">
-    <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s">de 2,135</div></div>
-    <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s">de 110 g</div></div>
-    <div class="stat-card"><div class="l">Carbs</div><div class="v" id="tot-c">0</div><div class="s">de 300 g</div></div>
-    <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s">de 55 g</div></div>
+  <div class="dtabs">
+    <button id="dt-hoy" class="dtab on">Hoy</button>
+    <button id="dt-prog" class="dtab">Peso &amp; progreso</button>
   </div>
 
-  <div id="comidas"></div>
+  <!-- ===== HOY ===== -->
+  <div id="d-hoy">
+    <div class="day-tools"><input type="date" id="day-date-pick"></div>
+
+    <!-- Totales del día con semáforo -->
+    <div class="stat-grid macros">
+      <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s">de 2,135</div></div>
+      <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s">de 110 g</div></div>
+      <div class="stat-card"><div class="l">Carbs</div><div class="v" id="tot-c">0</div><div class="s">de 300 g</div></div>
+      <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s">de 55 g</div></div>
+    </div>
+
+    <!-- Comparativo target vs real -->
+    <div class="card">
+      <div class="mono-label" style="margin-bottom:4px">Comparativo del día · target vs real</div>
+      <div id="comparativo"></div>
+    </div>
+
+    <div id="comidas"></div>
+  </div>
+
+  <!-- ===== PESO & PROGRESO ===== -->
+  <div id="d-prog" class="hidden">
+    <div class="card">
+      <div class="meal-head">
+        <div><div class="nombre">Peso corporal</div><div class="hora" id="peso-sub">media móvil 7 días</div></div>
+        <div class="meal-kcal"><b id="peso-actual">—</b> kg</div>
+      </div>
+      <div class="peso-form">
+        <input type="number" id="peso-input" inputmode="decimal" step="0.1" placeholder="kg de hoy">
+        <input type="date" id="peso-date">
+        <button class="btn-primary" id="peso-save">Guardar</button>
+      </div>
+      <canvas id="peso-chart" style="margin-top:14px"></canvas>
+      <div class="stat-grid" style="margin-top:14px">
+        <div class="stat-card"><div class="l">Media 7d</div><div class="v" id="peso-ma">—</div><div class="s">kg</div></div>
+        <div class="stat-card"><div class="l">Cambio 7d</div><div class="v" id="peso-d7">—</div><div class="s">kg</div></div>
+        <div class="stat-card"><div class="l">Cambio 30d</div><div class="v" id="peso-d30">—</div><div class="s">kg</div></div>
+      </div>
+      <div id="peso-info" class="muted" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <div class="mono-label">Adherencia semanal · días con kcal en rango</div>
+      <canvas id="adh-chart" style="margin-top:12px"></canvas>
+      <div id="corr-info" class="muted" style="margin-top:12px"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Nav inferior -->
@@ -244,6 +313,7 @@ async function cargar() {
     $(el).textContent = Math.round(sum[key]);
     $(el).className = "v " + semaforo(sum[key], TOTAL[key]);
   }
+  renderComparativo(sum);
 
   const cont = $("comidas");
   cont.innerHTML = "";
@@ -281,6 +351,208 @@ async function cargar() {
   }
 }
 
+// ---------- COMPARATIVO TARGET vs REAL ----------
+const MACROS = [
+  { key: "k", label: "Kcal", unit: "" },
+  { key: "p", label: "Proteína", unit: "g" },
+  { key: "c", label: "Carbs", unit: "g" },
+  { key: "g", label: "Grasas", unit: "g" },
+];
+function renderComparativo(sum) {
+  $("comparativo").innerHTML = MACROS.map(m => {
+    const real = Math.round(sum[m.key]), target = TOTAL[m.key];
+    const pct = Math.min(100, Math.round(real / target * 100));
+    const sem = semaforo(real, target) || "none";
+    const dif = real - target;
+    const difTxt = dif === 0 ? "en target" : dif > 0 ? `+${dif}${m.unit}` : `faltan ${-dif}${m.unit}`;
+    return `<div class="cmp-row">
+      <div class="lab"><span class="dot ${sem}"></span>${m.label}</div>
+      <div class="cmp-bar"><i class="${sem}" style="width:${pct}%"></i></div>
+      <div class="cmp-num"><b>${real}</b> / ${target}${m.unit}<span class="diff">${difTxt}</span></div>
+    </div>`;
+  }).join("");
+}
+
+// ---------- PESO & PROGRESO ----------
+Chart.defaults.color = "#767D92";
+Chart.defaults.borderColor = "#1E2330";
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+
+const MES3 = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const fmtFecha = (s) => { const d = new Date(s + "T12:00:00"); return `${d.getDate()} ${MES3[d.getMonth()]}`; };
+const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+function lunes(fechaStr) {
+  const d = new Date(fechaStr + "T12:00:00");
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); // retrocede al lunes
+  return d.toLocaleDateString("en-CA");
+}
+function pearson(xs, ys) {
+  const n = xs.length;
+  if (n < 3) return null;
+  const mx = avg(xs), my = avg(ys);
+  let num = 0, dx = 0, dy = 0;
+  for (let i = 0; i < n; i++) { const a = xs[i] - mx, b = ys[i] - my; num += a * b; dx += a * a; dy += b * b; }
+  if (dx === 0 || dy === 0) return null;
+  return num / Math.sqrt(dx * dy);
+}
+
+function dietaTab(t) {
+  $("dt-hoy").classList.toggle("on", t === "hoy");
+  $("dt-prog").classList.toggle("on", t === "prog");
+  $("d-hoy").classList.toggle("hidden", t !== "hoy");
+  $("d-prog").classList.toggle("hidden", t !== "prog");
+  if (t === "prog") cargarProgresoDieta();
+  window.scrollTo(0, 0);
+}
+
+async function guardarPeso() {
+  const w = parseFloat($("peso-input").value);
+  const fecha = $("peso-date").value || hoyMX();
+  if (!w || w <= 0) { toast("Ingresa un peso válido"); return; }
+  const { error } = await sb.from("body_weights")
+    .upsert({ measured_on: fecha, weight_kg: w }, { onConflict: "user_id,measured_on" });
+  if (error) { alert(error.message); return; }
+  $("peso-input").value = "";
+  toast("Peso registrado");
+  cargarProgresoDieta();
+}
+
+let pesoChart = null, adhChart = null;
+
+async function cargarProgresoDieta() {
+  const desde = new Date(); desde.setDate(desde.getDate() - 90);
+  const desdeStr = desde.toLocaleDateString("en-CA");
+  const { data: pesos } = await sb.from("body_weights").select("measured_on, weight_kg").order("measured_on");
+  const { data: logs } = await sb.from("meal_logs").select("log_date, kcal").gte("log_date", desdeStr);
+
+  const W = (pesos || []).map(p => ({ d: p.measured_on, w: +p.weight_kg }));
+  renderPesoChart(W);
+
+  const kcalDia = {};
+  (logs || []).forEach(l => { kcalDia[l.log_date] = (kcalDia[l.log_date] || 0) + (+l.kcal); });
+  renderAdherencia(kcalDia, W);
+}
+
+function media7(W) {
+  // media móvil de 7 días alineada a cada fecha medida
+  return W.map(p => {
+    const cut = new Date(p.d + "T12:00:00"); cut.setDate(cut.getDate() - 6);
+    const cutStr = cut.toLocaleDateString("en-CA");
+    return avg(W.filter(q => q.d >= cutStr && q.d <= p.d).map(q => q.w));
+  });
+}
+
+function renderPesoChart(W) {
+  $("peso-actual").textContent = W.length ? W[W.length - 1].w.toFixed(1) : "—";
+  const setV = (id, txt, cls) => { $(id).textContent = txt; $(id).className = "v" + (cls ? " " + cls : ""); };
+  if (!W.length) {
+    setV("peso-ma", "—"); setV("peso-d7", "—"); setV("peso-d30", "—");
+    $("peso-info").textContent = "Aún sin registros de peso. Pésate en ayunas para validar el superávit.";
+    if (pesoChart) pesoChart.destroy(); pesoChart = null;
+    return;
+  }
+  const ma = media7(W);
+  const maLast = ma[ma.length - 1];
+  const last = W[W.length - 1];
+  setV("peso-ma", maLast.toFixed(1));
+
+  const refMA = (dias) => {
+    const t = new Date(last.d + "T12:00:00"); t.setDate(t.getDate() - dias);
+    const tStr = t.toLocaleDateString("en-CA");
+    let ref = null;
+    for (let i = 0; i < W.length; i++) if (W[i].d <= tStr) ref = ma[i];
+    return ref;
+  };
+  const pintaCambio = (id, ref) => {
+    if (ref == null) { setV(id, "—"); return null; }
+    const d = maLast - ref;
+    setV(id, (d >= 0 ? "+" : "") + d.toFixed(1), Math.abs(d) < 0.05 ? "" : (d > 0 ? "up" : "down"));
+    return d;
+  };
+  pintaCambio("peso-d7", refMA(7));
+  const d30 = pintaCambio("peso-d30", refMA(30));
+
+  // validación del superávit (+200 kcal ≈ +0.2–0.45 kg/sem)
+  if (d30 != null) {
+    const sem = d30 / (30 / 7);
+    $("peso-info").innerHTML = `Tendencia ≈ <b style="color:var(--text)">${sem >= 0 ? "+" : ""}${sem.toFixed(2)} kg/sem</b>. ` +
+      (sem <= 0.02 ? "El peso no sube: tu superávit podría ser insuficiente." :
+       sem <= 0.5 ? "Ritmo saludable para un superávit limpio de +200." :
+       "Subes rápido; quizá el superávit sea mayor a +200.");
+  } else {
+    $("peso-info").textContent = "Sigue registrando para estimar la tendencia semanal.";
+  }
+
+  const labels = W.map(p => fmtFecha(p.d));
+  if (pesoChart) pesoChart.destroy();
+  pesoChart = new Chart($("peso-chart"), {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "Peso", data: W.map(p => p.w), borderColor: "#62687A", pointRadius: 2, pointBackgroundColor: "#62687A", borderWidth: 1, tension: 0.2 },
+        { label: "Media 7d", data: ma, borderColor: "#8FAEDC", backgroundColor: "rgba(143,174,220,0.12)", fill: true, pointRadius: 0, borderWidth: 2, tension: 0.3 },
+      ],
+    },
+    options: {
+      scales: { x: { grid: { display: false } }, y: { grid: { color: "#1E2330" } } },
+      plugins: { legend: { labels: { color: "#9AA1B3", boxWidth: 14, boxHeight: 2 } } },
+    },
+  });
+}
+
+function renderAdherencia(kcalDia, W) {
+  const low = TOTAL.k * 0.9, high = TOTAL.k * 1.1;
+  const weeks = {};
+  Object.entries(kcalDia).forEach(([d, k]) => { (weeks[lunes(d)] = weeks[lunes(d)] || { dias: [], pesos: [] }).dias.push(k); });
+  W.forEach(p => { (weeks[lunes(p.d)] = weeks[lunes(p.d)] || { dias: [], pesos: [] }).pesos.push(p.w); });
+  const keys = Object.keys(weeks).sort();
+
+  if (adhChart) { adhChart.destroy(); adhChart = null; }
+  if (!keys.length) { $("corr-info").textContent = "Registra comidas para ver tu adherencia semanal."; return; }
+
+  const recientes = keys.slice(-8);
+  const adh = recientes.map(k => {
+    const ds = weeks[k].dias;
+    return ds.length ? Math.round(ds.filter(x => x >= low && x <= high).length / ds.length * 100) : 0;
+  });
+  adhChart = new Chart($("adh-chart"), {
+    type: "bar",
+    data: {
+      labels: recientes.map(fmtFecha),
+      datasets: [{ label: "% en rango", data: adh, borderRadius: 4,
+        backgroundColor: adh.map(v => v >= 70 ? "#85C49E" : v >= 40 ? "#D9A763" : "#D9786C") }],
+    },
+    options: {
+      scales: { y: { min: 0, max: 100, grid: { color: "#1E2330" }, ticks: { callback: v => v + "%" } }, x: { grid: { display: false } } },
+      plugins: { legend: { display: false } },
+    },
+  });
+
+  // correlación: kcal media semanal ↔ cambio de peso respecto a la semana previa
+  const serie = keys.map(k => ({
+    avgKcal: weeks[k].dias.length ? avg(weeks[k].dias) : null,
+    avgW: weeks[k].pesos.length ? avg(weeks[k].pesos) : null,
+  }));
+  const xs = [], ys = [];
+  for (let i = 1; i < serie.length; i++) {
+    const a = serie[i - 1], b = serie[i];
+    if (b.avgKcal != null && a.avgW != null && b.avgW != null) { xs.push(b.avgKcal); ys.push(b.avgW - a.avgW); }
+  }
+  const r = pearson(xs, ys);
+  if (r == null) {
+    $("corr-info").textContent = `Con ~3 semanas de peso + comidas calcularé la correlación kcal ↔ peso (llevas ${xs.length}).`;
+    return;
+  }
+  const fuerza = Math.abs(r) >= 0.6 ? "fuerte" : Math.abs(r) >= 0.3 ? "moderada" : "débil";
+  const signo = r > 0 ? "positiva" : "negativa";
+  $("corr-info").innerHTML = `Correlación kcal ↔ cambio de peso: <b style="color:var(--text)">r = ${r.toFixed(2)}</b> (${fuerza} ${signo}). ` +
+    (r > 0.3 ? "Más calorías se traducen en más peso: el superávit se refleja en la báscula." :
+     r < -0.3 ? "Relación inversa; revisa la consistencia del registro." :
+     "Señal aún débil; sigue registrando para confirmar el superávit.");
+}
+
 // ---------- ARRANQUE ----------
 function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
 
@@ -288,6 +560,11 @@ async function init() {
   show("view-app");
   $("day-date-pick").value = hoyMX();
   $("day-date-pick").onchange = () => { formAbierto = null; cargar(); };
+  $("peso-date").value = hoyMX();
+  $("dt-hoy").onclick = () => dietaTab("hoy");
+  $("dt-prog").onclick = () => dietaTab("prog");
+  $("peso-save").onclick = guardarPeso;
+  $("peso-input").onkeydown = (e) => { if (e.key === "Enter") guardarPeso(); };
   await cargarBanco();
   cargar();
 }

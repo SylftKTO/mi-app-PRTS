@@ -106,6 +106,27 @@
 
   .screen-fade { animation: fade 0.25s ease; }
   @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* ---------- Editor de rutina ---------- */
+  .day-tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .day-tools .rt-edit { padding: 7px 12px; font-size: 13px; }
+  .rt-head { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .rt-head a { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); text-decoration: none; }
+  .rt-ex { display: flex; align-items: flex-start; gap: 8px; }
+  .rt-ex .grip { display: flex; flex-direction: column; gap: 3px; }
+  .rt-ex .grip button { padding: 3px 7px; font-size: 12px; line-height: 1; background: transparent; border: 1px solid var(--line); color: var(--faint); border-radius: 7px; }
+  .rt-ex .body { flex: 1; min-width: 0; }
+  .rt-ex .nm { font-family: var(--serif); font-size: 17px; }
+  .rt-ex .rm { background: transparent; border: none; color: var(--faint); font-size: 16px; padding: 2px 6px; }
+  .rt-ex .rm:active { color: var(--danger); }
+  .rt-fields { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 6px; margin-top: 9px; }
+  .rt-fields label { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); display: block; margin-bottom: 3px; }
+  .rt-fields input, .rt-fields select { width: 100%; padding: 8px 8px; font-size: 14px; text-align: center; }
+  .rt-fields select { text-align: left; }
+  .rt-add { border-top: 1px dashed var(--line); margin-top: 14px; padding-top: 14px; }
+  .rt-add .sep { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin-bottom: 8px; }
+  .rt-saved { font-family: var(--mono); font-size: 10px; color: var(--ok); margin-left: 8px; opacity: 0; transition: opacity 0.2s; }
+  .rt-saved.on { opacity: 1; }
 </style>
 </head>
 <body>
@@ -136,7 +157,10 @@
   <!-- HOY -->
   <div id="view-hoy" class="screen-fade">
     <div class="days" id="day-chips"></div>
-    <div class="day-tools"><input type="date" id="day-date-pick"></div>
+    <div class="day-tools">
+      <button id="btn-editar-rutina" class="btn-ghost rt-edit">✎ Editar rutina</button>
+      <input type="date" id="day-date-pick">
+    </div>
 
     <div class="stat-grid" id="day-stats">
       <div class="stat-card"><div class="l">Volumen</div><div class="v" id="st-vol">0</div><div class="s">kg hoy</div></div>
@@ -159,6 +183,23 @@
       <div class="stat-card"><div class="l">Sesiones</div><div class="v" id="pg-ses">—</div><div class="s">registradas</div></div>
     </div>
     <div id="prog-info" class="muted" style="margin-top:12px"></div>
+
+    <div class="card">
+      <div class="mono-label" style="display:flex;justify-content:space-between;align-items:baseline">
+        <span>Volumen por grupo muscular</span><span style="color:var(--faint)">últimos 30 días</span>
+      </div>
+      <canvas id="grp-chart" style="margin-top:12px"></canvas>
+      <div id="grp-info" class="muted" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- EDITOR DE RUTINA -->
+  <div id="view-rutina" class="hidden screen-fade">
+    <div class="rt-head">
+      <h1 class="page-title" style="font-size:24px" id="rt-title">Rutina</h1>
+      <a href="#" id="rt-volver">‹ Volver</a>
+    </div>
+    <div id="rt-body"></div>
   </div>
 </div>
 
@@ -473,8 +514,192 @@ function switchTab(t) {
   $("tab-prog").classList.toggle("on", t === "prog");
   $("view-hoy").classList.toggle("hidden", t !== "hoy");
   $("progress").classList.toggle("hidden", t !== "prog");
+  $("view-rutina").classList.toggle("hidden", t !== "rutina");
   if (t === "prog") initProgreso();
   window.scrollTo(0, 0);
+}
+
+// ---------- EDITOR DE RUTINA (sin tocar código) ----------
+const GRUPOS = ["Pecho","Espalda","Hombro","Bíceps","Tríceps","Cuádriceps","Femoral","Glúteo","Pantorrilla","Core","Antebrazo","Cardio"];
+let catalogo = [];        // [{id,name,muscle_group}]
+let rutinaWd = null;
+
+$("btn-editar-rutina").onclick = () => {
+  rutinaWd = new Date($("day-date-pick").value + "T12:00:00").getDay();
+  abrirRutina();
+};
+$("rt-volver").onclick = async (e) => { e.preventDefault(); switchTab("hoy"); await refrescarRutina(); renderDia(); };
+
+async function refrescarRutina() {
+  const { data } = await sb.from("routine_days").select("*").order("weekday");
+  routineDays = data || [];
+  const { data: ex } = await sb.from("exercises").select("id, name, muscle_group").order("name");
+  catalogo = ex || [];
+}
+
+async function abrirRutina() {
+  await refrescarRutina();
+  switchTab("rutina");
+  renderRutina();
+}
+
+function flashSaved(el) { if (el) { el.classList.add("on"); setTimeout(() => el.classList.remove("on"), 1100); } }
+
+async function renderRutina() {
+  const wd = rutinaWd;
+  const rd = routineDays.find(r => r.weekday === wd);
+  $("rt-title").textContent = `${DIAS[wd]}`;
+  const body = $("rt-body");
+  body.innerHTML = "";
+
+  // Nombre del día / crear día
+  const nameCard = document.createElement("div");
+  nameCard.className = "card";
+  if (rd) {
+    nameCard.innerHTML = `
+      <label class="mono-label">Nombre del día</label>
+      <div style="display:flex;gap:8px;margin-top:6px;align-items:center">
+        <input id="rt-dayname" type="text" value="${rd.name.replace(/"/g,"&quot;")}" style="flex:1">
+        <span class="rt-saved" id="rt-dayname-ok">guardado</span>
+      </div>
+      <button class="btn-ghost w100" id="rt-deleteday" style="margin-top:12px;color:var(--danger)">Eliminar este día (volver a descanso)</button>`;
+  } else {
+    nameCard.innerHTML = `
+      <div class="muted">${DIAS[wd]} es día de descanso.</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="rt-newday" type="text" placeholder="Nombre del día (p. ej. Push C)" style="flex:1">
+        <button class="btn-primary" id="rt-createday">Crear</button>
+      </div>`;
+  }
+  body.appendChild(nameCard);
+
+  if (rd) {
+    nameCard.querySelector("#rt-dayname").onchange = async (e) => {
+      const v = e.target.value.trim(); if (!v) return;
+      await sb.from("routine_days").update({ name: v }).eq("id", rd.id);
+      flashSaved($("rt-dayname-ok"));
+    };
+    nameCard.querySelector("#rt-deleteday").onclick = async () => {
+      if (!confirm(`¿Eliminar la rutina de ${DIAS[wd]}? Los entrenamientos registrados se conservan.`)) return;
+      await sb.from("routine_days").delete().eq("id", rd.id);
+      await refrescarRutina(); renderRutina();
+    };
+
+    // Ejercicios del día
+    const { data: rex } = await sb.from("routine_exercises")
+      .select("*, exercises(name, muscle_group)").eq("routine_day_id", rd.id).order("position");
+
+    (rex || []).forEach((re, idx) => body.appendChild(tarjetaEjercicioRutina(re, idx, rex.length, rd)));
+
+    // Agregar ejercicio
+    const add = document.createElement("div");
+    add.className = "card rt-add";
+    add.innerHTML = `
+      <div class="sep">Agregar ejercicio</div>
+      <input list="cat-list" id="rt-add-name" type="text" placeholder="Ejercicio (existente o nuevo)" style="width:100%">
+      <datalist id="cat-list">${catalogo.map(c => `<option value="${c.name.replace(/"/g,"&quot;")}">`).join("")}</datalist>
+      <div class="rt-fields" style="grid-template-columns:1fr 1fr 1fr; margin-top:8px">
+        <div><label>Series</label><input id="rt-add-sets" type="number" inputmode="numeric" value="3"></div>
+        <div><label>Rep mín</label><input id="rt-add-min" type="number" inputmode="numeric" value="6"></div>
+        <div><label>Rep máx</label><input id="rt-add-max" type="number" inputmode="numeric" value="10"></div>
+      </div>
+      <button class="btn-primary w100" id="rt-add-btn" style="margin-top:12px">+ Agregar a ${rd.name.replace(/</g,"&lt;")}</button>`;
+    body.appendChild(add);
+    add.querySelector("#rt-add-btn").onclick = () => agregarEjercicio(rd, rex ? rex.length : 0);
+  } else {
+    nameCard.querySelector("#rt-createday").onclick = async () => {
+      const v = nameCard.querySelector("#rt-newday").value.trim(); if (!v) return;
+      await sb.from("routine_days").insert({ weekday: wd, name: v });
+      await refrescarRutina(); renderRutina();
+    };
+  }
+}
+
+function tarjetaEjercicioRutina(re, idx, total, rd) {
+  const card = document.createElement("div");
+  card.className = "card";
+  const grp = re.exercises.muscle_group || "";
+  card.innerHTML = `
+    <div class="rt-ex">
+      <div class="grip">
+        <button data-up ${idx === 0 ? "disabled" : ""}>↑</button>
+        <button data-down ${idx === total - 1 ? "disabled" : ""}>↓</button>
+      </div>
+      <div class="body">
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div class="nm">${re.exercises.name.replace(/</g,"&lt;")}</div>
+          <button class="rm" data-rm title="Quitar del día">✕</button>
+        </div>
+        <div class="rt-fields">
+          <div><label>Grupo</label>
+            <select data-grp>
+              <option value="">—</option>
+              ${GRUPOS.map(g => `<option value="${g}" ${g === grp ? "selected" : ""}>${g}</option>`).join("")}
+            </select></div>
+          <div><label>Series</label><input data-sets type="number" inputmode="numeric" value="${re.target_sets}"></div>
+          <div><label>Rep mín</label><input data-min type="number" inputmode="numeric" value="${re.rep_min}"></div>
+          <div><label>Rep máx</label><input data-max type="number" inputmode="numeric" value="${re.rep_max}"></div>
+        </div>
+        <span class="rt-saved" data-ok>guardado</span>
+      </div>
+    </div>`;
+
+  const ok = card.querySelector("[data-ok]");
+  const guardar = async (patch) => {
+    const { error } = await sb.from("routine_exercises").update(patch).eq("id", re.id);
+    if (error) { alert(error.message); return; }
+    flashSaved(ok);
+  };
+  card.querySelector("[data-sets]").onchange = (e) => guardar({ target_sets: +e.target.value });
+  card.querySelector("[data-min]").onchange = (e) => guardar({ rep_min: +e.target.value });
+  card.querySelector("[data-max]").onchange = (e) => guardar({ rep_max: +e.target.value });
+  card.querySelector("[data-grp]").onchange = async (e) => {
+    await sb.from("exercises").update({ muscle_group: e.target.value || null }).eq("id", re.exercise_id);
+    flashSaved(ok);
+  };
+  card.querySelector("[data-rm]").onclick = async () => {
+    if (!confirm(`¿Quitar ${re.exercises.name} de ${rd.name}?`)) return;
+    await sb.from("routine_exercises").delete().eq("id", re.id);
+    renderRutina();
+  };
+  card.querySelector("[data-up]").onclick = () => reordenar(rd, re, -1);
+  card.querySelector("[data-down]").onclick = () => reordenar(rd, re, 1);
+  return card;
+}
+
+async function reordenar(rd, re, dir) {
+  const { data: rex } = await sb.from("routine_exercises")
+    .select("id, position").eq("routine_day_id", rd.id).order("position");
+  const i = rex.findIndex(r => r.id === re.id);
+  const j = i + dir;
+  if (j < 0 || j >= rex.length) return;
+  await sb.from("routine_exercises").update({ position: rex[j].position }).eq("id", rex[i].id);
+  await sb.from("routine_exercises").update({ position: rex[i].position }).eq("id", rex[j].id);
+  renderRutina();
+}
+
+async function agregarEjercicio(rd, nextPos) {
+  const name = $("rt-add-name").value.trim();
+  const sets = +$("rt-add-sets").value || 3;
+  const rmin = +$("rt-add-min").value || 6;
+  const rmax = +$("rt-add-max").value || 10;
+  if (!name) return;
+  let ex = catalogo.find(c => c.name.toLowerCase() === name.toLowerCase());
+  if (!ex) {
+    const { data, error } = await sb.from("exercises").insert({ name }).select().single();
+    if (error) { alert(error.message); return; }
+    ex = data; catalogo.push(data);
+  }
+  // ¿ya está en el día?
+  const { data: dup } = await sb.from("routine_exercises")
+    .select("id").eq("routine_day_id", rd.id).eq("exercise_id", ex.id).maybeSingle();
+  if (dup) { alert("Ese ejercicio ya está en este día."); return; }
+  const { error } = await sb.from("routine_exercises").insert({
+    routine_day_id: rd.id, exercise_id: ex.id, position: nextPos,
+    target_sets: sets, rep_min: rmin, rep_max: rmax,
+  });
+  if (error) { alert(error.message); return; }
+  renderRutina();
 }
 
 // ---------- PROGRESO ----------
@@ -492,6 +717,48 @@ async function initProgreso() {
     progExLoaded = true;
   }
   renderProgreso();
+  renderGrupos();
+}
+
+// ---------- Volumen por grupo muscular (últimos 30 días) ----------
+let grpChart = null;
+const GRP_COLORS = ["#8FAEDC","#85C49E","#D9A763","#B49FD9","#6FB5AE","#D9786C","#C9B27C","#7FA0C8","#9CC57F","#C887A8","#7AB0C0","#B0B0B8"];
+async function renderGrupos() {
+  const desde = new Date(); desde.setDate(desde.getDate() - 30);
+  const { data, error } = await sb.from("workout_sets")
+    .select("weight_kg, reps, exercises!inner(muscle_group), workout_sessions!inner(session_date)")
+    .gte("workout_sessions.session_date", desde.toLocaleDateString("en-CA"))
+    .limit(8000);
+  if (error) { $("grp-info").textContent = error.message; return; }
+  const vol = {};
+  (data || []).forEach(s => {
+    const g = s.exercises.muscle_group || "Sin grupo";
+    vol[g] = (vol[g] || 0) + (+s.weight_kg) * s.reps;
+  });
+  const labels = Object.keys(vol).sort((a, b) => vol[b] - vol[a]);
+  if (grpChart) grpChart.destroy();
+  if (!labels.length) { $("grp-info").textContent = "Sin entrenamientos en los últimos 30 días."; return; }
+  $("grp-info").textContent = "";
+  grpChart = new Chart($("grp-chart"), {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        label: "Volumen (kg)",
+        data: labels.map(g => Math.round(vol[g])),
+        backgroundColor: labels.map((_, i) => GRP_COLORS[i % GRP_COLORS.length]),
+        borderRadius: 4, borderWidth: 0,
+      }],
+    },
+    options: {
+      indexAxis: "y",
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: "#1E2330" }, ticks: { callback: (v) => v >= 1000 ? (v / 1000) + "k" : v } },
+        y: { grid: { display: false } },
+      },
+    },
+  });
 }
 
 async function renderProgreso() {
