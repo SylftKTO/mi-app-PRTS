@@ -69,12 +69,38 @@
 
   /* ---------- MAIN ---------- */
   main { flex: 1; padding: 22px 28px 40px; overflow-y: auto; }
-  .map-head { text-align: center; margin-bottom: 10px; }
-  .map-head .muted { color: var(--muted); font-size: 0.8rem; margin-top: 4px; }
+  #map-block { max-width: 980px; margin: 0 auto; }
+  .map-head { text-align: center; margin-bottom: 12px; }
+  .map-head .muted { color: var(--muted); font-size: 0.78rem; margin-top: 2px; }
+  .map-title {
+    font-size: 2.1rem; font-weight: 500; letter-spacing: 0.3em;
+    padding-left: 0.3em; /* compensa el tracking para centrar */
+    color: var(--text); line-height: 1.1;
+    text-shadow: 0 0 26px rgba(125, 162, 216, 0.55), 0 0 6px rgba(125, 162, 216, 0.25);
+  }
   #map-wrap {
-    position: relative; border: 1px solid var(--border); border-radius: 14px;
-    background: radial-gradient(ellipse at center, #0E1119 0%, var(--bg) 75%);
-    height: 46vh; min-height: 330px;
+    position: relative; border: 1px solid rgba(125, 162, 216, 0.22); border-radius: 14px;
+    background:
+      linear-gradient(rgba(125, 162, 216, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(125, 162, 216, 0.04) 1px, transparent 1px),
+      radial-gradient(ellipse at center, #0E1119 0%, var(--bg) 78%);
+    background-size: 36px 36px, 36px 36px, 100% 100%;
+    box-shadow: inset 0 0 90px rgba(125, 162, 216, 0.06);
+    height: 50vh; min-height: 360px; overflow: hidden;
+  }
+  #map-wrap::before, #map-wrap::after {
+    content: ""; position: absolute; width: 16px; height: 16px;
+    pointer-events: none; z-index: 2;
+  }
+  #map-wrap::before {
+    top: 9px; left: 9px;
+    border-top: 2px solid rgba(125, 162, 216, 0.5); border-left: 2px solid rgba(125, 162, 216, 0.5);
+    border-top-left-radius: 5px;
+  }
+  #map-wrap::after {
+    bottom: 9px; right: 9px;
+    border-bottom: 2px solid rgba(125, 162, 216, 0.5); border-right: 2px solid rgba(125, 162, 216, 0.5);
+    border-bottom-right-radius: 5px;
   }
   #map { width: 100%; height: 100%; display: block; cursor: default; }
   #map-tip {
@@ -355,22 +381,36 @@
 
 <!-- VISTA DASHBOARD -->
 <div id="tab-dashboard" class="tab-fade">
-  <div class="map-head">
-    <div class="mono" style="color:var(--blue)">Mapa del sistema</div>
-    <div class="muted">Red de módulos · pasa el cursor para explorar · clic para navegar</div>
-  </div>
-  <div id="map-wrap">
-    <canvas id="map"></canvas>
-    <div id="map-tip"></div>
+  <!-- Mapa del sistema (centrado) -->
+  <div id="map-block">
+    <div class="map-head">
+      <div class="map-title serif">PRTS</div>
+      <div class="muted">Red de módulos · clic para navegar</div>
+    </div>
+    <div id="map-wrap">
+      <canvas id="map"></canvas>
+      <div id="map-tip"></div>
+    </div>
   </div>
 
   <div class="grid">
     <div class="stack">
-      <!-- Contenedor PRTS: briefing diario (Fase 4) -->
+      <!-- PRTS: briefing diario (Fase 4) -->
       <div class="panel" id="prts-panel">
         <div class="panel-head">
-          <span class="mono" style="color:var(--blue)"><span class="pulse-dot"></span>PRTS · Captura</span>
+          <span class="mono" style="color:var(--blue)"><span class="pulse-dot"></span>PRTS · Briefing del día</span>
           <span class="mono" id="fecha-hoy"></span>
+        </div>
+        <div id="prts-briefing">
+          <div class="serif">Pronto. En espera de datos suficientes.</div>
+          Este panel mostrará el resumen diario: tareas críticas, rutina del día y alertas.
+        </div>
+      </div>
+
+      <!-- PRTS: captura universal -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono" style="color:var(--blue)">PRTS · Captura</span>
         </div>
         <div class="cap-row">
           <input id="cap-text" class="f-in" placeholder="Agregar tarea, gasto, apunte, entrenamiento o recordatorio…" autocomplete="off">
@@ -382,14 +422,6 @@
         </div>
       </div>
 
-      <!-- Tareas de hoy -->
-      <div class="panel">
-        <div class="panel-head">
-          <span class="mono">Tareas prioritarias</span>
-          <a href="#tareas" data-view="tareas">ver todas ›</a>
-        </div>
-        <div id="lista-tareas"><div class="empty">Cargando…</div></div>
-      </div>
     </div>
 
     <div class="stack">
@@ -409,6 +441,14 @@
         <div class="prow"><label>Tareas</label><div class="bar"><i id="bar-tareas" style="width:0%"></i></div><span id="txt-tareas">—</span></div>
       </div>
 
+      <!-- Tareas de hoy -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="mono">Tareas prioritarias</span>
+          <a href="#tareas" data-view="tareas">ver todas ›</a>
+        </div>
+        <div id="lista-tareas"><div class="empty">Cargando…</div></div>
+      </div>
     </div>
   </div>
 </div><!-- /tab-dashboard -->
@@ -572,7 +612,7 @@ function drawMap(time) {
   ctx.lineWidth = 1;
   for (const [a, b] of ENLACES) {
     const A = px(nodo(a)), B = px(nodo(b));
-    ctx.strokeStyle = "rgba(125,162,216,0.10)";
+    ctx.strokeStyle = "rgba(125,162,216,0.13)";
     ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
   }
   // partículas
@@ -602,13 +642,32 @@ function drawMap(time) {
     ctx.lineWidth = hover ? 1.8 : 1.2;
     ctx.beginPath(); ctx.arc(P.x, P.y, r, 0, 7); ctx.fill(); ctx.stroke();
 
+    // anillo HUD exterior en nodos activos
+    if (activo && !n.core) {
+      ctx.strokeStyle = hover ? "rgba(169,196,232,0.55)" : "rgba(125,162,216,0.22)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(P.x, P.y, r + 4.5, 0, 7); ctx.stroke();
+    }
+    // doble arco orbital giratorio en el núcleo
+    if (n.core) {
+      const a = time / 900;
+      ctx.strokeStyle = "rgba(125,162,216,0.65)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(P.x, P.y, r + 9, a, a + 1.15); ctx.stroke();
+      ctx.beginPath(); ctx.arc(P.x, P.y, r + 9, a + Math.PI, a + Math.PI + 1.15); ctx.stroke();
+      ctx.strokeStyle = "rgba(125,162,216,0.25)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(P.x, P.y, r + 16, -a * 0.6, -a * 0.6 + 0.7); ctx.stroke();
+      ctx.beginPath(); ctx.arc(P.x, P.y, r + 16, -a * 0.6 + Math.PI, -a * 0.6 + Math.PI + 0.7); ctx.stroke();
+    }
+
     ctx.fillStyle = activo ? "#E8EAF0" : "#8A93A6";
-    ctx.font = `${n.core ? 600 : 500} ${n.core ? 12 : 10.5}px Inter, sans-serif`;
+    ctx.font = `${n.core ? 600 : 500} ${n.core ? 13 : 10.5}px Inter, sans-serif`;
     ctx.textAlign = "center"; ctx.textBaseline = "middle";
     ctx.fillText(n.label, P.x, P.y);
-    ctx.fillStyle = "rgba(138,147,166,0.75)";
-    ctx.font = "9px Inter, sans-serif";
-    ctx.fillText(n.sub, P.x, P.y + r + 13);
+    ctx.fillStyle = "rgba(138,147,166,0.7)";
+    ctx.font = "7.5px 'JetBrains Mono', monospace";
+    ctx.fillText(n.sub.toUpperCase(), P.x, P.y + r + (n.core ? 24 : 15));
   }
   requestAnimationFrame(drawMap);
 }
