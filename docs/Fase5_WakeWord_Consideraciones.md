@@ -213,3 +213,24 @@ Para "siempre encendido" literal, el **helper en bandeja** suele ser el punto du
 - [openwakeword_wasm: wrapper browser-first con onnxruntime-web — GitHub](https://github.com/dnavarrom/openwakeword_wasm)
 - [Open Wake Word on the Web — Deep Core Labs](https://deepcorelabs.com/open-wake-word-on-the-web/)
 - [Procesar audio del micrófono (getUserMedia + AudioWorklet) — web.dev](https://web.dev/patterns/media/microphone-process)
+
+---
+
+## Estado de implementación (Fase 5.0 — entregado)
+
+Implementado el **nivel A** (escucha mientras la pestaña de PRTS vive), enfoque **sin dependencias** con `webkitSpeechRecognition` en modo continuo como detector "suave" de palabra clave. Archivo: `app/ai/wakeword.js`.
+
+- **Activación:** opt-in, **apagada por defecto**, toggle "Escucha continua «PRTS»" en el panel de Captura (solo escritorio Chromium). Preferencia en `localStorage`.
+- **Disparo:** frase final que contiene «PRTS» (+ mis-hears comunes: `prest*`, `prots`, `pretz`, `partes`…) → el resto de la frase se enruta como comando (`ejecutarComando(cmd, spoken=true)`). Si solo se dijo «PRTS», abre una ventana de ~6 s y la siguiente frase es el comando ("PRTS" → *"te escucho"* → "pon música").
+- **Respuesta verbal:** `PRTS_AI.say()` (TTS `es-MX`) ya leía las respuestas; ahora las **escrituras por voz** (`create_task`, `log_weight`, `log_set`) se aplican **sin modal** y se confirman hablando (el comando dictado es la disposición). Clima y resumen se responden en voz alta.
+- **Coordinación (un reconocedor a la vez):** push-to-talk pausa la escucha continua (`onStart → wakePause`) y la reanuda al terminar; el TTS también la pausa mientras habla para no oírse a sí misma (evita bucle de realimentación).
+- **Degradación:** sin soporte/mic → toggle oculto; push-to-talk sigue siendo la base.
+
+### Limitaciones asumidas (y por qué)
+
+1. **Privacidad:** `webkitSpeechRecognition` **envía el audio a Google** para transcribir; en modo continuo es audio ambiental constante mientras está activa. Por eso es opt-in, apagada por defecto y con indicador visible. Documentado en el `title` del toggle.
+2. **Precisión del acrónimo «PRTS»:** el reconocedor lo transcribe de forma aproximada; se mitiga con la lista de variantes en `WAKE`, pero no es un detector entrenado.
+
+### Próximo nivel (5.1, opcional) — detector on-device
+
+Para escucha continua **sin enviar audio a la nube** y con una palabra clave «PRTS» entrenada: **Picovoice Porcupine Web** (WASM, AccessKey gratis, `.ppn` custom). Encaja como adaptador alterno detrás de la misma API (`initWake`/`wakeSet`/`wakePause`): se sustituye el backend de `wakeword.js` por el detector Porcupine y, al disparar, se abre el push-to-talk existente para capturar el comando. Sigue siendo **nivel A/B**; el nivel C (escucha de SO con el navegador cerrado) requeriría companion nativo (§8) y queda fuera.

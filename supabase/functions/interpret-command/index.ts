@@ -14,7 +14,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { callLLM, costUsd, MODEL } from "../_shared/llm.ts";
 import { parseJSON, validateCommand, type CommandIntent } from "../_shared/schemas.ts";
-import { SYSTEM, buildUser, VERSION } from "../_shared/prompts/command.v2.ts";
+import { SYSTEM, buildUser, VERSION } from "../_shared/prompts/command.v4.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",

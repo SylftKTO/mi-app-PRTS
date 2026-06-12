@@ -52,7 +52,10 @@ Deno.serve(async (req) => {
 
   let q = sb.from("inbox_entries").select("id, raw_text").eq("status", "pendiente")
     .order("created_at", { ascending: false }).limit(5);
+  // Sin entry_id (auto/cron) sólo procesa las aún SIN sugerencia cacheada
+  // (result null) → idempotente y sin re-gastar LLM al reabrir el dashboard.
   if (body.entry_id) q = q.eq("id", body.entry_id);
+  else q = q.is("result", null);
   const { data: entries, error: eErr } = await q;
   if (eErr) return json({ error: eErr.message }, 500);
   if (!entries?.length) return json({ status: "ok", suggestions: [] });
@@ -81,6 +84,10 @@ async function clasificar(
       suggestion = validateInbox(parseJSON(out.text));
     }
     if (!suggestion || !out) throw new Error("salida del modelo no valida el schema");
+
+    // Cachear la sugerencia en la entrada (sigue 'pendiente'): el dashboard la
+    // muestra al abrir sin re-llamar al LLM. Se sobrescribe al confirmar/descartar.
+    await sb.from("inbox_entries").update({ result: { cached_suggestion: suggestion } }).eq("id", entry.id);
 
     await logCall(sb, uid, "ok", entry.id, {
       model: out.model, inT: out.inputTokens, outT: out.outputTokens,

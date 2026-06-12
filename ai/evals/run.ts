@@ -10,7 +10,7 @@
 import { callLLM } from "../../supabase/functions/_shared/llm.ts";
 import { parseJSON, validateCommand, validateInbox } from "../../supabase/functions/_shared/schemas.ts";
 import * as inboxPrompt from "../../supabase/functions/_shared/prompts/inbox.v1.ts";
-import * as commandPrompt from "../../supabase/functions/_shared/prompts/command.v2.ts";
+import * as commandPrompt from "../../supabase/functions/_shared/prompts/command.v4.ts";
 
 const agente = Deno.args[0];
 if (agente !== "inbox" && agente !== "command") {

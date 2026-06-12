@@ -10,14 +10,14 @@ export interface InboxSuggestion {
 }
 
 export interface CommandIntent {
-  intent: "open" | "navigate" | "summary" | "create_task" | "log_weight" | "weather" | "unknown";
+  intent: "open" | "navigate" | "summary" | "create_task" | "log_weight" | "log_set" | "weather" | "ask" | "unknown";
   params: Record<string, unknown>;
   speak: string;
   confidence: number;
 }
 
 const INBOX_MODULES = ["tareas", "dieta", "apuntes", "proyectos", "recordatorio", "gym", "semana", "desconocido"];
-const INTENTS = ["open", "navigate", "summary", "create_task", "log_weight", "weather", "unknown"];
+const INTENTS = ["open", "navigate", "summary", "create_task", "log_weight", "log_set", "weather", "ask", "unknown"];
 const ORIGINS = ["escuela", "wolves", "levelup", "personal"];
 const PRIORITIES = ["alta", "media", "baja"];
 const MEALS = ["desayuno", "comida", "pregym", "cena", "snack"];
@@ -130,6 +130,15 @@ export function validateCommand(raw: unknown): CommandIntent | null {
     case "log_weight":
       if (!isNum(p.weight_kg) || p.weight_kg <= 0 || p.weight_kg > 400) return null;
       if (!isDateOrNull(p.date)) p.date = null;
+      break;
+    case "log_set":
+      if (!isStr(p.exercise) || !p.exercise.trim()) return null;
+      if (!isNum(p.weight_kg) || p.weight_kg <= 0 || p.weight_kg > 500) return null;
+      if (!isNum(p.reps) || p.reps <= 0 || p.reps > 100) return null;
+      break;
+    case "ask":
+      // La respuesta vive en `speak`; debe ser no vacía.
+      if (!sp.trim()) return null;
       break;
   }
   return { intent, params: p, speak: sp, confidence } as CommandIntent;

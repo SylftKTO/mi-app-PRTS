@@ -2,5 +2,10 @@
 {"text": "hola PRTS, qué tal el clima de hoy", "expect": {"intent": "weather"}}
 {"text": "PRTS, crea una tarea de estudiar para el examen de potencia el viernes", "expect": {"intent": "create_task"}}
 {"text": "PRTS, hoy pesé 78.5 kilos", "expect": {"intent": "log_weight", "params": {"weight_kg": 78.5}}}
+{"text": "PRTS, registra press banca 80 por 8", "expect": {"intent": "log_set", "params": {"weight_kg": 80, "reps": 8}}}
+{"text": "PRTS, sentadilla 100 kg por 5", "expect": {"intent": "log_set", "params": {"weight_kg": 100, "reps": 5}}}
 {"text": "PRTS, abre el módulo de dieta", "expect": {"intent": "navigate", "params": {"view": "dieta"}}}
-{"text": "PRTS, cuántas estrellas tiene la galaxia", "expect": {"intent": "unknown"}}
+{"text": "PRTS, cuánto es 15 por ciento de 200", "expect": {"intent": "ask"}}
+{"text": "PRTS, cómo se dice mesa en inglés", "expect": {"intent": "ask"}}
+{"text": "PRTS, quién escribió Cien años de soledad", "expect": {"intent": "ask"}}
+{"text": "PRTS, asdf qwerty ñlkj", "expect": {"intent": "unknown"}}

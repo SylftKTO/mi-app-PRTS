@@ -64,6 +64,23 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - ✅ Tarifas vigentes (Haiku 4.5): `LLM_PRICE_IN=1.00`, `LLM_PRICE_OUT=5.00` USD/M tokens.
 - ❌ Wake word: fuera de alcance por decisión (§2); extensión futura con Picovoice Porcupine en primer plano.
 
+### Extras post-Fase 4 (mejoras de uso diario)
+
+- ✅ **Spotify de escritorio:** `abrirSpotify()` en `app/ai/actions.js` convierte links web a URI `spotify:tipo:id` y lanza la app de escritorio vía handler de protocolo; si no toma el foco en ~1.5 s, cae al reproductor web. Presets en `PLAYLISTS` (estudio/foco/entreno) — el usuario pega sus links.
+- ✅ **TTS (PRTS responde por voz):** `PRTS_AI.say()` con `speechSynthesis` (`es-MX`), solo escritorio, sin costo/backend. Toda respuesta del ejecutor se muestra y se lee.
+- ✅ **Intent `log_set`** (registrar serie de gym por voz/texto): `command.v3` + validación en `schemas.ts`. Router local resuelve "press banca 80 por 8"/"…80 kg x 8" sin LLM; el cliente matchea el ejercicio contra el catálogo `exercises`, crea la sesión del día si falta y calcula el `set_number`. Confirmación antes de insertar.
+- ✅ **Inbox auto-procesado** (versión cliente del "cron"): `process-inbox` cachea la sugerencia en `inbox_entries.result.cached_suggestion` (sigue `pendiente`) y solo procesa las que aún no tienen sugerencia (`result is null`). El dashboard muestra lo cacheado al abrir (`refrescarSugerencias`) y auto-procesa lo nuevo en segundo plano (`autoInbox`); agregar una captura la auto-sugiere. Idempotente, sin re-gastar LLM al reabrir.
+
+## Fase 5 — Wake word (escucha continua)
+
+- ✅ **5.0 — Wake word sin dependencias** (`app/ai/wakeword.js`): `webkitSpeechRecognition` continuo como detector "suave". Palabra clave hablada **«Priestess»** (pronunciación inglesa; se eligió sobre el acrónimo «PRTS» porque el reconocedor es-MX la transcribe mucho mejor — `WAKE` cubre sus mis-hears: priest*/prist*/prest*/prís*). Internamente el comando se normaliza con prefijo "PRTS, " para el router. **Opt-in, apagada por defecto**, toggle en el panel de Captura; solo escritorio Chromium. Frase única ("Priestess, pon música") o dos pasos ("Priestess" → ventana de 6 s → comando). Enruta vía `ejecutarComando(cmd, spoken=true)`.
+- ✅ **Protocolos de respuesta simple** (en `PRTS_AI.routeLocal`, sin LLM ni datos → intent local `say`): hora, fecha/día, saludo según la hora, gracias, "cómo estás", ayuda/qué puedes hacer. Respuesta hablada inmediata.
+- ✅ **Intent `ask`** (`command.v4`): preguntas cotidianas / conocimiento general que no encajan en otra intención (cálculos, conversiones, traducciones, definiciones, datos) → el LLM pone la respuesta breve en `speak` y PRTS la dice. No se usa para notas/tareas (eso es create_task/unknown→captura). `ES_COMANDO` enruta interrogativos y saludos por push-to-talk (ojo: `\b` no sirve tras vocal acentuada en JS → se usa `(?=\s|$|\?)`).
+- ✅ **Interacción por voz manos libres:** las escrituras dictadas (`create_task`/`log_weight`/`log_set`) se aplican **sin modal** y se confirman **hablando** (TTS `es-MX`); clima y resumen responden en voz alta. `opts.spoken` distingue voz (sin confirm) de teclado (con confirm).
+- ✅ **Coordinación de un solo reconocedor:** push-to-talk pausa la escucha continua (`wakePause`/`wakeResume`); el TTS también la pausa mientras habla (anti-feedback).
+- ⚠️ **Privacidad asumida:** `webkitSpeechRecognition` envía audio a Google al transcribir; en continuo es audio ambiental constante → opt-in, off por defecto, indicador visible.
+- ⏭️ **5.1 (opcional):** detector on-device con Picovoice Porcupine (WASM, AccessKey gratis, `.ppn` «PRTS») detrás de la misma API; al disparar abre el push-to-talk existente. Nivel C (SO, navegador cerrado) → companion nativo, fuera de alcance. Ver `docs/Fase5_WakeWord_Consideraciones.md`.
+
 ### Decisiones abiertas (resolver al implementar)
 
 - Tarifas/modelo vigentes para `cost_usd` (verificar precios al implementar).

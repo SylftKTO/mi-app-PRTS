@@ -23,12 +23,13 @@
   PRTS_AI.initVoice = function (opts) {
     if (!PRTS_AI.voiceAvailable()) return false;
 
-    const { button, input, onFinal, onState } = opts;
+    const { button, input, onFinal, onState, onStart } = opts;
     let rec = null;
     let escuchando = false;
 
     function start() {
       if (escuchando) return;
+      if (onStart) onStart();   // p. ej. pausar la escucha continua (un reconocedor a la vez)
       rec = new window.webkitSpeechRecognition();
       rec.lang = "es-MX";
       rec.interimResults = true;   // transcripción en vivo en el input

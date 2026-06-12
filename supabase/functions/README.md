@@ -57,6 +57,11 @@ supabase functions deploy generate-insights
 
 > `process-inbox` e `interpret-command` actúan con el **JWT del usuario** (RLS protege);
 > se invocan desde el cliente con `sb.functions.invoke(...)`. No usan service role.
+>
+> `interpret-command` usa el prompt `command.v3` (intents `weather` + `log_set`).
+> `process-inbox` cachea la sugerencia en `inbox_entries.result.cached_suggestion`
+> y solo procesa entradas `pendiente` con `result is null` (auto-procesado idempotente
+> desde el dashboard); al reabrir no re-gasta LLM.
 
 ## 4. Probar manualmente
 

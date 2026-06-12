@@ -14,6 +14,7 @@
 <script src="config.js"></script>
 <script src="ai/actions.js"></script>
 <script src="ai/voice.js"></script>
+<script src="ai/wakeword.js"></script>
 <style>
   :root {
     --bg: #0B0D12; --panel: #10131B; --panel2: #141823; --border: #1D2230;
@@ -295,6 +296,11 @@
   .cap-item .del:hover { color: var(--red); }
   #cap-lista { margin-top: 6px; }
   .cap-mic.listening { color: var(--red); border-color: var(--red); box-shadow: 0 0 14px rgba(216, 113, 113, 0.3); }
+  .wake-row { display: flex; align-items: center; gap: 7px; margin-top: 10px; cursor: pointer;
+    font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+  .wake-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.2s, box-shadow 0.2s; }
+  .wake-dot.on { background: var(--green); box-shadow: 0 0 8px rgba(95, 185, 126, 0.6); }
+  .wake-dot.hot { background: var(--red); box-shadow: 0 0 9px rgba(216, 113, 113, 0.7); }
   .cap-proc {
     margin-top: 10px; width: 100%; padding: 7px; background: transparent; cursor: pointer;
     border: 1px solid rgba(125, 162, 216, 0.45); border-radius: 8px; color: var(--blue);
@@ -500,6 +506,11 @@
         <div id="cap-lista"></div>
         <div id="cap-sugerencias"></div>
         <button id="cap-procesar" class="cap-proc">Procesar con PRTS</button>
+        <label id="wake-row" class="wake-row hidden" title="Escucha continua en escritorio: di «Priestess». Nota: el reconocimiento envía audio a Google mientras está activa.">
+          <input type="checkbox" id="wake-toggle">
+          <span class="mono">Escucha continua «Priestess»</span>
+          <span id="wake-dot" class="wake-dot"></span>
+        </label>
         <details class="auto-cfg">
           <summary class="mono">Automático (Fase 4.3)</summary>
           <div class="auto-cfg-body">
@@ -649,7 +660,7 @@ function switchView(v) {
     $("tab-" + t).classList.toggle("hidden", t !== v);
     document.querySelector(`.nav-link[data-view="${t}"]`)?.classList.toggle("on", t === v);
   }
-  if (v === "dashboard") { cargarDashboard(); cargarInbox(); }
+  if (v === "dashboard") { cargarDashboard(); cargarInbox(); autoInbox(); }
   if (v === "semana") cargarSemana();
   if (v === "proyectos") cargarProyectos();
   if (v === "tareas") cargarTareasView();
@@ -953,6 +964,7 @@ async function addCaptura() {
   $("cap-text").value = "";
   $("cap-text").focus();
   cargarInbox();
+  procesarInbox(true);   // auto-sugerir la captura recién agregada
 }
 
 async function descartarCaptura(id) {
@@ -1033,20 +1045,47 @@ async function renderAutoCfg() {
   }
 }
 
-async function procesarInbox() {
+// Lee las sugerencias YA cacheadas en inbox_entries.result (las generó
+// process-inbox) y las renderiza al instante. Devuelve true si quedan
+// pendientes sin sugerir (para disparar el auto-procesado).
+async function refrescarSugerencias() {
+  const { data } = await sb.from("inbox_entries").select("id, raw_text, result")
+    .eq("status", "pendiente").order("created_at", { ascending: false }).limit(8);
+  const items = (data || []).filter((e) => e.result && e.result.cached_suggestion)
+    .map((e) => ({ id: e.id, raw_text: e.raw_text, status: "ok", suggestion: e.result.cached_suggestion }));
+  await renderSugerencias(items);
+  return (data || []).some((e) => !e.result);
+}
+
+async function procesarInbox(silencioso) {
   const btn = $("cap-procesar");
-  btn.disabled = true; btn.textContent = "Procesando…";
+  if (!silencioso) { btn.disabled = true; btn.textContent = "Procesando…"; }
   try {
     const { data, error } = await sb.functions.invoke("process-inbox", { body: {} });
     if (error) throw error;
-    if (data.status === "degraded") { notaPRTS("IA en pausa (tope mensual). Procesa a mano por ahora."); return; }
-    await renderSugerencias(data.suggestions || []);
-    if (!(data.suggestions || []).length) notaPRTS("Sin capturas pendientes que procesar.");
+    if (data.status === "degraded") {
+      if (!silencioso) notaPRTS("IA en pausa (tope mensual). Procesa a mano por ahora.");
+      return;
+    }
+    await refrescarSugerencias();
+    if (!silencioso && !(data.suggestions || []).length) notaPRTS("Sin capturas nuevas que procesar.");
   } catch (err) {
-    notaPRTS("PRTS no respondió; tus capturas siguen pendientes (camino manual).");
+    if (!silencioso) notaPRTS("PRTS no respondió; tus capturas siguen pendientes (camino manual).");
     console.error(err);
   } finally {
-    btn.disabled = false; btn.textContent = "Procesar con PRTS";
+    if (!silencioso) { btn.disabled = false; btn.textContent = "Procesar con PRTS"; }
+  }
+}
+
+// Auto-procesado al abrir el dashboard (la versión cliente del "cron del inbox"):
+// muestra lo cacheado al instante y, si hay capturas nuevas, las sugiere en segundo
+// plano. Idempotente: process-inbox sólo toca las que aún no tienen sugerencia.
+let autoInboxCorriendo = false;
+async function autoInbox() {
+  const hayNuevas = await refrescarSugerencias();
+  if (hayNuevas && !autoInboxCorriendo) {
+    autoInboxCorriendo = true;
+    try { await procesarInbox(true); } finally { autoInboxCorriendo = false; }
   }
 }
 
@@ -1201,15 +1240,15 @@ async function generarInsights() {
 
 // --- Fase 4.2: comandos (voz/texto) — router híbrido ---
 // Patrones locales sin LLM; solo lo freeform va a interpret-command.
-async function ejecutarComando(texto) {
+async function ejecutarComando(texto, spoken) {
   const local = PRTS_AI.routeLocal(texto);
-  if (local) { await PRTS_AI.executeIntent(local); return; }
+  if (local) { await PRTS_AI.executeIntent(local, { spoken }); return; }
   notaPRTS("PRTS pensando…");
   try {
     const { data, error } = await sb.functions.invoke("interpret-command", { body: { text: texto } });
     if (error) throw error;
     if (data.status !== "ok" || !data.intent || data.intent.intent === "unknown") throw new Error(data.reason || "unknown");
-    await PRTS_AI.executeIntent(data.intent);
+    await PRTS_AI.executeIntent(data.intent, { spoken });
   } catch {
     // Degradación: el texto no se pierde — se vuelca a captura normal
     await sb.from("inbox_entries").insert({ raw_text: texto });
@@ -1218,7 +1257,7 @@ async function ejecutarComando(texto) {
   }
 }
 
-const ES_COMANDO = /^(hola\s+)?prts\b|^(abre|abrir|ve a|muestra|muéstrame|resume|resumen|pon (la )?música|crea(r)? tarea|peso|clima|qué tal el clima)/i;
+const ES_COMANDO = /^(hola\s+)?prts\b|^(abre|abrir|ve a|muestra|muéstrame|resume|resumen|pon (la )?música|crea(r)? tarea|registra|anota|apunta|peso|clima|qué tal el clima)\b|^(hola|buen[oa]s|gracias|ayuda)\b|^(qué|que|cuál|cual|cuánt[oa]s?|cuant[oa]s?|quién|quien|cómo|como|cuándo|cuando|dónde|donde|por qué|por que)(?=\s|$|\?)|\d+\s*(kg|kilos)\s*(por|x|×)\s*\d+|\d+\s*[x×]\s*\d+/i;
 
 // ---------- SEMANA (plantilla de bloques) ----------
 // weekday: convención JS getDay() → 0=Dom … 6=Sáb. Se muestra Lun→Dom.
@@ -1729,7 +1768,7 @@ async function init() {
   // captura universal
   $("cap-add").onclick = addCaptura;
   $("cap-text").onkeydown = (e) => { if (e.key === "Enter") addCaptura(); };
-  $("cap-procesar").onclick = procesarInbox;
+  $("cap-procesar").onclick = () => procesarInbox(false);
   $("ins-generar").onclick = generarInsights;
   cargarAICfg();
   cargarInsights();
@@ -1739,15 +1778,16 @@ async function init() {
   const vozOk = PRTS_AI.initVoice({
     button: $("cap-voz"),
     input: $("cap-text"),
+    onStart: () => PRTS_AI.wakePause && PRTS_AI.wakePause(),   // un solo reconocedor a la vez
     onFinal: (transcripcion) => {
       // Comando ("PRTS, …" o patrón conocido) → router; si no → dictado a captura
-      if (ES_COMANDO.test(transcripcion)) ejecutarComando(transcripcion);
+      if (ES_COMANDO.test(transcripcion)) ejecutarComando(transcripcion, true);
       else { $("cap-text").value = transcripcion; addCaptura(); }
     },
     onState: (st, msg) => {
       if (st === "listening") notaPRTS("Escuchando… suelta para enviar.");
       else if (st === "error") notaPRTS(msg || "Error de voz.");
-      else notaPRTS("");
+      else { notaPRTS(""); if (PRTS_AI.wakeResume) PRTS_AI.wakeResume(); }
     },
   });
   if (vozOk) {
@@ -1755,6 +1795,31 @@ async function init() {
   } else {
     // Degradación: sin Web Speech / en móvil → se oculta el botón, captura por texto
     $("cap-voz").classList.add("hidden");
+  }
+
+  // Fase 5: wake word (escucha continua, opt-in, solo escritorio Chromium)
+  PRTS_AI.initWake({
+    onCommand: (cmd) => ejecutarComando(cmd, true),
+    onState: (st) => {
+      const dot = $("wake-dot");
+      if (st === "awaiting") { notaPRTS("PRTS · te escucho, dime…"); PRTS_AI.say("Te escucho."); }
+      else if (st === "trigger") notaPRTS("PRTS · procesando…");
+      else if (st === "denied") notaPRTS("Sin permiso de micrófono para escucha continua.");
+      if (dot) dot.className = "wake-dot" + (st === "awaiting" || st === "trigger" ? " hot"
+                                            : PRTS_AI.wakeOn() ? " on" : "");
+    },
+  });
+  if (PRTS_AI.wakeSupported()) {
+    $("wake-row").classList.remove("hidden");
+    $("wake-toggle").checked = PRTS_AI.wakeOn();
+    $("wake-dot").className = "wake-dot" + (PRTS_AI.wakeOn() ? " on" : "");
+    $("wake-toggle").onchange = (e) => {
+      const activa = PRTS_AI.wakeSet(e.target.checked);
+      e.target.checked = activa;
+      $("wake-dot").className = "wake-dot" + (activa ? " on" : "");
+      notaPRTS(activa ? "Escucha continua activada. Di «Priestess, …»." : "Escucha continua desactivada.");
+      if (activa) PRTS_AI.say("Escucha activada.");
+    };
   }
 
   // controles Tareas
