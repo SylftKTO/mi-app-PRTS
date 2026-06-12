@@ -255,6 +255,14 @@
   /* --- Captura universal (inbox PRTS) --- */
   .cap-row { display: flex; gap: 8px; }
   .cap-row input { flex: 1; min-width: 0; }
+  .cap-mic {
+    width: 38px; min-width: 38px; border-radius: 8px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--bg); color: var(--muted);
+    display: grid; place-items: center; padding: 0;
+    transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .cap-mic svg { width: 16px; height: 16px; }
+  .cap-mic:hover { color: var(--blue); border-color: rgba(125, 162, 216, 0.45); box-shadow: 0 0 12px rgba(125, 162, 216, 0.18); }
   .cap-item { display: flex; align-items: baseline; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
   .cap-item:last-child { border-bottom: none; }
   .cap-item .cuando { font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.08em; color: var(--dim); min-width: 78px; }
@@ -414,10 +422,13 @@
         </div>
         <div class="cap-row">
           <input id="cap-text" class="f-in" placeholder="Agregar tarea, gasto, apunte, entrenamiento o recordatorio…" autocomplete="off">
+          <button id="cap-voz" class="cap-mic" title="Captura por voz (Fase 4)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0"/><path d="M12 18.5V22M8.5 22h7"/></svg>
+          </button>
           <button id="cap-add" class="f-btn">Capturar</button>
         </div>
         <div id="cap-lista"></div>
-        <div class="future-note" style="margin-top:10px">
+        <div class="future-note" id="cap-note" style="margin-top:10px">
           PRTS procesará estas capturas y completará el registro en el módulo correspondiente (Fase 4).
         </div>
       </div>
@@ -1261,6 +1272,13 @@ async function init() {
   // captura universal
   $("cap-add").onclick = addCaptura;
   $("cap-text").onkeydown = (e) => { if (e.key === "Enter") addCaptura(); };
+  $("cap-voz").onclick = () => {
+    const note = $("cap-note");
+    const original = note.textContent;
+    note.textContent = "🎙 Captura por voz — disponible cuando se integre PRTS (Fase 4).";
+    note.style.color = "var(--blue)";
+    setTimeout(() => { note.textContent = original; note.style.color = ""; }, 2600);
+  };
 
   // controles Tareas
   $("tarea-origin").innerHTML = Object.entries(ORIGENES_T)
