@@ -1,6 +1,6 @@
 // Service worker mínimo: red primero, caché como respaldo.
 // El modo offline completo (cola de escrituras) llega en Fase 2.
-const CACHE = "prts-v9";
+const CACHE = "prts-v10";
 
 self.addEventListener("install", (e) => self.skipWaiting());
 self.addEventListener("activate", (e) => {

@@ -843,8 +843,14 @@ async function cargarDashboard() {
     $("prts-briefing").innerHTML = `<span class="lead">No pude calcular el día.</span>${error ? esc(error.message) : ""}`;
     return;
   }
-  const frases = frasesBriefing(d);
-  $("prts-briefing").innerHTML = `<span class="lead">${DIAS[d.weekday]}. ${frases[0]}</span>${frases.slice(1).join(" ")}`;
+  // Briefing: usa el texto de IA del día si existe (Fase 4); si no, el determinista.
+  const { data: bf } = await sb.from("daily_briefings").select("text").eq("brief_date", d.fecha).maybeSingle();
+  if (bf && bf.text) {
+    $("prts-briefing").innerHTML = `<span class="lead">${DIAS[d.weekday]}</span>${esc(bf.text).replace(/\n/g, "<br>")}`;
+  } else {
+    const frases = frasesBriefing(d);
+    $("prts-briefing").innerHTML = `<span class="lead">${DIAS[d.weekday]}. ${frases[0]}</span>${frases.slice(1).join(" ")}`;
+  }
   renderAlertas(d);
 
   $("gym-hoy").innerHTML = d.gym.has_routine_today
