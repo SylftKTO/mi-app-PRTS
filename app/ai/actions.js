@@ -76,6 +76,27 @@
   // speechSynthesis viene en el navegador: sin costo, sin backend, degrada solo.
   const puedeHablar = () =>
     "speechSynthesis" in window && window.matchMedia("(pointer: fine)").matches;
+  PRTS_AI.ttsAvailable = puedeHablar;
+
+  // Voz configurable (persistida): el usuario elige entre las voces del sistema.
+  const VOICE_KEY = "prts_voice";
+  let vozPreferida = (() => { try { return localStorage.getItem(VOICE_KEY) || ""; } catch { return ""; } })();
+  PRTS_AI.getVoices = () => {
+    if (!("speechSynthesis" in window)) return [];
+    const todas = speechSynthesis.getVoices();
+    const es = todas.filter((v) => /^es/i.test(v.lang));
+    return es.length ? es : todas;   // si no hay voces es-*, mostrar todas
+  };
+  PRTS_AI.getVoice = () => vozPreferida;
+  PRTS_AI.setVoice = (name) => {
+    vozPreferida = name || "";
+    try { localStorage.setItem(VOICE_KEY, vozPreferida); } catch { /* sin storage */ }
+  };
+
+  // Estado observable para la UI (animación del nodo PRTS en el mapa).
+  PRTS_AI.speaking = false;
+  PRTS_AI.attention = false;
+
   PRTS_AI.say = function (texto) {
     if (!puedeHablar() || !texto) return;
     try {
@@ -83,11 +104,15 @@
       const u = new SpeechSynthesisUtterance(texto);
       u.lang = "es-MX";
       u.rate = 1.05;
+      const voz = speechSynthesis.getVoices().find((v) => v.name === vozPreferida);
+      if (voz) { u.voice = voz; u.lang = voz.lang; }
       // Pausa la escucha continua mientras PRTS habla, para no oírse a sí misma.
-      if (PRTS_AI.wakePause) {
-        PRTS_AI.wakePause();
-        u.onend = u.onerror = () => PRTS_AI.wakeResume && PRTS_AI.wakeResume();
-      }
+      if (PRTS_AI.wakePause) PRTS_AI.wakePause();
+      u.onstart = () => { PRTS_AI.speaking = true; };
+      u.onend = u.onerror = () => {
+        PRTS_AI.speaking = false;
+        if (PRTS_AI.wakeResume) PRTS_AI.wakeResume();
+      };
       speechSynthesis.speak(u);
     } catch { /* sin voz: el texto ya se muestra */ }
   };
@@ -117,9 +142,10 @@
   // --- Router local: intenciones simples SIN LLM (costo/latencia cero) ---
   // Devuelve una intención si el texto matchea un patrón conocido; null si es freeform.
   PRTS_AI.routeLocal = function (texto) {
-    // Quita la muletilla de mando inicial: «PRTS» (normalizado) o «Priestess» y mis-hears.
+    // Quita la muletilla de mando inicial: «PRTS» (normalizado) o la wake word
+    // hablada («Dalia») y sus mis-hears.
     const t = texto.toLowerCase()
-      .replace(/^(?:hey |oye )?(?:priest\w*|prist\w*|prest\w*|pr[ií]s\w*|prts)[,.]?\s*/i, "").trim();
+      .replace(/^(?:hola\s+|hey\s+|oye\s+)?(?:dal[ií]a\w*|prts)[,.]?\s*/i, "").trim();
 
     let m = t.match(/^(?:abre|abrir|ve a|vamos a|muestra|muéstrame)\s+(?:el |la |los |las |mis? )?(\w+)/);
     if (m) {

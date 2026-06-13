@@ -1,9 +1,9 @@
 // PRTS · Fase 5 — Wake word ("escucha continua").
 //
 // Enfoque sin dependencias: webkitSpeechRecognition en modo continuo como
-// detector "suave" de palabra clave. Cuando una frase final contiene «PRTS»,
+// detector "suave" de palabra clave. Cuando una frase final contiene «Dalia»,
 // el resto de la frase se enruta como comando (Fase 4.2). Si solo se dijo
-// «PRTS», entra una ventana de escucha y la SIGUIENTE frase es el comando.
+// «Dalia», entra una ventana de escucha y la SIGUIENTE frase es el comando.
 //
 // Limitaciones honestas (documentadas):
 //  - Solo escritorio Chromium (igual que push-to-talk).
@@ -11,9 +11,9 @@
 //    continuo eso es audio ambiental constante mientras está activa. Por eso:
 //    opt-in, apagada por defecto, con indicador visible. Para un detector
 //    100% en el dispositivo, ver el adaptador Porcupine documentado en el README.
-//  - Palabra clave HABLADA: «Priestess» (pronunciación inglesa "príst-es").
-//    Se eligió sobre el acrónimo «PRTS» porque el reconocedor es-MX transcribe
-//    mucho mejor una palabra pronunciable. WAKE acepta sus mis-hears comunes.
+//  - Palabra clave HABLADA: «Dalia». Se eligió sobre el acrónimo «PRTS»
+//    porque el reconocedor es-MX transcribe mucho mejor una palabra
+//    pronunciable. WAKE acepta sus mis-hears comunes (dalía, dalia…).
 //    (Internamente el comando se normaliza con prefijo "PRTS, " para el router.)
 
 (function () {
@@ -22,10 +22,9 @@
   const PRTS_AI = (window.PRTS_AI = window.PRTS_AI || {});
   const KEY = "prts_wake_on";
 
-  // «Priestess» (inglés) y sus transcripciones aproximadas en es-MX, con
-  // muletilla opcional (hey/oye). Cubre: priestess, priestes, priesta, priest,
-  // pristes, prist, preste(s), prís, pris…
-  const WAKE = /\b(?:hey |oye )?(priest\w*|prist\w*|prest\w*|pr[ií]s\w*)\b/i;
+  // «Dalia» y sus transcripciones aproximadas en es-MX, con muletilla
+  // opcional (hey/oye). Cubre: dalia, dalía, dalias…
+  const WAKE = /\b(?:hey |oye )?Dal[ií]a\w*\b/i;
 
   let rec = null, on = false, paused = false, restartT = null;
   let lastFire = 0, awaiting = false, awaitT = null;

@@ -73,13 +73,27 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 ## Fase 5 — Wake word (escucha continua)
 
-- ✅ **5.0 — Wake word sin dependencias** (`app/ai/wakeword.js`): `webkitSpeechRecognition` continuo como detector "suave". Palabra clave hablada **«Priestess»** (pronunciación inglesa; se eligió sobre el acrónimo «PRTS» porque el reconocedor es-MX la transcribe mucho mejor — `WAKE` cubre sus mis-hears: priest*/prist*/prest*/prís*). Internamente el comando se normaliza con prefijo "PRTS, " para el router. **Opt-in, apagada por defecto**, toggle en el panel de Captura; solo escritorio Chromium. Frase única ("Priestess, pon música") o dos pasos ("Priestess" → ventana de 6 s → comando). Enruta vía `ejecutarComando(cmd, spoken=true)`.
+- ✅ **5.0 — Wake word sin dependencias** (`app/ai/wakeword.js`): `webkitSpeechRecognition` continuo como detector "suave". Palabra clave hablada **«Dalia»** (`WAKE = /dal[ií]a\w*/`; una palabra pronunciable se transcribe mucho mejor que el acrónimo «PRTS»). Internamente el comando se normaliza con prefijo "PRTS, " para el router. **Opt-in, apagada por defecto**, toggle en el panel de Captura; solo escritorio Chromium. Frase única ("Dalia, pon música") o dos pasos ("Dalia" → ventana de 6 s → comando). Enruta vía `ejecutarComando(cmd, spoken=true)`.
 - ✅ **Protocolos de respuesta simple** (en `PRTS_AI.routeLocal`, sin LLM ni datos → intent local `say`): hora, fecha/día, saludo según la hora, gracias, "cómo estás", ayuda/qué puedes hacer. Respuesta hablada inmediata.
 - ✅ **Intent `ask`** (`command.v4`): preguntas cotidianas / conocimiento general que no encajan en otra intención (cálculos, conversiones, traducciones, definiciones, datos) → el LLM pone la respuesta breve en `speak` y PRTS la dice. No se usa para notas/tareas (eso es create_task/unknown→captura). `ES_COMANDO` enruta interrogativos y saludos por push-to-talk (ojo: `\b` no sirve tras vocal acentuada en JS → se usa `(?=\s|$|\?)`).
 - ✅ **Interacción por voz manos libres:** las escrituras dictadas (`create_task`/`log_weight`/`log_set`) se aplican **sin modal** y se confirman **hablando** (TTS `es-MX`); clima y resumen responden en voz alta. `opts.spoken` distingue voz (sin confirm) de teclado (con confirm).
 - ✅ **Coordinación de un solo reconocedor:** push-to-talk pausa la escucha continua (`wakePause`/`wakeResume`); el TTS también la pausa mientras habla (anti-feedback).
 - ⚠️ **Privacidad asumida:** `webkitSpeechRecognition` envía audio a Google al transcribir; en continuo es audio ambiental constante → opt-in, off por defecto, indicador visible.
-- ⏭️ **5.1 (opcional):** detector on-device con Picovoice Porcupine (WASM, AccessKey gratis, `.ppn` «PRTS») detrás de la misma API; al disparar abre el push-to-talk existente. Nivel C (SO, navegador cerrado) → companion nativo, fuera de alcance. Ver `docs/Fase5_WakeWord_Consideraciones.md`.
+- ⏭️ **5.1 (opcional):** detector on-device con Picovoice Porcupine (WASM, AccessKey gratis, `.ppn` custom) detrás de la misma API; al disparar abre el push-to-talk existente. Nivel C (SO, navegador cerrado) → companion nativo, fuera de alcance. Ver `docs/Fase5_WakeWord_Consideraciones.md`.
+
+### UI/UX post-Fase 5
+
+- ✅ **Insights como vista propia** (`#tab-insights` + link en sidebar): salió del stack derecho del dashboard; `TABS` incluye `insights` y `switchView` la carga (`cargarInsights`).
+- ✅ **Botón «‹ Dashboard»** (`.back-dash`, `data-view="dashboard"`) en las vistas Semana, Proyectos, Tareas e Insights — se cablea con el mismo `querySelectorAll("[data-view]")` de `init()`.
+- ✅ **Nodo PRTS animado en el mapa:** lee `PRTS_AI.attention` (capturando comando por wake word → pulso rápido + halo/anillo ámbar respirando + órbitas aceleradas) y `PRTS_AI.speaking` (TTS contestando → ondas de voz concéntricas azules expandiéndose). `attention` lo setea el `onState` de `initWake` (awaiting/trigger, con timeout de 2.5 s tras trigger); `speaking` lo setea `PRTS_AI.say()` (`utterance.onstart/onend`).
+- ✅ **Voz de PRTS configurable:** selector "Voz de PRTS" + botón Probar en el panel de Captura. `PRTS_AI.getVoices()` (filtra voces `es-*` del sistema, fallback a todas), `setVoice(name)` persiste en `localStorage` (`prts_voice`); `say()` la aplica. "Automática (es-MX)" por defecto; las voces cargan async (`onvoiceschanged`).
+- ✅ **Dashboard reacomodado (mockup constelación):** el `#tab-dashboard` pasó de "mapa full-width + grid 2-col" a dos filas — `.dash-top` (mapa `2.4fr` + `#rail` con Gimnasio·hoy y Progreso semanal) y `.dash-bottom` (Briefing · Captura `#panel-captura` · Tareas `#panel-tareas`). Encabezado `.dash-head` con título "PRTS" + control segmentado `#dash-seg` de 3 modos (`applyDashMode`, persiste en `localStorage` `prts_dash_mode`): **Constelación** (todo), **Mando** (sin mapa, riel en 2 col), **Diario** (sin mapa ni captura, briefing ancho). Colapsa a 1 col < 1080px.
+- ✅ **Wake word renombrada a «Dalia»** (antes «Víctor»): `WAKE = /dal[ií]a\w*/` en `wakeword.js`; `routeLocal` (actions.js) y el atajo escrito del input de captura (index.html) aceptan `prts|dal[ií]a`.
+
+### Módulo Finanzas (Fase 5 · básico con gráficas)
+
+- ✅ Migración `..0010_finances_schema.sql`: tabla `finances` (`entry_date`, `kind` ingreso/gasto, `category` texto libre, `amount`, `note`), RLS `owner_all`, índice `(user_id, entry_date desc)`.
+- ✅ `app/finanzas.html` (móvil, `styles.css` + Chart.js, mismo patrón que dieta/gym): navegador de mes, stat-cards Balance/Ingresos/Gastos, captura (toggle ingreso/gasto + chips de categoría + monto/fecha/nota), **gráficas**: dona de gastos por categoría con leyenda %, línea de balance acumulado del mes, y pestaña Tendencia con barras ingresos vs gastos + línea de balance (8 meses) y promedios/ahorro. Enlazado en sidebar y como nodo activo del mapa.
 
 ### Decisiones abiertas (resolver al implementar)
 
