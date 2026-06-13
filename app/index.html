@@ -596,7 +596,7 @@
         <div id="cap-lista"></div>
         <div id="cap-sugerencias"></div>
         <button id="cap-procesar" class="cap-proc">Procesar con PRTS</button>
-        <label id="wake-row" class="wake-row hidden" title="Escucha continua en escritorio: di «Dalia». Nota: el reconocimiento envía audio a Google mientras está activa.">
+        <label id="wake-row" class="wake-row hidden" title="Escucha continua en escritorio: di «Dalia». Sigue activa con la pestaña en segundo plano (el indicador de micrófono permanece encendido). El reconocimiento envía audio a Google mientras está activa.">
           <input type="checkbox" id="wake-toggle">
           <span class="mono">Escucha continua «Dalia»</span>
           <span id="wake-dot" class="wake-dot"></span>
@@ -1949,7 +1949,7 @@ async function init() {
       const activa = PRTS_AI.wakeSet(e.target.checked);
       e.target.checked = activa;
       $("wake-dot").className = "wake-dot" + (activa ? " on" : "");
-      notaPRTS(activa ? "Escucha continua activada. Di «Dalia, …»." : "Escucha continua desactivada.");
+      notaPRTS(activa ? "Escucha continua activada. Di «Dalia, …» (sigue activa en segundo plano)." : "Escucha continua desactivada.");
       if (activa) PRTS_AI.say("Escucha activada.");
     };
   }
