@@ -97,6 +97,19 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - ✅ Migración `..0010_finances_schema.sql`: tabla `finances` (`entry_date`, `kind` ingreso/gasto, `category` texto libre, `amount`, `note`), RLS `owner_all`, índice `(user_id, entry_date desc)`.
 - ✅ `app/finanzas.html` (móvil, `styles.css` + Chart.js, mismo patrón que dieta/gym): navegador de mes, stat-cards Balance/Ingresos/Gastos, captura (toggle ingreso/gasto + chips de categoría + monto/fecha/nota), **gráficas**: dona de gastos por categoría con leyenda %, línea de balance acumulado del mes, y pestaña Tendencia con barras ingresos vs gastos + línea de balance (8 meses) y promedios/ahorro. Enlazado en sidebar y como nodo activo del mapa.
 
+### Módulo Recordatorios (Fase 5 · notificación al celular vía Google Calendar)
+
+- **Por qué Calendar y no Web Push:** el celular ya tiene la app de Google Calendar, que entrega la notificación a la hora con PRTS cerrado. PRTS solo crea el evento (con recordatorio "popup"); Google hace el resto. Cero backend de push.
+- ✅ Migración `..0011_reminders_schema.sql`: tabla `reminders` (`title`, `notes`, `remind_at timestamptz`, `lead_minutes`, `status` pendiente/hecho/cancelado, `google_event_id`), RLS `owner_all`, índice `(user_id, remind_at)`.
+- ✅ `app/ai/gcal.js` — integración **cliente puro** con Google Calendar: Google Identity Services (GIS) flujo token (access token ~1 h en memoria, re-pedido en silencio; sin refresh token, sin secretos → sin Edge Function). `PRTS_AI.gcal`: `available()` (hay `GOOGLE_CLIENT_ID`), `connected()`, `connect()`/`disconnect()`, `createEvent/updateEvent/deleteEvent` (REST sobre `calendars/primary/events`, TZ MX, `reminders.overrides` popup a `lead_minutes`). Degrada a `null` si no conectado/falla.
+- ✅ `app/config.js` → `GOOGLE_CLIENT_ID` (público, vacío por defecto). **Setup del usuario en Google Cloud Console:** habilitar *Google Calendar API*; pantalla de consentimiento *Externo* + agregarse como *usuario de prueba* (sin verificación de Google); crear *ID de cliente OAuth* tipo Web con orígenes JS = URL de Vercel + `http://localhost:3210`; pegar el ID en config.js. Mientras esté vacío, los recordatorios se guardan pero NO notifican al celular.
+- ✅ `app/recordatorios.html` (móvil): tarjeta Conectar/Desconectar Google con estado, captura (título + `datetime-local` + chips de antelación + nota), listas Próximos / Pasados-y-hechos con completar·editar·eliminar (sincroniza el evento GCal). Badge "● Calendar" vs "○ solo PRTS".
+- ✅ **Fuente de verdad en Supabase** (PRTS posee los recordatorios; Google es la capa de notificación). Sincronización **una vía** PRTS→Google. **Degradación total:** sin Google conectado el recordatorio igual se guarda y aparece en el dashboard.
+- ✅ **Voz (Dalia):** intent local `create_reminder` en `actions.js` con parser de fecha/hora en español (`parseRecordatorio`: "en N min/horas/días", hoy/mañana/pasado mañana, día de semana, "el día N", "a las H[:MM] am/pm/de la mañana/tarde/noche"; hora baja sin sufijo → PM). "Dalia, recuérdame …" inserta en `reminders` + crea evento GCal y confirma hablando.
+- ✅ **Dashboard:** próximos recordatorios (48 h) y vencidos pendientes se anteponen en `#prts-alertas` (`renderRecordatoriosDash`); link en sidebar.
+- ✅ **Inbox:** `aplicarSugerencia` para `recordatorio` con fecha/hora → tabla `reminders` (+ evento GCal); solo fecha → a las 9:00; sin fecha → tarea simple (como antes). `deshacerAplicacion` borra también el evento GCal.
+- ⚠️ **Límite honesto:** el evento se crea con PRTS abierto; la notificación la entrega Google con PRTS cerrado. Editar en el celular no regresa a PRTS. App OAuth en modo testing (test user) basta para uso personal.
+
 ### Decisiones abiertas (resolver al implementar)
 
 - Tarifas/modelo vigentes para `cost_usd` (verificar precios al implementar).

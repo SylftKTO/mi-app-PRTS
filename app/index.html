@@ -15,6 +15,7 @@
 <script src="ai/actions.js"></script>
 <script src="ai/voice.js"></script>
 <script src="ai/wakeword.js"></script>
+<script src="ai/gcal.js"></script>
 <style>
   :root {
     --bg: #0B0D12; --panel: #10131B; --panel2: #141823; --border: #1D2230;
@@ -479,6 +480,9 @@
   <a class="nav-link" href="#insights" data-view="insights">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 6-8 3 4"/><path d="M3 21h18"/></svg>
     Insights</a>
+  <a class="nav-link" href="recordatorios.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a1.7 1.7 0 0 1-3 0"/></svg>
+    Recordatorios</a>
 
   <div class="nav-label mono">Estudio &amp; academias</div>
   <a class="nav-link" href="apuntes.html">
@@ -1006,6 +1010,23 @@ function renderAlertas(d) {
   $("prts-alertas").innerHTML = out.join("");
 }
 
+// Próximos recordatorios (48 h) y vencidos pendientes → se anteponen en las alertas.
+async function renderRecordatoriosDash() {
+  const limite = new Date(Date.now() + 48 * 3600 * 1000).toISOString();
+  const { data } = await sb.from("reminders").select("title, remind_at")
+    .eq("status", "pendiente").lte("remind_at", limite).order("remind_at").limit(4);
+  if (!data || !data.length) return;
+  const ahora = new Date();
+  const html = data.map(r => {
+    const when = new Date(r.remind_at);
+    const venc = when < ahora;
+    const txt = when.toLocaleString("es-MX", { timeZone: "America/Mexico_City", weekday: "short", hour: "numeric", minute: "2-digit" });
+    return `<div class="alerta ${venc ? "red" : ""}">${ICO_ALERTA.reloj}
+      <span>${esc(r.title)}</span><span class="tag">${venc ? "vencido" : txt}</span></div>`;
+  }).join("");
+  $("prts-alertas").insertAdjacentHTML("afterbegin", html);
+}
+
 function renderTareasDash(tasks, fecha) {
   const cont = $("lista-tareas");
   cont.innerHTML = "";
@@ -1043,6 +1064,7 @@ async function cargarDashboard() {
     $("prts-briefing").innerHTML = `<span class="lead">${DIAS[d.weekday]}. ${frases[0]}</span>${frases.slice(1).join(" ")}`;
   }
   renderAlertas(d);
+  renderRecordatoriosDash();
 
   $("gym-hoy").innerHTML = d.gym.has_routine_today
     ? `<div class="serif" style="font-size:1.3rem;color:var(--text)">${esc(d.gym.routine)}</div>
@@ -1112,7 +1134,7 @@ async function cargarInbox() {
 // La Edge Function solo SUGIERE; aquí se confirma y el cliente escribe (RLS).
 const MOD_LABEL = { tareas: "Tarea", recordatorio: "Recordatorio", dieta: "Dieta", apuntes: "Apunte",
                     proyectos: "Proyecto", gym: "Gym", semana: "Semana", desconocido: "Sin clasificar" };
-const MOD_EDIT_NAV = { tareas: "#tareas", recordatorio: "#tareas", proyectos: "#proyectos",
+const MOD_EDIT_NAV = { tareas: "#tareas", recordatorio: "recordatorios.html", proyectos: "#proyectos",
                        dieta: "dieta.html", apuntes: "apuntes.html", gym: "gym.html" };
 
 function notaPRTS(msg) {
@@ -1270,16 +1292,30 @@ async function renderSugerencias(items) {
 // Devuelve { error } o { table, targetId, modulo } para poder deshacer.
 const MOD_TABLA = { tareas: "tasks", recordatorio: "tasks", dieta: "meal_logs", apuntes: "notes", proyectos: "projects" };
 async function aplicarSugerencia(id, s) {
-  let res, modulo = s.module;
+  let res, modulo = s.module, tabla = MOD_TABLA[s.module];
   const p = s.payload || {};
   switch (s.module) {
     case "tareas":
       res = await sb.from("tasks").insert({ title: p.title, origin: p.origin, priority: p.priority, deadline: p.deadline ?? null }).select("id").single();
       break;
-    case "recordatorio":
-      modulo = "tareas";
-      res = await sb.from("tasks").insert({ title: p.title, origin: "personal", priority: "media", deadline: p.deadline ?? null }).select("id").single();
+    case "recordatorio": {
+      // Con fecha/hora → recordatorio que notifica al celular (Google Calendar).
+      // Solo fecha → recordatorio a las 9:00 de ese día. Sin fecha → tarea simple.
+      const remIso = p.remind_at && !isNaN(new Date(p.remind_at).getTime())
+        ? new Date(p.remind_at).toISOString()
+        : (/^\d{4}-\d{2}-\d{2}$/.test(p.deadline || "") ? new Date(p.deadline + "T09:00:00").toISOString() : null);
+      if (remIso) {
+        modulo = "recordatorio"; tabla = "reminders";
+        let gid = null;
+        if (window.PRTS_AI && PRTS_AI.gcal && PRTS_AI.gcal.createEvent)
+          gid = await PRTS_AI.gcal.createEvent({ title: p.title, notes: null, remind_at: remIso, lead_minutes: 0 });
+        res = await sb.from("reminders").insert({ title: p.title, remind_at: remIso, lead_minutes: 0, google_event_id: gid }).select("id").single();
+      } else {
+        modulo = "tareas"; tabla = "tasks";
+        res = await sb.from("tasks").insert({ title: p.title, origin: "personal", priority: "media", deadline: p.deadline ?? null }).select("id").single();
+      }
       break;
+    }
     case "dieta":
       res = await sb.from("meal_logs").insert({ meal: p.meal, name: p.name, kcal: p.kcal, protein_g: p.protein_g, carbs_g: p.carbs_g, fat_g: p.fat_g }).select("id").single();
       break;
@@ -1299,11 +1335,16 @@ async function aplicarSugerencia(id, s) {
     result: { module: modulo, target_id: res.data.id, summary: s.summary },
   }).eq("id", id);
   cargarInbox();
-  return { table: MOD_TABLA[s.module], targetId: res.data.id, modulo };
+  return { table: tabla, targetId: res.data.id, modulo };
 }
 
 // Deshacer una aplicación automática: borra el registro creado y la captura vuelve a pendiente
 async function deshacerAplicacion(entryId, res, card) {
+  // Si era un recordatorio sincronizado, quita también su evento de Google Calendar.
+  if (res.table === "reminders" && window.PRTS_AI && PRTS_AI.gcal) {
+    const { data: r } = await sb.from("reminders").select("google_event_id").eq("id", res.targetId).maybeSingle();
+    if (r && r.google_event_id) await PRTS_AI.gcal.deleteEvent(r.google_event_id);
+  }
   const { error } = await sb.from(res.table).delete().eq("id", res.targetId);
   if (error) { notaPRTS("No pude deshacer: " + error.message); return; }
   await sb.from("inbox_entries").update({ status: "pendiente", processed_at: null, result: null }).eq("id", entryId);
@@ -1369,7 +1410,7 @@ async function ejecutarComando(texto, spoken) {
   }
 }
 
-const ES_COMANDO = /^(hola\s+|hey\s+|oye\s+)?(prts|dal[ií]a)\b|^(abre|abrir|lanza|inicia|ejecuta|arranca|ve a|muestra|muéstrame|resume|resumen|pon (la )?música|crea(r)? tarea|registra|anota|apunta|peso|clima|qué tal el clima)\b|^(hola|buen[oa]s|gracias|ayuda)\b|^(qué|que|cuál|cual|cuánt[oa]s?|cuant[oa]s?|quién|quien|cómo|como|cuándo|cuando|dónde|donde|por qué|por que)(?=\s|$|\?)|\d+\s*(kg|kilos)\s*(por|x|×)\s*\d+|\d+\s*[x×]\s*\d+/i;
+const ES_COMANDO = /^(hola\s+|hey\s+|oye\s+)?(prts|dal[ií]a)\b|^(abre|abrir|lanza|inicia|ejecuta|arranca|ve a|muestra|muéstrame|resume|resumen|pon (la )?música|crea(r)? tarea|recu[ée]rdame|recordatorio|registra|anota|apunta|peso|clima|qué tal el clima|despierta)\b|^(hola|buen[oa]s|gracias|ayuda)\b|^(qué|que|cuál|cual|cuánt[oa]s?|cuant[oa]s?|quién|quien|cómo|como|cuándo|cuando|dónde|donde|por qué|por que)(?=\s|$|\?)|\d+\s*(kg|kilos)\s*(por|x|×)\s*\d+|\d+\s*[x×]\s*\d+/i;
 
 // ---------- SEMANA (plantilla de bloques) ----------
 // weekday: convención JS getDay() → 0=Dom … 6=Sáb. Se muestra Lun→Dom.

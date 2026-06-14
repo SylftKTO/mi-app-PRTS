@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · Recordatorios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="ai/gcal.js"></script>
+<style>
+  /* conexión Google */
+  .gcal-card { display: flex; align-items: center; gap: 12px; }
+  .gcal-card .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; }
+  .gcal-card .dot.on { background: var(--ok); box-shadow: 0 0 8px rgba(133,196,158,0.6); }
+  .gcal-card .cuerpo { flex: 1; min-width: 0; }
+  .gcal-card .t { font-size: 0.92rem; }
+  .gcal-card .s { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; color: var(--faint); margin-top: 2px; }
+  .gcal-card button { padding: 8px 14px; font-size: 13px; white-space: nowrap; }
+
+  /* captura */
+  .sep { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 12px 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  .chip.on { border-color: var(--accent-deep); color: var(--text); background: var(--accent-soft); }
+
+  /* lista */
+  .rem { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .rem:last-child { border-bottom: none; }
+  .rem .chk { width: 21px; height: 21px; min-width: 21px; border-radius: 50%; border: 1.5px solid var(--faint); background: transparent; padding: 0; display: grid; place-items: center; color: transparent; font-size: 12px; }
+  .rem.hecho .chk { border-color: var(--ok); background: var(--ok); color: var(--bg); }
+  .rem .cuerpo { flex: 1; min-width: 0; }
+  .rem .t { font-size: 0.95rem; word-break: break-word; }
+  .rem.hecho .t, .rem.pasado .t { color: var(--muted); }
+  .rem.hecho .t { text-decoration: line-through; }
+  .rem .meta { margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-family: var(--mono); font-size: 10px; letter-spacing: 0.04em; color: var(--faint); }
+  .rem .meta .cuando { color: var(--accent); }
+  .rem .meta .cuando.venc { color: var(--danger); }
+  .rem .meta .sync { display: inline-flex; align-items: center; gap: 3px; }
+  .rem .meta .sync.on { color: var(--ok); }
+  .rem .acts { display: flex; gap: 2px; }
+  .rem .acts button { background: transparent; border: none; color: var(--faint); padding: 4px 6px; font-size: 0.9rem; }
+  .rem .acts button:hover { color: var(--text); }
+
+  #toggle-pasados { margin-top: 18px; width: 100%; padding: 9px; background: transparent; border: 1px dashed var(--line); color: var(--faint); font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; }
+  .empty { color: var(--faint); font-size: 0.88rem; padding: 10px 0; }
+  .editing-banner { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); margin-bottom: 8px; display: none; }
+  .editing .editing-banner { display: block; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Recordatorios</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="view-app" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Recordatorios</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+
+  <h1 class="page-title">Recordatorios</h1>
+  <div class="mono-label page-sub">Avisos que te notifican en el celular</div>
+
+  <!-- Conexión Google Calendar -->
+  <div class="card gcal-card">
+    <span class="dot" id="gcal-dot"></span>
+    <div class="cuerpo">
+      <div class="t" id="gcal-title">Google Calendar</div>
+      <div class="s" id="gcal-sub">—</div>
+    </div>
+    <button id="gcal-btn" class="btn-ghost">Conectar</button>
+  </div>
+
+  <!-- Captura -->
+  <div class="card" id="form-card">
+    <div class="editing-banner">Editando recordatorio · <a href="#" id="cancel-edit" style="color:var(--accent)">cancelar</a></div>
+    <input type="text" id="r-title" placeholder="¿De qué te recuerdo?" autocomplete="off" style="width:100%">
+    <div class="sep">Cuándo</div>
+    <input type="datetime-local" id="r-when" style="width:100%">
+    <div class="sep">Avisarme</div>
+    <div class="chips" id="lead-chips"></div>
+    <input type="text" id="r-notes" placeholder="Nota (opcional)" style="width:100%;margin-top:10px">
+    <button class="btn-primary w100" id="r-save">Crear recordatorio</button>
+  </div>
+
+  <!-- Próximos -->
+  <div class="card">
+    <div class="mono-label" style="margin-bottom:4px">Próximos</div>
+    <div id="lista-prox"></div>
+  </div>
+
+  <button id="toggle-pasados">Pasados y hechos (0)</button>
+  <div id="lista-pasados" class="hidden"></div>
+</div>
+
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span>Inicio</span></a>
+    <a class="nav-item" href="gym.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+    <a class="nav-item" href="finanzas.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 3 8-8"/><path d="M21 7v5M21 7h-5"/><path d="M3 21h18"/></svg>
+      <span>Finanzas</span></a>
+    <a class="nav-item on" href="recordatorios.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a1.7 1.7 0 0 1-3 0"/></svg>
+      <span>Avisos</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const gcal = PRTS_AI.gcal;
+
+const DIAS3 = ["dom","lun","mar","mié","jue","vie","sáb"];
+const MESES3 = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+const LEADS = [
+  { m: 0, label: "A la hora" }, { m: 10, label: "10 min antes" },
+  { m: 30, label: "30 min" }, { m: 60, label: "1 h" }, { m: 1440, label: "1 día" },
+];
+
+let lista = [];
+let leadSel = 0;
+let editingId = null;
+
+function toast(txt) { const t = $("toast"); t.textContent = txt; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); }
+
+// "YYYY-MM-DDTHH:MM" (hora local) por defecto: dentro de 1 h, redondeado a 5 min.
+function defaultWhen() {
+  const d = new Date(Date.now() + 60 * 60000);
+  d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5, 0, 0);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+function fmtCuando(iso) {
+  const d = new Date(iso), p = (n) => String(n).padStart(2, "0");
+  return `${DIAS3[d.getDay()]} ${d.getDate()} ${MESES3[d.getMonth()]} · ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- GOOGLE CALENDAR ----------
+function pintarGcal() {
+  const dot = $("gcal-dot"), btn = $("gcal-btn");
+  if (!gcal.available()) {
+    dot.className = "dot";
+    $("gcal-title").textContent = "Google Calendar (sin configurar)";
+    $("gcal-sub").textContent = "Falta GOOGLE_CLIENT_ID en config.js";
+    btn.classList.add("hidden");
+    return;
+  }
+  btn.classList.remove("hidden");
+  if (gcal.connected()) {
+    dot.className = "dot on";
+    $("gcal-title").textContent = "Google Calendar conectado";
+    $("gcal-sub").textContent = "Tus recordatorios notifican en el celular";
+    btn.textContent = "Desconectar"; btn.className = "btn-ghost";
+    btn.onclick = () => { gcal.disconnect(); pintarGcal(); toast("Google Calendar desconectado"); };
+  } else {
+    dot.className = "dot";
+    $("gcal-title").textContent = "Google Calendar";
+    $("gcal-sub").textContent = "Conéctalo para recibir avisos en el celular";
+    btn.textContent = "Conectar"; btn.className = "btn-primary";
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const ok = await gcal.connect();
+      btn.disabled = false;
+      pintarGcal();
+      toast(ok ? "Google Calendar conectado" : "No se pudo conectar");
+    };
+  }
+}
+
+// ---------- CAPTURA ----------
+function pintarChips() {
+  $("lead-chips").innerHTML = LEADS.map(l =>
+    `<button class="chip ${l.m === leadSel ? "on" : ""}" data-m="${l.m}">${l.label}</button>`).join("");
+  $("lead-chips").querySelectorAll(".chip").forEach(b => b.onclick = () => { leadSel = +b.dataset.m; pintarChips(); });
+}
+
+function resetForm() {
+  editingId = null;
+  $("form-card").classList.remove("editing");
+  $("r-title").value = ""; $("r-notes").value = "";
+  $("r-when").value = defaultWhen();
+  leadSel = 0; pintarChips();
+  $("r-save").textContent = "Crear recordatorio";
+}
+
+function editar(r) {
+  editingId = r.id;
+  $("form-card").classList.add("editing");
+  $("r-title").value = r.title;
+  $("r-notes").value = r.notes || "";
+  const d = new Date(r.remind_at), p = (n) => String(n).padStart(2, "0");
+  $("r-when").value = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  leadSel = LEADS.some(l => l.m === r.lead_minutes) ? r.lead_minutes : 0;
+  pintarChips();
+  $("r-save").textContent = "Guardar cambios";
+  $("form-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function guardar() {
+  const title = $("r-title").value.trim();
+  const when = $("r-when").value;
+  if (!title) { toast("Ponle un título"); return; }
+  if (!when) { toast("Elige fecha y hora"); return; }
+  const remind_at = new Date(when).toISOString();
+  const notes = $("r-notes").value.trim() || null;
+  const rem = { title, notes, remind_at, lead_minutes: leadSel };
+  $("r-save").disabled = true;
+
+  if (editingId) {
+    const prev = lista.find(r => r.id === editingId);
+    let gid = prev?.google_event_id || null;
+    if (gid) gid = await gcal.updateEvent(gid, rem) || gid;
+    else gid = await gcal.createEvent(rem);   // no tenía evento; intenta crearlo ahora
+    const { error } = await sb.from("reminders").update({ ...rem, google_event_id: gid }).eq("id", editingId);
+    $("r-save").disabled = false;
+    if (error) { toast("Error: " + error.message); return; }
+    toast("Recordatorio actualizado");
+  } else {
+    const gid = await gcal.createEvent(rem);   // null si Google no está conectado (degrada)
+    const { error } = await sb.from("reminders").insert({ ...rem, google_event_id: gid });
+    $("r-save").disabled = false;
+    if (error) { toast("Error: " + error.message); return; }
+    toast(gid ? "Listo · te avisará en el celular" : "Guardado (conecta Google para avisos al celular)");
+  }
+  resetForm();
+  cargar();
+}
+
+// ---------- ACCIONES ----------
+async function completar(r) {
+  await sb.from("reminders").update({ status: r.status === "hecho" ? "pendiente" : "hecho" }).eq("id", r.id);
+  // al marcar hecho, quita el evento futuro de Google para que no notifique de más
+  if (r.status !== "hecho" && r.google_event_id && new Date(r.remind_at) > new Date()) {
+    await gcal.deleteEvent(r.google_event_id);
+    await sb.from("reminders").update({ google_event_id: null }).eq("id", r.id);
+  }
+  cargar();
+}
+async function borrar(r) {
+  if (!confirm("¿Eliminar este recordatorio?")) return;
+  if (r.google_event_id) await gcal.deleteEvent(r.google_event_id);
+  await sb.from("reminders").delete().eq("id", r.id);
+  if (editingId === r.id) resetForm();
+  cargar();
+}
+
+// ---------- RENDER ----------
+function fila(r) {
+  const div = document.createElement("div");
+  const ahora = new Date();
+  const venc = new Date(r.remind_at) < ahora;
+  const pasado = r.status !== "pendiente" || venc;
+  div.className = "rem" + (r.status === "hecho" ? " hecho" : pasado ? " pasado" : "");
+  const lead = r.lead_minutes ? ` · avisa ${LEADS.find(l => l.m === r.lead_minutes)?.label.toLowerCase() || r.lead_minutes + " min"}` : "";
+  const sync = r.google_event_id
+    ? `<span class="sync on" title="Sincronizado con Google Calendar">● Calendar</span>`
+    : `<span class="sync" title="Solo en PRTS (sin aviso al celular)">○ solo PRTS</span>`;
+  div.innerHTML = `
+    <button class="chk" title="${r.status === "hecho" ? "Reabrir" : "Marcar hecho"}">✓</button>
+    <div class="cuerpo">
+      <div class="t">${r.title.replace(/</g, "&lt;")}${r.notes ? ` <span style="color:var(--faint)">· ${r.notes.replace(/</g, "&lt;")}</span>` : ""}</div>
+      <div class="meta"><span class="cuando ${venc && r.status === "pendiente" ? "venc" : ""}">${fmtCuando(r.remind_at)}${lead}</span>${sync}</div>
+    </div>
+    <div class="acts">
+      <button class="edit" title="Editar">✎</button>
+      <button class="del" title="Eliminar">✕</button>
+    </div>`;
+  div.querySelector(".chk").onclick = () => completar(r);
+  div.querySelector(".edit").onclick = () => editar(r);
+  div.querySelector(".del").onclick = () => borrar(r);
+  return div;
+}
+
+async function cargar() {
+  const { data, error } = await sb.from("reminders").select("*").order("remind_at", { ascending: true });
+  if (error) { toast("Error: " + error.message); return; }
+  lista = data || [];
+  const ahora = new Date();
+  const prox = lista.filter(r => r.status === "pendiente" && new Date(r.remind_at) >= ahora);
+  const pasados = lista.filter(r => !(r.status === "pendiente" && new Date(r.remind_at) >= ahora))
+    .sort((a, b) => b.remind_at.localeCompare(a.remind_at));
+
+  const cp = $("lista-prox"); cp.innerHTML = "";
+  if (prox.length) prox.forEach(r => cp.appendChild(fila(r)));
+  else cp.innerHTML = `<div class="empty">Sin recordatorios próximos.</div>`;
+
+  $("toggle-pasados").textContent = `Pasados y hechos (${pasados.length})`;
+  const lpz = $("lista-pasados"); lpz.innerHTML = "";
+  pasados.slice(0, 40).forEach(r => lpz.appendChild(fila(r)));
+}
+
+// ---------- ARRANQUE ----------
+function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+
+async function init() {
+  show("view-app");
+  pintarGcal();
+  resetForm();
+  $("r-save").onclick = guardar;
+  $("r-title").onkeydown = (e) => { if (e.key === "Enter") guardar(); };
+  $("cancel-edit").onclick = (e) => { e.preventDefault(); resetForm(); };
+  $("toggle-pasados").onclick = () => $("lista-pasados").classList.toggle("hidden");
+  cargar();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+</script>
+</body>
+</html>

@@ -194,6 +194,79 @@
     else if (item.web) window.open(item.web, "_blank", "noopener");
   }
 
+  // --- Parser ligero de fecha/hora en español (para recordatorios por voz) ---
+  // Soporta: "en N min/horas/días", "hoy/mañana/pasado mañana", día de semana,
+  // "el día N" / "el N", y hora "a las H[:MM] [am|pm|de la mañana/tarde/noche]".
+  // Devuelve { remind_at: ISO, title } o null si no hay un título tras limpiar.
+  const DIAS_SEM = { domingo: 0, lunes: 1, martes: 2, miercoles: 3, jueves: 4, viernes: 5, sabado: 6 };
+  function limpiarTitulo(s) {
+    return s.replace(/\b(a las?|el|la|los|las|de|del|para|que|este|esta)\b/gi, " ")
+      .replace(/\s{2,}/g, " ").replace(/^[\s,.:;-]+|[\s,.:;-]+$/g, "").trim();
+  }
+  function parseRecordatorio(t) {
+    const mm = t.match(/^(?:recu[ée]rdame|recuerdame|recu[ée]rda|recordatorio(?:\sde)?)\s+(?:de\s+|que\s+)?(.+)$/i);
+    if (!mm) return null;
+    let resto = mm[1].trim();
+    const now = new Date();
+    const cap = (s) => s ? s[0].toUpperCase() + s.slice(1) : s;
+
+    // "en N minutos/horas/días" → relativo exacto desde ahora
+    let r = resto.match(/\ben\s+(\d+)\s*(min(?:uto)?s?|h(?:ora)?s?|d[ií]as?)\b/i);
+    if (r) {
+      const n = +r[1], u = r[2].toLowerCase(), at = new Date(now);
+      if (/^min/.test(u)) at.setMinutes(at.getMinutes() + n);
+      else if (/^h/.test(u)) at.setHours(at.getHours() + n);
+      else at.setDate(at.getDate() + n);
+      const title = cap(limpiarTitulo(resto.replace(r[0], " ")));
+      return title ? { remind_at: at.toISOString(), title } : null;
+    }
+
+    const base = new Date(now); base.setSeconds(0, 0);
+    let diaFijado = false;
+    if (/\bpasado\s+ma[ñn]ana\b/i.test(resto)) { base.setDate(base.getDate() + 2); resto = resto.replace(/\bpasado\s+ma[ñn]ana\b/i, " "); diaFijado = true; }
+    else if (/\bma[ñn]ana\b/i.test(resto)) { base.setDate(base.getDate() + 1); resto = resto.replace(/\bma[ñn]ana\b/i, " "); diaFijado = true; }
+    else if (/\bhoy\b/i.test(resto)) { resto = resto.replace(/\bhoy\b/i, " "); diaFijado = true; }
+
+    r = resto.match(/\b(?:el\s+)?(domingo|lunes|martes|mi[eé]rcoles|jueves|viernes|s[áa]bado)\b/i);
+    if (r) {
+      const k = r[1].toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+      const target = DIAS_SEM[k];
+      if (target != null) { let diff = (target - base.getDay() + 7) % 7; if (diff === 0) diff = 7; base.setDate(base.getDate() + diff); diaFijado = true; resto = resto.replace(r[0], " "); }
+    }
+    r = resto.match(/\bel\s+(?:d[ií]a\s+)?(\d{1,2})\b/i);
+    if (r) {
+      const dia = +r[1];
+      if (dia >= 1 && dia <= 31) { base.setDate(dia); if (base < now) base.setMonth(base.getMonth() + 1); diaFijado = true; resto = resto.replace(r[0], " "); }
+    }
+
+    // hora con cue explícito (evita capturar números del título)
+    let h = null, min = 0, horaFijada = false;
+    r = resto.match(/\ba\s+la(?:s)?\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm|a\.m\.|p\.m\.|de la ma[ñn]ana|de la tarde|de la noche|hrs?|horas)?/i)
+      || resto.match(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/i)
+      || resto.match(/\b(\d{1,2})\s*(am|pm)\b/i);
+    if (r) {
+      h = +r[1]; min = r[2] ? +r[2] : 0;
+      const suf = (r[3] || r[2] || "").toString().toLowerCase();
+      if (/pm|p\.m\.|tarde|noche/.test(suf) && h < 12) h += 12;
+      else if (/(am|a\.m\.|ma[ñn]ana)/.test(suf) && h === 12) h = 0;
+      else if (!suf && h >= 1 && h <= 7) h += 12;   // "a las 5" sin am/pm → 17:00 (la tarde es lo común en un recordatorio)
+      if (h >= 0 && h <= 23) { horaFijada = true; resto = resto.replace(r[0], " "); }
+      else h = null;
+    }
+
+    let at;
+    if (horaFijada) {
+      at = new Date(base); at.setHours(h, min, 0, 0);
+      if (!diaFijado && at < now) at.setDate(at.getDate() + 1);   // solo hora y ya pasó → mañana
+    } else if (diaFijado) {
+      at = new Date(base); at.setHours(9, 0, 0, 0);               // día sin hora → 9:00
+    } else {
+      at = new Date(now.getTime() + 60 * 60000);                  // sin cuándo → en 1 hora
+    }
+    const title = cap(limpiarTitulo(resto));
+    return title ? { remind_at: at.toISOString(), title } : null;
+  }
+
   // --- Router local: intenciones simples SIN LLM (costo/latencia cero) ---
   // Devuelve una intención si el texto matchea un patrón conocido; null si es freeform.
   PRTS_AI.routeLocal = function (texto) {
@@ -217,10 +290,19 @@
       const key = matchLauncher(m[1]);
       if (key) return { intent: "launch", params: { app: key }, speak: `Abriendo ${LAUNCHERS[key].label}.`, confidence: 1 };
     }
-    // Rutina matutina: "buen día" / "buenos días" (con o sin «Dalia») → abre el set de arranque
-    if (/^buen(?:os)?\s+d[ií]as?\b/.test(t))
-      return { intent: "routine", params: { apps: ["discord", "spotify", "youtube"] },
-               speak: "Buen día, Sergio. Abriendo Discord, Spotify y YouTube.", confidence: 1 };
+    // Rutina matutina: comando «Dalia despierta» → abre el set de arranque.
+    // Requiere la wake word (no «despierta» a secas): por voz llega normalizada
+    // como prefijo "PRTS, "; por teclado puede venir "Dalia despierta".
+
+    if (/^(?:hola\s+|hey\s+|oye\s+)?(?:dal[ií]a\w*|prts)[\s,.]+despierta\b/i.test(texto.trim()))
+      return { intent: "routine", params: { apps: ["discord", "spotify"] },
+               speak: "Buen día, Carlos.", confidence: 1 };
+    // "recuérdame …" → recordatorio con hora (notifica al celular vía Google Calendar)
+    if (/^(?:recu[ée]rdame|recuerdame|recu[ée]rda|recordatorio)\b/i.test(t)) {
+      const rem = parseRecordatorio(t);
+      if (rem) return { intent: "create_reminder", params: { title: rem.title, remind_at: rem.remind_at, lead_minutes: 0 }, speak: "", confidence: 1 };
+      return { intent: "say", params: {}, speak: "¿Qué te recuerdo y para cuándo?", confidence: 1 };
+    }
     if (/resume|resumen|qué (hay|tengo|toca) hoy|cómo va (el|mi) día/.test(t)) {
       const scope = /tarea/.test(t) ? "tareas" : /gym|gimnasio|entrena/.test(t) ? "gym" : "dia";
       return { intent: "summary", params: { scope }, speak: "", confidence: 1 };
@@ -319,6 +401,22 @@
         const { data: d, error } = await deps.sb.rpc("dashboard_brief");
         if (error || !d) { notify("No pude calcular el resumen."); return; }
         notify(resumenLocal(String(it.params?.scope || "dia"), d));
+        return;
+      }
+      case "create_reminder": {
+        const p = it.params || {};
+        const title = String(p.title || "").trim();
+        const remind_at = p.remind_at;
+        if (!title || !remind_at || isNaN(new Date(remind_at).getTime())) { notify("¿Qué te recuerdo y para cuándo?"); return; }
+        const lead = Math.max(0, Math.round(Number(p.lead_minutes) || 0));
+        const human = new Date(remind_at).toLocaleString("es-MX", { timeZone: "America/Mexico_City", weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" });
+        if (!spoken && !confirm(`Crear recordatorio: "${title}" — ${human}?`)) return;
+        let gid = null;
+        if (PRTS_AI.gcal && PRTS_AI.gcal.createEvent) gid = await PRTS_AI.gcal.createEvent({ title, notes: null, remind_at, lead_minutes: lead });
+        const { error } = await deps.sb.from("reminders").insert({ title, notes: null, remind_at, lead_minutes: lead, google_event_id: gid });
+        notify(error ? "No pude crear el recordatorio: " + error.message
+                     : `Listo, te recuerdo "${title}" el ${human}${gid ? ". Te aviso en el celular." : "."}`);
+        if (!error && deps.refresh) deps.refresh();
         return;
       }
       case "create_task": {
