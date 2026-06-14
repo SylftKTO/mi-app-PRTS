@@ -1,6 +1,6 @@
 supabase 
 x7PlWRP4a4xAk7A1
-
+u3eDomGg079zv7Bg wolves
 cd C:\Users\Sylft\Desktop\Projects\mi-app-PRTS
 
 juancarloslr.kt@gmail.com
@@ -9,7 +9,7 @@ kal98SiT
 npx serve app
 
 git add -A
-git commit -m "Actualizacion"
+git commit -m "V1"
 git push
 
 
@@ -20,3 +20,5 @@ prototipo
 cd C:\Users\Sylft\Desktop\Projects\mi-app-personal
 npm run dev:frontend
 npm run dev:backend
+
+

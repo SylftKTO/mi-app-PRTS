@@ -92,8 +92,11 @@
         if (m && Date.now() - lastFire > 1500) {
           lastFire = Date.now();
           const resto = txt.slice(m.index + m[0].length).replace(/^[\s,.:]+/, "").trim();
+          const antes = txt.slice(0, m.index).replace(/[\s,.:]+$/, "").trim();
           if (resto.length >= 2) {
-            dispara("PRTS, " + resto);                     // frase única: «Dalia, pon música»
+            dispara("PRTS, " + resto);                     // wake al inicio: «Dalia, pon música»
+          } else if (antes.length >= 2) {
+            dispara("PRTS, " + antes);                     // wake al final: «Pon música, Dalia» · «Buen día Dalia»
           } else {
             awaiting = true;                               // solo dijo «Dalia» → escucho lo siguiente
             emit("awaiting");

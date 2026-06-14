@@ -62,7 +62,7 @@
     }
   }
   const VIEWS_INTERNAS = { dashboard: null, tareas: null, semana: null, proyectos: null }; // vistas SPA (switchView)
-  const PAGINAS = { gym: "gym.html", dieta: "dieta.html", apuntes: "apuntes.html" };       // páginas propias
+  const PAGINAS = { gym: "gym.html", dieta: "dieta.html", apuntes: "apuntes.html", finanzas: "finanzas.html" }; // páginas propias
   const ORIGENES = ["escuela", "wolves", "levelup", "personal"];
   const PRIORIDADES = ["alta", "media", "baja"];
 
@@ -139,21 +139,88 @@
     location.href = uri;
   }
 
+  // --- Lanzadores de apps / web / carpetas (whitelist cerrada) ---
+  // app    → handler de protocolo (discord://, vscode://…); si la app no toma el
+  //          foco en ~1.4 s, cae al fallback web (si existe).
+  // web    → pestaña del navegador.
+  // folder → file:// — el navegador suele BLOQUEARLO desde http; para abrir el
+  //          Explorador de verdad hace falta el companion nativo (Nivel C).
+  // ⚠️ EDITA las rutas de carpeta a las de tu equipo.
+  const LAUNCHERS = {
+    discord:   { kind: "app", uri: "discord://",        web: "https://discord.com/app",        label: "Discord" },
+    spotify:   { kind: "app", uri: "spotify:",          web: "https://open.spotify.com/",       label: "Spotify" },
+    vscode:    { kind: "app", uri: "vscode://",         web: null,                              label: "Visual Studio Code" },
+    steam:     { kind: "app", uri: "steam://open/main", web: "https://store.steampowered.com/", label: "Steam" },
+    whatsapp:  { kind: "app", uri: "whatsapp://",       web: "https://web.whatsapp.com/",       label: "WhatsApp" },
+    youtube:   { kind: "web", web: "https://www.youtube.com/", label: "YouTube" },
+    navegador: { kind: "web", web: "https://www.google.com/",  label: "el navegador" },
+    proyectos: { kind: "folder", web: "file:///C:/Users/Sylft/Desktop/Projects", label: "tu carpeta de proyectos" },
+    descargas: { kind: "folder", web: "file:///C:/Users/Sylft/Downloads",        label: "Descargas" },
+    documentos:{ kind: "folder", web: "file:///C:/Users/Sylft/Documents",        label: "Documentos" },
+  };
+  // Sinónimos hablados (y mis-hears comunes) → clave del lanzador.
+  const LAUNCH_ALIAS = {
+    discord: "discord", spotify: "spotify",
+    "visual studio code": "vscode", "vs code": "vscode", vscode: "vscode", code: "vscode",
+    helium: "navegador", navegador: "navegador", browser: "navegador", chrome: "navegador",
+    youtube: "youtube", "you tube": "youtube", yutu: "youtube",
+    whatsapp: "whatsapp", "whats app": "whatsapp", wasap: "whatsapp", wasa: "whatsapp",
+    steam: "steam", estim: "steam",
+    proyectos: "proyectos", proyecto: "proyectos", projects: "proyectos",
+    descargas: "descargas", downloads: "descargas",
+    documentos: "documentos", documents: "documentos", docs: "documentos",
+  };
+  function matchLauncher(raw) {
+    const s = String(raw).toLowerCase().trim()
+      .replace(/[¿?¡!.]+$/g, "").replace(/^(?:carpeta de |carpeta )/, "").trim();
+    return LAUNCH_ALIAS[s] || (LAUNCHERS[s] ? s : null);
+  }
+  // Lanza un protocolo sin sacar a PRTS de su pestaña (iframe oculto); permite
+  // abrir varias apps seguidas. Si la app no captura el foco, abre el fallback web.
+  function abrirProtocolo(uri, web) {
+    const ifr = document.createElement("iframe");
+    ifr.style.display = "none";
+    ifr.src = uri;
+    document.body.appendChild(ifr);
+    setTimeout(() => ifr.remove(), 1500);
+    if (web) {
+      const visibleAntes = !document.hidden;
+      setTimeout(() => { if (visibleAntes && !document.hidden) window.open(web, "_blank", "noopener"); }, 1400);
+    }
+  }
+  function abrirDestino(item) {
+    if (!item) return;
+    if (item.kind === "app" && item.uri) abrirProtocolo(item.uri, item.web);
+    else if (item.web) window.open(item.web, "_blank", "noopener");
+  }
+
   // --- Router local: intenciones simples SIN LLM (costo/latencia cero) ---
   // Devuelve una intención si el texto matchea un patrón conocido; null si es freeform.
   PRTS_AI.routeLocal = function (texto) {
     // Quita la muletilla de mando inicial: «PRTS» (normalizado) o la wake word
     // hablada («Dalia») y sus mis-hears.
     const t = texto.toLowerCase()
-      .replace(/^(?:hola\s+|hey\s+|oye\s+)?(?:dal[ií]a\w*|prts)[,.]?\s*/i, "").trim();
+      .replace(/^(?:hola\s+|hey\s+|oye\s+)?(?:dal[ií]a\w*|prts)[,.]?\s*/i, "")   // wake word al inicio
+      .replace(/[\s,]+(?:dal[ií]a\w*|prts)\s*$/i, "")                             // …o al final
+      .trim();
 
     let m = t.match(/^(?:abre|abrir|ve a|vamos a|muestra|muéstrame)\s+(?:el |la |los |las |mis? )?(\w+)/);
     if (m) {
       const destino = m[1].replace(/s$/, ""); // tarea(s), proyecto(s)…
       const mapa = { dashboard: "dashboard", inicio: "dashboard", tarea: "tareas", semana: "semana",
-                     proyecto: "proyectos", gym: "gym", gimnasio: "gym", dieta: "dieta", apunte: "apuntes" };
+                     proyecto: "proyectos", gym: "gym", gimnasio: "gym", dieta: "dieta", apunte: "apuntes", finanza: "finanzas" };
       if (mapa[destino]) return { intent: "navigate", params: { view: mapa[destino] }, speak: "Abriendo " + mapa[destino] + ".", confidence: 1 };
     }
+    // Abrir apps / carpetas (whitelist de lanzadores) — "abre Discord", "abre mi carpeta de proyectos"…
+    m = t.match(/^(?:abre|abrir|lanza|inicia|ejecuta|arranca)\s+(?:el |la |los |las |mi |mis )?(.+)$/);
+    if (m) {
+      const key = matchLauncher(m[1]);
+      if (key) return { intent: "launch", params: { app: key }, speak: `Abriendo ${LAUNCHERS[key].label}.`, confidence: 1 };
+    }
+    // Rutina matutina: "buen día" / "buenos días" (con o sin «Dalia») → abre el set de arranque
+    if (/^buen(?:os)?\s+d[ií]as?\b/.test(t))
+      return { intent: "routine", params: { apps: ["discord", "spotify", "youtube"] },
+               speak: "Buen día, Sergio. Abriendo Discord, Spotify y YouTube.", confidence: 1 };
     if (/resume|resumen|qué (hay|tengo|toca) hoy|cómo va (el|mi) día/.test(t)) {
       const scope = /tarea/.test(t) ? "tareas" : /gym|gimnasio|entrena/.test(t) ? "gym" : "dia";
       return { intent: "summary", params: { scope }, speak: "", confidence: 1 };
@@ -210,6 +277,26 @@
         if (!DEEP_LINK_PREFIXES.some((p) => link.startsWith(p))) { notify("Deep link no permitido."); return; }
         notify(it.speak || "Abriendo…");
         abrirSpotify(link);
+        return;
+      }
+      case "launch": {   // abrir app / web / carpeta de la whitelist de lanzadores
+        const item = LAUNCHERS[String(it.params?.app || "")];
+        if (!item) { notify("No tengo ese acceso configurado."); return; }
+        if (item.kind === "folder") {
+          // file:// suele estar bloqueado desde http → intento y aviso honesto si no abre.
+          const w = window.open(item.web, "_blank", "noopener");
+          notify(w ? (it.speak || `Abriendo ${item.label}…`)
+                   : `No pude abrir ${item.label}: el navegador bloquea carpetas locales. Hace falta el companion nativo.`);
+          return;
+        }
+        notify(it.speak || `Abriendo ${item.label}…`);
+        abrirDestino(item);
+        return;
+      }
+      case "routine": {  // abrir varias apps en secuencia (p. ej. "buen día Dalia")
+        const apps = Array.isArray(it.params?.apps) ? it.params.apps : [];
+        notify(it.speak || "Preparando tu espacio de trabajo.");
+        apps.forEach((k, i) => { const item = LAUNCHERS[k]; if (item) setTimeout(() => abrirDestino(item), i * 700); });
         return;
       }
       case "weather": {
