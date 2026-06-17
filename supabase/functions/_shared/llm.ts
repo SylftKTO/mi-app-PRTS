@@ -17,15 +17,15 @@ export interface LLMResult {
 
 const API_URL = "https://api.anthropic.com/v1/messages";
 export const MODEL = Deno.env.get("LLM_MODEL") ?? "claude-haiku-4-5-20251001";
-const API_KEY = Deno.env.get("LLM_API_KEY") ?? "";
 
-// Precios configurables por env (0 por defecto: el costo se registra como 0
-// hasta que se fijen las tarifas vigentes; ver README).
-const PRICE_IN = Number(Deno.env.get("LLM_PRICE_IN") ?? "0");
-const PRICE_OUT = Number(Deno.env.get("LLM_PRICE_OUT") ?? "0");
+// Leídos en tiempo de llamada (no en módulo load) para permitir
+// que los tests sobreescriban el entorno sin pelea de hoisting.
+function apiKey() { return Deno.env.get("LLM_API_KEY") ?? ""; }
+function priceIn() { return Number(Deno.env.get("LLM_PRICE_IN") ?? "0"); }
+function priceOut() { return Number(Deno.env.get("LLM_PRICE_OUT") ?? "0"); }
 
 export function costUsd(inTok: number, outTok: number): number {
-  return (inTok / 1e6) * PRICE_IN + (outTok / 1e6) * PRICE_OUT;
+  return (inTok / 1e6) * priceIn() + (outTok / 1e6) * priceOut();
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -50,6 +50,7 @@ export async function callLLM(opts: {
   user: string;
   maxTokens?: number;
 }): Promise<LLMResult> {
+  const API_KEY = apiKey();
   if (!API_KEY) throw new Error("LLM_API_KEY no configurada");
   if (Date.now() < breakerOpenUntil) {
     throw new Error("circuit breaker abierto: IA en pausa temporal tras fallos repetidos");
@@ -110,4 +111,10 @@ export async function callLLM(opts: {
     consecutiveFails = 0;
   }
   throw lastErr instanceof Error ? lastErr : new Error("LLM falló tras reintentos");
+}
+
+/** Solo para tests — reinicia el estado del circuit breaker. */
+export function _resetBreakerForTest() {
+  consecutiveFails = 0;
+  breakerOpenUntil = 0;
 }

@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "test:schemas": "deno test supabase/functions/_shared/schemas.test.ts",
+    "test:llm": "deno test --allow-env supabase/functions/_shared/llm.test.ts"
+  },
+  "imports": {
+    "jsr:@std/assert": "jsr:@std/assert@^1.0.0",
+    "jsr:@std/testing/mock": "jsr:@std/testing@^1.0.0/mock"
+  }
+}

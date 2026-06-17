@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "npx serve app",
     "db:push": "supabase db push",
-    "db:new": "supabase migration new"
+    "db:new": "supabase migration new",
+    "test:parser": "node --test app/ai/reminder-parser.test.mjs",
+    "test:schemas": "deno test supabase/functions/_shared/schemas.test.ts",
+    "test:llm": "deno test --allow-env supabase/functions/_shared/llm.test.ts",
+    "test:evals": "deno run --allow-net --allow-env --allow-read ai/evals/run.ts",
+    "test": "npm run test:parser && npm run test:schemas && npm run test:llm"
   },
   "devDependencies": {
     "supabase": "^2.105.0"
