@@ -232,9 +232,14 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - **`app/elfie/desktop.js`:** `resourceGuard` sobre el evento `elfie:metrics` → si VRAM/CPU ≥90% sostenido (2 ticks) o hay juego/IDE en primer plano (`HEAVY_APPS`, throttle ~15 s) → `applyMode("bajos")` + `setWake(false)` + notifica; al despejarse (4 ticks) restaura el modo previo. Toggle **Auto-recursos** en Elfie Core (`features.autoResources`, default on). `elfieSys.foregroundApp`.
 - ⚠️ La regla "pausar Ollama al generar imagen" queda lista (`free_for`/`claim`) pero su consumidor real es la Fase 7.2 (aún no existe).
 
-### ⏭️ Pendiente Fase 8
+### ✅ 8.3a — Archivo interno / Lore (`PRTS-NNN`)
 
-- **8.3a — Lore/Codex (`PRTS-NNN`):** migración `lore_entries` + `app/lore.html` + indexar en RAG/memoria para que Elfie conozca su propio lore.
+- **Migración `..0021_lore.sql`:** tabla `lore_entries` (`code` PRTS-NNN único por usuario, `title`, `body`, `kind` sistema/elfie/diario), RLS `owner_all`.
+- **`app/lore.html`** (nuevo, patrón apuntes): lista + buscador + editor con código autoincremental (`nextCode` → PRTS-001…), tipos, y botón **sembrar entradas base** (PRTS-001 sistema, 002 elfie, 003 perfil de personalidad, del documento). Enlace en sidebar + navbar.
+- **Sinergia IA:** al guardar (o sembrar) en escritorio, la entrada se indexa en la memoria de Elfie (`elfieChat.remember(..., "lore")`, LanceDB) → Elfie **conoce su propio lore** y lo recupera en el chat.
+- **Voz/navegación:** intent local `navigate→lore` ("abre el lore/codex/archivo/diario"); `PAGINAS.lore`.
+
+> **Fase 8 completa** (8.1 Core + 8.2 Orquestador + 8.3a Lore + 8.3b Personalidad). Decisión abierta heredada: arquetipo/identidad de Elfie ("¿basada en un personaje?") — el campo `personaDesc` y la entrada PRTS-003 lo dejan listo para definir.
 
 ### Decisiones abiertas (resolver al implementar)
 

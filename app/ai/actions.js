@@ -62,7 +62,7 @@
     }
   }
   const VIEWS_INTERNAS = { dashboard: null, tareas: null, semana: null, proyectos: null }; // vistas SPA (switchView)
-  const PAGINAS = { gym: "gym.html", dieta: "dieta.html", apuntes: "apuntes.html", finanzas: "finanzas.html", chat: "elfie-chat.html" }; // páginas propias
+  const PAGINAS = { gym: "gym.html", dieta: "dieta.html", apuntes: "apuntes.html", finanzas: "finanzas.html", chat: "elfie-chat.html", lore: "lore.html" }; // páginas propias
   const ORIGENES = ["escuela", "wolves", "levelup", "personal"];
   const PRIORIDADES = ["alta", "media", "baja"];
 
@@ -346,6 +346,10 @@
     // "hablemos" / "charlemos" / "abre el chat" / "quiero platicar" → Chat con Elfie
     if (/^(?:hablemos|charlemos|platiquemos|quiero (?:hablar|platicar|charlar)|abre? el chat|abrir chat|vamos a (?:hablar|platicar|charlar))\b/.test(t)) {
       return { intent: "navigate", params: { view: "chat" }, speak: "Vamos a platicar.", confidence: 1 };
+    }
+    // "abre el lore/codex/archivo/diario" → Archivo interno
+    if (/^(?:abre|abrir|ve a|muestra)?\s*(?:el |mi )?(?:lore|codex|archivo interno|diario t[eé]cnico)\b/.test(t)) {
+      return { intent: "navigate", params: { view: "lore" }, speak: "Abriendo el archivo.", confidence: 1 };
     }
 
     // "¿qué anotamos sobre X?" / "busca en mis apuntes X" → RAG de Apuntes (Elfie Desktop)

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<title>SYLFT · Lore</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="elfie/chat.js"></script>
+<style>
+  .lore-card { cursor: pointer; }
+  .lore-card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .lore-card .code { font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; color: var(--accent); }
+  .lore-card .kind { font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+  .lore-card .titl { font-family: var(--serif); font-size: 17px; margin-top: 2px; }
+  .lore-card .prev { font-size: 0.85rem; color: var(--muted); margin-top: 6px; line-height: 1.45;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; }
+  .ed-meta { display: flex; gap: 8px; margin-top: 14px; }
+  .ed-meta input { flex: 1; min-width: 0; }
+  .ed-meta select { flex: 0 0 120px; }
+  .campo { margin-top: 14px; }
+  .campo textarea { min-height: 220px; font-family: var(--mono); }
+  .seed { margin-top: 12px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: var(--radius); font-size: 0.82rem; color: var(--faint); }
+  .seed a { color: var(--accent); cursor: pointer; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Lore</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- LISTA -->
+<div id="view-lista" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Lore</small></div>
+    <div class="links"><a href="index.html">‹ Inicio</a> · <a href="#" id="btn-logout">Salir</a></div>
+  </div>
+  <h1 class="page-title">Archivo interno</h1>
+  <div class="mono-label page-sub" id="contador">—</div>
+  <div class="tools" style="display:flex;gap:8px;margin-top:14px">
+    <input type="search" id="buscar" placeholder="Buscar en el lore…" style="flex:1;min-width:0">
+    <button class="btn-primary" id="btn-nuevo">+ Nueva</button>
+  </div>
+  <div id="seed-box" class="seed hidden">Sin entradas. <a id="btn-seed">Crear entradas base (PRTS-001…003)</a></div>
+  <div id="lista" style="margin-top:14px"></div>
+</div>
+
+<!-- EDITOR -->
+<div id="view-editor" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Lore</small></div>
+    <div class="links"><a href="#" id="btn-volver">‹ Volver</a></div>
+  </div>
+  <div class="ed-head"><h1 class="page-title" style="font-size:24px">Entrada</h1><span id="ed-estado">—</span></div>
+  <div class="ed-meta">
+    <input type="text" id="ed-code" placeholder="PRTS-001" style="flex:0 0 120px">
+    <input type="text" id="ed-title" placeholder="Título">
+    <select id="ed-kind"><option value="sistema">sistema</option><option value="elfie">elfie</option><option value="diario" selected>diario</option></select>
+  </div>
+  <div class="campo">
+    <div class="mono-label">Contenido</div>
+    <textarea id="ed-body" placeholder="Escribe la entrada…"></textarea>
+  </div>
+  <button class="btn-primary w100" id="btn-guardar" style="margin-top:14px">Guardar</button>
+  <button class="btn-ghost w100 btn-del" id="btn-borrar" style="margin-top:8px">Eliminar</button>
+</div>
+
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Inicio</span></a>
+    <a class="nav-item" href="elfie-chat.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg><span>Elfie</span></a>
+    <a class="nav-item on" href="lore.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Lore</span></a>
+    <a class="nav-item" href="apuntes.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span>Apuntes</span></a>
+  </div>
+</nav>
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+window.sb = sb;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+let actual = null, todas = [];
+
+function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("show"); setTimeout(() => e.classList.remove("show"), 1800); }
+function show(id) {
+  ["view-login", "view-lista", "view-editor"].forEach((v) => $(v).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+  $("navbar").classList.toggle("hidden", id === "view-editor");
+}
+
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+function nextCode() {
+  let max = 0;
+  for (const e of todas) { const m = String(e.code || "").match(/PRTS-(\d+)/i); if (m) max = Math.max(max, +m[1]); }
+  return "PRTS-" + String(max + 1).padStart(3, "0");
+}
+
+async function cargar() {
+  const { data } = await sb.from("lore_entries").select("*").order("code", { ascending: true });
+  todas = data || [];
+  renderLista();
+}
+function renderLista(filtro) {
+  const f = (filtro || $("buscar").value || "").toLowerCase();
+  const items = todas.filter((e) => !f || (e.code + e.title + e.body).toLowerCase().includes(f));
+  $("contador").textContent = todas.length + " entrada" + (todas.length === 1 ? "" : "s");
+  $("seed-box").classList.toggle("hidden", todas.length > 0);
+  $("lista").innerHTML = items.map((e) =>
+    `<div class="card lore-card" data-id="${e.id}">
+      <div class="top"><span class="code">${esc(e.code)}</span><span class="kind">${esc(e.kind)}</span></div>
+      <div class="titl">${esc(e.title) || "—"}</div>
+      <div class="prev">${esc(e.body).slice(0, 200)}</div>
+    </div>`).join("");
+  $("lista").querySelectorAll(".lore-card").forEach((c) => c.onclick = () => abrir(todas.find((x) => x.id === c.dataset.id)));
+}
+$("buscar").oninput = () => renderLista();
+
+function abrir(e) {
+  actual = e || null;
+  $("ed-code").value = e ? e.code : nextCode();
+  $("ed-title").value = e ? e.title : "";
+  $("ed-kind").value = e ? e.kind : "diario";
+  $("ed-body").value = e ? e.body : "";
+  $("ed-estado").textContent = e ? "editando" : "nueva";
+  $("btn-borrar").style.display = e ? "" : "none";
+  show("view-editor");
+}
+$("btn-nuevo").onclick = () => abrir(null);
+$("btn-volver").onclick = (e) => { e.preventDefault(); show("view-lista"); };
+
+// Indexa la entrada en la memoria de Elfie (solo escritorio) para que la recuerde.
+function indexarEnElfie(code, title, body) {
+  if (window.elfieChat && window.elfieChat.available()) {
+    window.elfieChat.remember(`Lore ${code}${title ? " · " + title : ""}: ${body}`.slice(0, 600), "lore");
+  }
+}
+
+$("btn-guardar").onclick = async () => {
+  const code = $("ed-code").value.trim(), title = $("ed-title").value.trim(),
+    kind = $("ed-kind").value, body = $("ed-body").value.trim();
+  if (!code) { toast("Falta el código."); return; }
+  const row = { code, title, kind, body, updated_at: new Date().toISOString() };
+  let err;
+  if (actual) ({ error: err } = await sb.from("lore_entries").update(row).eq("id", actual.id));
+  else ({ error: err } = await sb.from("lore_entries").insert(row));
+  if (err) { toast(err.message); return; }
+  indexarEnElfie(code, title, body);
+  toast("Guardado.");
+  await cargar();
+  show("view-lista");
+};
+$("btn-borrar").onclick = async () => {
+  if (!actual || !confirm("¿Eliminar " + actual.code + "?")) return;
+  await sb.from("lore_entries").delete().eq("id", actual.id);
+  toast("Eliminada.");
+  await cargar();
+  show("view-lista");
+};
+
+// Entradas base del documento (opt-in).
+const SEED = [
+  { code: "PRTS-001", kind: "sistema", title: "Definición del sistema", body: "PRTS es el sistema personal de organización de Sylft: PWA vanilla sobre Supabase, con app de escritorio Elfie (Tauri) que añade voz local, control del sistema e IA on-device. Web y escritorio comparten el mismo app/." },
+  { code: "PRTS-002", kind: "elfie", title: "Elfie", body: "Asistente de PRTS. Wake word «Dalia» (y «Elfie»). Voz local (Whisper + Kokoro/XTTS), LLM local (Ollama qwen2.5) con memoria, comandos por whitelist y chat con personalidad. Degradación total: si la IA falla, todo tiene camino manual." },
+  { code: "PRTS-003", kind: "elfie", title: "Perfil de personalidad", body: "Ejes: tono (operativo/cálido/directo/casual), iniciativa (baja/media/alta), detalle (breve/normal/extenso), confirmaciones (estrictas/normales/mínimas), voz (Kokoro/XTTS/sistema), modo conversación (ligero/completo). Decisión abierta: ¿personalidad basada en un personaje? (arquetipo propio para evitar copyright)." },
+];
+$("btn-seed").onclick = async () => {
+  const { error } = await sb.from("lore_entries").insert(SEED);
+  if (error) { toast(error.message); return; }
+  SEED.forEach((e) => indexarEnElfie(e.code, e.title, e.body));
+  toast("Entradas base creadas.");
+  cargar();
+};
+
+async function init() { show("view-lista"); await cargar(); }
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>
