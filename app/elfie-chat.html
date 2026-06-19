@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · Chat con Elfie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="elfie/elfie-config.js"></script>
+<script src="elfie/chat.js"></script>
+<style>
+  #view-chat { display: flex; flex-direction: column; min-height: 100vh; padding-bottom: 84px; }
+  .chat-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .chat-head .grow { flex: 1; min-width: 0; }
+  .chat-ctrls { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .chat-ctrls select { padding: 8px 10px; }
+  .chip-toggle { display: inline-flex; align-items: center; gap: 7px; padding: 8px 12px; border: 1px solid var(--line);
+    border-radius: 999px; font-size: 0.78rem; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  .chip-toggle.on { border-color: var(--accent); color: var(--text); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .chip-toggle .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+  .chip-toggle.on .dot { background: var(--accent); }
+
+  #msgs { flex: 1; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 86%; padding: 11px 14px; border-radius: 16px; line-height: 1.5; font-size: 0.95rem; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.user { align-self: flex-end; background: color-mix(in srgb, var(--accent) 16%, var(--surface)); border: 1px solid var(--line); border-bottom-right-radius: 5px; }
+  .msg.elfie { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+  .msg .who { font-family: var(--mono); font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); margin-bottom: 5px; }
+  .msg.elfie.pensando { color: var(--faint); font-style: italic; }
+  .chat-empty { color: var(--faint); text-align: center; margin: auto 0; padding: 40px 10px; line-height: 1.6; }
+
+  .chat-bar { position: fixed; left: 0; right: 0; bottom: 56px; padding: 10px 14px; background: color-mix(in srgb, var(--bg) 92%, transparent);
+    backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
+  .chat-bar .inner { display: flex; gap: 8px; max-width: 760px; margin: 0 auto; align-items: flex-end; }
+  .chat-bar textarea { flex: 1; min-width: 0; resize: none; max-height: 120px; padding: 11px 12px; }
+  .chat-bar button { padding: 11px 16px; white-space: nowrap; }
+  #btn-mic.rec { background: var(--accent); color: #fff; }
+
+  #mem-panel { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  #mem-panel .mono-label { color: var(--accent); margin-bottom: 8px; }
+  .mem-row { display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 0.85rem; }
+  .mem-row:first-of-type { border-top: 0; }
+  .mem-row a { color: var(--faint); cursor: pointer; flex: 0 0 auto; }
+  .mem-row a:hover { color: var(--accent); }
+  .desktop-only.hidden { display: none; }
+  .web-note { margin-top: 14px; padding: 10px 14px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--faint); font-size: 0.82rem; line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">Sistema personal · Chat con Elfie</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- CHAT -->
+<div id="view-chat" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Elfie</small></div>
+    <div class="links"><a href="index.html">‹ Inicio</a> · <a href="#" id="btn-logout">Salir</a></div>
+  </div>
+
+  <div class="chat-head">
+    <h1 class="page-title grow">Chat con Elfie</h1>
+    <button class="btn-ghost" id="btn-nueva" title="Nueva conversación">+ Nueva</button>
+  </div>
+
+  <div class="chat-ctrls">
+    <select id="sel-pers" title="Personalidad de Elfie"></select>
+    <span class="chip-toggle" id="tg-voz"><span class="dot"></span> Voz</span>
+    <span class="chip-toggle desktop-only hidden" id="tg-mem" title="Ver lo que Elfie recuerda">Memoria</span>
+  </div>
+
+  <div id="web-note" class="web-note hidden">
+    El chat conversacional con Elfie corre con el LLM local (Ollama) del <b>Elfie de escritorio</b>.
+    En el navegador puedes escribir, pero Elfie no responderá hasta abrir la app de escritorio.
+  </div>
+
+  <div id="mem-panel" class="desktop-only hidden" style="display:none">
+    <div class="mono-label">Lo que Elfie recuerda <span id="mem-count" style="color:var(--faint)"></span></div>
+    <div id="mem-list"></div>
+  </div>
+
+  <div id="msgs">
+    <div class="chat-empty" id="chat-empty">Salúdala o pregúntale lo que quieras.<br>Recuerda tus conversaciones y puedes darle una personalidad.</div>
+  </div>
+</div>
+
+<!-- Barra de entrada -->
+<div class="chat-bar hidden" id="chat-bar">
+  <div class="inner">
+    <button class="btn-ghost desktop-only hidden" id="btn-mic" title="Mantén para hablar">🎤</button>
+    <textarea id="entrada" rows="1" placeholder="Escríbele a Elfie…"></textarea>
+    <button class="btn-primary" id="btn-enviar">Enviar</button>
+  </div>
+</div>
+
+<!-- Nav inferior -->
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span>Inicio</span></a>
+    <a class="nav-item on" href="elfie-chat.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg>
+      <span>Elfie</span></a>
+    <a class="nav-item" href="apuntes.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      <span>Apuntes</span></a>
+    <a class="nav-item" href="gym.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+window.sb = sb;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const isDesktop = () => !!window.__TAURI__;
+
+let sessionId = null;
+let mensajes = [];   // [{role, content}] cronológico (caché de la conversación actual)
+
+function toast(txt) {
+  const t = $("toast");
+  t.textContent = txt; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+function show(id) {
+  ["view-login", "view-chat"].forEach(v => $(v).classList.add("hidden"));
+  $(id).classList.remove("hidden");
+  $("chat-bar").classList.toggle("hidden", id !== "view-chat");
+  $("navbar").classList.toggle("hidden", id !== "view-chat");
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- Personalidad ----------
+function cargarPersonalidades() {
+  const sel = $("sel-pers");
+  const pers = window.ElfieConfig.personalities();
+  sel.innerHTML = Object.keys(pers).map(k =>
+    `<option value="${esc(k)}">${esc(k[0].toUpperCase() + k.slice(1))}</option>`).join("");
+  sel.value = window.ElfieConfig.data.personality;
+  sel.onchange = () => { window.ElfieConfig.data.personality = sel.value; window.ElfieConfig.save(); toast("Personalidad: " + sel.value); };
+}
+
+// ---------- Voz (TTS) ----------
+function syncVozChip() {
+  $("tg-voz").classList.toggle("on", window.ElfieConfig.data.ttsEnabled !== false && isDesktop());
+}
+$("tg-voz").onclick = () => {
+  if (!isDesktop()) { toast("La voz es del Elfie de escritorio."); return; }
+  window.ElfieConfig.data.ttsEnabled = !(window.ElfieConfig.data.ttsEnabled !== false);
+  window.ElfieConfig.save();
+  if (!window.ElfieConfig.data.ttsEnabled) window.elfieChat.stopSpeak();
+  syncVozChip();
+};
+
+// ---------- Render ----------
+function pintarMensaje(role, content) {
+  $("chat-empty")?.remove();
+  const el = document.createElement("div");
+  el.className = "msg " + (role === "user" ? "user" : "elfie");
+  el.innerHTML = `<div class="who">${role === "user" ? "Tú" : "Elfie"}</div>` + esc(content).replace(/\n/g, "<br>");
+  $("msgs").appendChild(el);
+  el.scrollIntoView({ behavior: "smooth", block: "end" });
+  return el;
+}
+
+// ---------- Sesiones / persistencia ----------
+async function asegurarSesion() {
+  if (sessionId) return sessionId;
+  const { data, error } = await sb.from("elfie_chat_sessions").insert({ title: "Conversación" }).select().single();
+  if (error) { console.warn(error); return null; }
+  sessionId = data.id;
+  return sessionId;
+}
+async function guardarMensaje(role, content) {
+  const sid = await asegurarSesion();
+  if (!sid) return;
+  await sb.from("elfie_chat_messages").insert({ session_id: sid, role, content });
+  await sb.from("elfie_chat_sessions").update({ updated_at: new Date().toISOString() }).eq("id", sid);
+}
+async function cargarUltimaSesion() {
+  const { data: ses } = await sb.from("elfie_chat_sessions").select("id").order("updated_at", { ascending: false }).limit(1);
+  if (!ses || !ses.length) return;
+  sessionId = ses[0].id;
+  const { data: msgs } = await sb.from("elfie_chat_messages").select("role,content,created_at")
+    .eq("session_id", sessionId).order("created_at", { ascending: true });
+  mensajes = (msgs || []).map(m => ({ role: m.role, content: m.content }));
+  if (mensajes.length) { $("chat-empty")?.remove(); mensajes.forEach(m => pintarMensaje(m.role, m.content)); }
+}
+
+$("btn-nueva").onclick = async () => {
+  sessionId = null; mensajes = [];
+  $("msgs").innerHTML = '<div class="chat-empty" id="chat-empty">Nueva conversación. ¿De qué hablamos?</div>';
+  window.elfieChat.stopSpeak();
+};
+
+// ---------- Envío ----------
+let enviando = false;
+async function enviar() {
+  const ta = $("entrada");
+  const texto = ta.value.trim();
+  if (!texto || enviando) return;
+  if (!isDesktop()) { toast("Abre el Elfie de escritorio para que responda."); }
+  enviando = true;
+  ta.value = ""; ta.style.height = "auto";
+
+  mensajes.push({ role: "user", content: texto });
+  pintarMensaje("user", texto);
+  guardarMensaje("user", texto);
+
+  if (!isDesktop()) { enviando = false; return; }
+
+  const pensando = pintarMensaje("elfie", "Elfie está pensando…");
+  pensando.classList.add("pensando");
+
+  const tone = window.ElfieConfig.tone();
+  const res = await window.elfieChat.send(mensajes, tone);
+  pensando.remove();
+
+  if (!res || res.ok === false || !res.reply) {
+    pintarMensaje("elfie", res && res.error ? "No pude responder ahora mismo (¿Ollama encendido?)." : "No tengo respuesta para eso.");
+    enviando = false;
+    return;
+  }
+  mensajes.push({ role: "assistant", content: res.reply });
+  pintarMensaje("elfie", res.reply);
+  guardarMensaje("assistant", res.reply);
+  if (window.ElfieConfig.data.ttsEnabled !== false) window.elfieChat.speak(res.reply);
+  enviando = false;
+}
+$("btn-enviar").onclick = enviar;
+$("entrada").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); enviar(); }
+});
+$("entrada").addEventListener("input", function () {
+  this.style.height = "auto"; this.style.height = Math.min(this.scrollHeight, 120) + "px";
+});
+
+// ---------- Micrófono (push-to-talk, desktop) ----------
+function initMic() {
+  const btn = $("btn-mic");
+  if (!isDesktop()) return;
+  btn.classList.remove("hidden");
+  let grabando = false;
+  const VOICE = "http://127.0.0.1:7331";
+  const start = async (e) => {
+    e.preventDefault();
+    if (grabando) return; grabando = true; btn.classList.add("rec");
+    try { await fetch(VOICE + "/stt/start", { method: "POST" }); } catch (_) { grabando = false; btn.classList.remove("rec"); }
+  };
+  const stop = async (e) => {
+    e.preventDefault();
+    if (!grabando) return; grabando = false; btn.classList.remove("rec");
+    try {
+      const r = await (await fetch(VOICE + "/stt/stop", { method: "POST" })).json();
+      const t = (r && r.text || "").trim();
+      if (t) { $("entrada").value = t; enviar(); }
+    } catch (_) {}
+  };
+  btn.addEventListener("pointerdown", start);
+  btn.addEventListener("pointerup", stop);
+  btn.addEventListener("pointerleave", stop);
+}
+
+// ---------- Memoria ----------
+async function refreshMem() {
+  const r = await window.elfieChat.memories();
+  if (!r || !r.ok) return;
+  $("mem-count").textContent = r.results.length ? `(${r.results.length})` : "(vacía)";
+  $("mem-list").innerHTML = r.results.length
+    ? r.results.map(m => `<div class="mem-row"><span>${esc(m.text)}</span><a data-id="${esc(m.id)}">olvidar</a></div>`).join("")
+    : '<div style="color:var(--faint);font-size:.85rem">Aún no recuerda nada. Dile "recuerda que…".</div>';
+  $("mem-list").querySelectorAll("a[data-id]").forEach(a => a.onclick = async () => {
+    await window.elfieChat.forget(a.dataset.id); refreshMem();
+  });
+}
+$("tg-mem").onclick = () => {
+  const p = $("mem-panel");
+  const open = p.style.display === "none";
+  p.style.display = open ? "block" : "none";
+  p.classList.toggle("hidden", !open);
+  $("tg-mem").classList.toggle("on", open);
+  if (open) refreshMem();
+};
+
+// ---------- Init ----------
+async function init() {
+  show("view-chat");
+  cargarPersonalidades();
+  syncVozChip();
+  if (isDesktop()) {
+    $("tg-mem").classList.remove("hidden");
+    $("btn-mic")?.classList.remove("hidden");
+    initMic();
+  } else {
+    $("web-note").classList.remove("hidden");
+  }
+  await cargarUltimaSesion();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>

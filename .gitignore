@@ -15,3 +15,18 @@ Thumbs.db
 # Temporales
 entorno_check.txt
 check_entorno.bat
+
+# Python (sidecars de Elfie)
+__pycache__/
+*.pyc
+elfie-desktop/venv-voice/
+elfie-desktop/venv-xtts/
+
+# Rust / Tauri (artefactos de build)
+elfie-desktop/src-tauri/target/
+
+# Elfie Desktop — datos locales y modelos (no versionar)
+elfie-desktop/db/
+elfie-desktop/voices/
+elfie-desktop/models/
+_build.log

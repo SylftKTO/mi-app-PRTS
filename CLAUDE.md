@@ -5,8 +5,9 @@ Sistema personal de organización de Sergio (Sylft): estudiante TecNM Celaya, in
 ## Stack
 
 - **Frontend:** HTML/JS **vanilla** (sin frameworks, sin build step). Cada módulo es un HTML autocontenido en `app/`. PWA (`manifest.json`, `sw.js`). Deploy en Vercel con root `app/`.
-- **Backend:** Supabase — Postgres con **RLS** (`owner_all`, `auth.uid() = user_id`), Auth, **Edge Functions** (Deno/TS) para la capa IA.
-- **LLM:** Anthropic (Claude tier económico) vía Edge Functions; la API key vive solo en Supabase secrets, **nunca en el cliente**.
+- **Desktop (Elfie):** app **Tauri 2** (Rust) en `elfie-desktop/` con `frontendDist: "../../app"` → carga el **mismo** `app/` (todo lo de Elfie es NO-OP en web vía `window.__TAURI__`). Sidecars Python locales en `elfie-desktop/sidecars/` (voz Whisper+Kokoro+Vosk, RAG/chat con Ollama+LanceDB, XTTS) en **venvs aislados** (`venv-voice` numpy2; `venv-xtts` torch+CUDA). **Venvs, modelos, `db/`, `voices/` y `target/` NO se versionan** (ver `.gitignore`).
+- **Backend:** Supabase — Postgres con **RLS** (`owner_all`, `auth.uid() = user_id`), Auth, **Edge Functions** (Deno/TS) para la capa IA en la nube.
+- **LLM (dos caminos):** **Web/nube** → Anthropic (Claude tier económico) vía Edge Functions, key solo en Supabase secrets, **nunca en el cliente**. **Desktop** → Ollama local (`qwen2.5:7b` + embeddings `bge-m3`), privado y $0; degrada a Anthropic si falla. Restricción rectora del desktop: **8 GB de VRAM compartida** (Whisper+Kokoro+Ollama+XTTS no caben todos calientes).
 
 ## Comandos
 
@@ -15,6 +16,10 @@ npm run dev          # npx serve app
 npm run db:push      # supabase db push (aplicar migraciones)
 npm run db:new       # supabase migration new <nombre>
 supabase functions deploy <nombre>
+
+# Elfie Desktop (Tauri) — dentro de elfie-desktop/
+cd elfie-desktop && npm run dev    # tauri dev (compila Rust + lanza app + sidecar de voz)
+cd elfie-desktop && npm run build  # tauri build (instalador Windows)
 ```
 
 > Git y `supabase` los corre el usuario en PowerShell cuando hay deploy/push real.
@@ -22,19 +27,29 @@ supabase functions deploy <nombre>
 ## Estructura
 
 ```
-app/                 # frontend: index.html (dashboard+tareas+inbox, ~1500 líneas), gym.html, dieta.html, apuntes.html
-app/config.js        # URL + anon key de Supabase (pública por diseño)
-app/styles.css       # tokens compartidos de diseño — único idioma visual
-supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql)
-supabase/functions/  # Edge Functions: generate-briefing + _shared/ (llm.ts, prompts/*.vN.ts)
+app/                 # frontend vanilla (mismo en web y desktop)
+  index.html         # dashboard radial (runa) + tareas/semana/proyectos/insights/recordatorios/levelup (SPA, ~2.5k líneas)
+  gym.html dieta.html apuntes.html finanzas.html recordatorios.html elfie.html elfie-chat.html
+  levelup-maestros.html levelup-alumnos.html levelup-admin.html
+  config.js          # URL + anon key Supabase + GOOGLE_CLIENT_ID (público por diseño)
+  styles.css         # tokens de diseño compartidos — único idioma visual
+  ai/                # voice.js (push-to-talk web) wakeword.js (Dalia web) actions.js (router+ejecutor) gcal.js (Google Calendar)
+  elfie/             # puentes Tauri (NO-OP en web): desktop.js rag.js chat.js elfie-config.js monitor.js routines.js
+elfie-desktop/       # app Tauri 2
+  src-tauri/src/     # Rust: lib.rs (tray/atajos/comandos) monitor.rs system_control.rs voice.rs
+  sidecars/          # Python: voice_server.py rag.py chat.py xtts_server.py (corren en venv-voice/venv-xtts)
+supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0019 = último
+supabase/functions/  # Edge Functions: generate-briefing, generate-insights, process-inbox, interpret-command
+                     #   + _shared/ (llm.ts, schemas.ts, prompts/*.vN.ts — command.v4 vigente)
 docs/Fase4_Arquitectura_IA.md  # ARQUITECTURA DE REFERENCIA para Fase 4 — leer antes de tocar la capa IA
-PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referencias
+docs/Fase5_WakeWord_Consideraciones.md  # decisiones de wake word
+PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referencias (⚠ paleta de DESIGN.md desactualizada)
 ```
 
 ## Convenciones
 
 - **SQL:** tablas con `user_id default auth.uid()` (excepto las que escribe la Edge Function con service role → `user_id` explícito), RLS `owner_all`, TZ `America/Mexico_City`.
-- **Diseño:** navy profundo, serif para títulos/cifras, mono mayúsculas para etiquetas, un solo acento azul acero. Nada de gamificación, gradientes ni glassmorphism. Targets táctiles ≥44px. Contraste AA. `prefers-reduced-motion`.
+- **Diseño:** **fondo dark casi-negro cálido** (`--bg: #0D0C0E`), serif para títulos/cifras, mono mayúsculas para etiquetas, **un solo acento rosa** (`--accent: #E68AA2`; verde/ámbar/rojo solo como semántica de estado). Tokens en `app/styles.css` (fuente de verdad). Nada de gamificación, gradientes ni glassmorphism. Targets táctiles ≥44px. Contraste AA. `prefers-reduced-motion`. ⚠ **`DESIGN.md` aún describe la paleta vieja (navy/azul acero `#8FAEDC`) — está desactualizado; el CSS manda.**
 - **Prompts versionados:** `supabase/functions/_shared/prompts/<agente>.vN.ts`; cada llamada registra `prompt_version` en `ai_calls`.
 - **Filosofía de fases:** un módulo a la vez; uso real antes de avanzar.
 
@@ -87,9 +102,9 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 - ✅ **Insights como vista propia** (`#tab-insights` + link en sidebar): salió del stack derecho del dashboard; `TABS` incluye `insights` y `switchView` la carga (`cargarInsights`).
 - ✅ **Botón «‹ Dashboard»** (`.back-dash`, `data-view="dashboard"`) en las vistas Semana, Proyectos, Tareas e Insights — se cablea con el mismo `querySelectorAll("[data-view]")` de `init()`.
-- ✅ **Nodo PRTS animado en el mapa:** lee `PRTS_AI.attention` (capturando comando por wake word → pulso rápido + halo/anillo ámbar respirando + órbitas aceleradas) y `PRTS_AI.speaking` (TTS contestando → ondas de voz concéntricas azules expandiéndose). `attention` lo setea el `onState` de `initWake` (awaiting/trigger, con timeout de 2.5 s tras trigger); `speaking` lo setea `PRTS_AI.say()` (`utterance.onstart/onend`).
+- ✅ **Runa central con auras de voz:** el núcleo del dashboard es la **runa** (`app/runa.png`, blanca sobre el campo oscuro) en `#prts-core .core-stage`; respira en idle (`@keyframes rune-breathe`). Las auras de estado viven en **CSS** (`#prts-core.escuchando` → anillos ámbar `ring-listen`; `#prts-core.hablando` → anillos rosa `ring-speak`, con `@keyframes ring-ripple` y stagger por `.d1/.d2`); `drawMap` solo **sincroniza** las clases leyendo `PRTS_AI.attention`/`PRTS_AI.speaking` cada frame. `attention` lo setea el `onState` de `initWake` (awaiting/trigger, timeout 2.5 s); `speaking` lo setea `PRTS_AI.say()` (`utterance.onstart/onend`). El lienzo `#map` quedó como **campo de constelación de fondo** (estrellas + líneas del núcleo a las anclas de cada panel + partículas); ya no dibuja los nodos abstractos ni navega (la navegación es por sidebar y enlaces de cada tarjeta).
 - ✅ **Voz de PRTS configurable:** selector "Voz de PRTS" + botón Probar en el panel de Captura. `PRTS_AI.getVoices()` (filtra voces `es-*` del sistema, fallback a todas), `setVoice(name)` persiste en `localStorage` (`prts_voice`); `say()` la aplica. "Automática (es-MX)" por defecto; las voces cargan async (`onvoiceschanged`).
-- ✅ **Dashboard reacomodado (mockup constelación):** el `#tab-dashboard` pasó de "mapa full-width + grid 2-col" a dos filas — `.dash-top` (mapa `2.4fr` + `#rail` con Gimnasio·hoy y Progreso semanal) y `.dash-bottom` (Briefing · Captura `#panel-captura` · Tareas `#panel-tareas`). Encabezado `.dash-head` con título "PRTS" + control segmentado `#dash-seg` de 3 modos (`applyDashMode`, persiste en `localStorage` `prts_dash_mode`): **Constelación** (todo), **Mando** (sin mapa, riel en 2 col), **Diario** (sin mapa ni captura, briefing ancho). Colapsa a 1 col < 1080px.
+- ✅ **Dashboard radial (runa al centro):** el `#tab-dashboard` usa un único grid `.constelacion` con la runa (`#prts-core`) en la columna central (`grid-area: runa`, abarca 2 filas) y los paneles **en órbita** — Gimnasio·hoy (`.c-gym`) y Tareas (`.c-tareas`) a la izquierda, Progreso (`.c-prog`) y Briefing (`.c-brief`) a la derecha, Captura (`#panel-captura`) a lo ancho abajo. `grid-template-columns: 1fr minmax(210px,0.8fr) 1fr` con `min-width:0` implícito → columnas laterales simétricas y runa centrada. Encabezado `.dash-head` con título "PRTS" + control segmentado `#dash-seg` de 3 modos (`applyDashMode`, persiste en `localStorage` `prts_dash_mode`): **Constelación** (runa + campo + paneles), **Mando** (sin runa/campo, paneles en rejilla de 3 col), **Diario** (1 col, briefing ancho, sin captura). Colapsa a 1 col (runa arriba, campo `#map` oculto) < 1024px.
 - ✅ **Wake word renombrada a «Dalia»** (antes «Víctor»): `WAKE = /dal[ií]a\w*/` en `wakeword.js`; `routeLocal` (actions.js) y el atajo escrito del input de captura (index.html) aceptan `prts|dal[ií]a`.
 
 ### Módulo Finanzas (Fase 5 · básico con gráficas)
@@ -109,6 +124,67 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - ✅ **Dashboard:** próximos recordatorios (48 h) y vencidos pendientes se anteponen en `#prts-alertas` (`renderRecordatoriosDash`); link en sidebar.
 - ✅ **Inbox:** `aplicarSugerencia` para `recordatorio` con fecha/hora → tabla `reminders` (+ evento GCal); solo fecha → a las 9:00; sin fecha → tarea simple (como antes). `deshacerAplicacion` borra también el evento GCal.
 - ⚠️ **Límite honesto:** el evento se crea con PRTS abierto; la notificación la entrega Google con PRTS cerrado. Editar en el celular no regresa a PRTS. App OAuth en modo testing (test user) basta para uso personal.
+
+### Apartado LevelUp (Fase 5 · mini-CRM/ERP de la academia de idiomas)
+
+- ✅ Migración `..0012_levelup_schema.sql`: `levelup_teachers` (idiomas `text[]`, formatos, `pay_type` mensual/por_hora + `pay_rate`, notas), `levelup_students` (idioma, nivel, horas/sem, `teacher_id`, `monthly_fee`, status), `levelup_classes` (kind `recurrente`/`sesion`, weekday|class_date, start_time, duration_min, `week_block_id`, `google_event_id`), `levelup_class_students` (roster grupal), `levelup_payments` (mensual: period, amount_due, amount_paid, paid_at, unique por user+student+period). RLS `owner_all`.
+- ✅ **3 páginas móviles** (patrón `finanzas.html`), grupo "LevelUp" en sidebar + navbar compartida:
+  - `app/levelup-maestros.html`: CRUD maestros; tarjeta expandible con sus clases y alumnos; alta de clase (recurrente [día+hora+duración] o sesión [fecha]) con roster. Clase recurrente → inserta `week_blocks` (rol `levelup`) **y** evento recurrente en GCal; sesión → solo evento GCal. Eliminar clase borra bloque + evento.
+  - `app/levelup-alumnos.html`: CRUD alumnos **agrupados/filtrables por maestro**; navegador de mes; pago mensual por alumno (registrar monto/fecha vía upsert en `levelup_payments`, muestra estado pagado/parcial/pendiente + faltante + historial).
+  - `app/levelup-admin.html`: resumen del mes (ingresos cobrados vs esperado, sueldos, neto, alumnos, clases, horas/sem), desglose por maestro (sueldo = mensual o `pay_rate × horas × 4.33`), gráficas Chart.js (ingresos vs sueldos por maestro, dona estado de pagos) y lista de pagos pendientes.
+- ✅ Migración `..0013_levelup_expenses.sql`: tabla `levelup_expenses` (`entry_date`, categoría, monto, nota) para **gastos de operación** de la academia (clases muestra, marketing, materiales, renta…), separados de los sueldos. El neto del admin = ingresos − sueldos − gastos. RLS `owner_all`; migración independiente de la ..0012.
+- ✅ **Decisiones:** clases recurrentes **y** sesiones sueltas; cobro **mensual por alumno**; finanzas **self-contained** (NO tocan el módulo Finanzas personal); **varios maestros**.
+- ✅ `gcal.js` extendido: `createClass`/`updateClass` (evento con duración real; `RRULE:FREQ=WEEKLY` si recurrente, inicio = próxima ocurrencia del weekday). Mapa: nodo `alumnos` enlaza a `levelup-alumnos.html`.
+- ⚠️ **Límite honesto:** Semana es plantilla recurrente, así que solo las clases **recurrentes** entran a `week_blocks`; las sesiones sueltas van a GCal + lista (no al grid de Semana). Sin Google conectado, las clases se guardan y Semana funciona igual.
+- ⏭️ **Futuro:** voz/Dalia para LevelUp ("registra pago de X"), recordatorios de cobro día 1/15, asistencia y progreso de nivel.
+
+## Fase 6 — Elfie Desktop (plan en `docs/Elfie_PRTS_Desktop_Planificacion_v2.0.pdf`)
+
+> El Elfie Desktop es la app Tauri en `elfie-desktop/` (`frontendDist: "../../app"` → carga el mismo `app/`). Fases F0–F5 ya estaban (tray, shortcuts, control SO, voz local Whisper+Kokoro+Vosk, router Ollama, personalidad, Routine Engine). Migraciones Elfie: `..0014_elfie_config` … `..0018_routines`.
+
+### ✅ 6.1 — RAG local de Apuntes (búsqueda semántica)
+
+- **Por qué:** el módulo Apuntes (tabla `notes`: subject, topic, key_concepts, formulas, doubts, connections, summary) solo se buscaba por texto. RAG permite *"Elfie, ¿qué anotamos sobre X?"* sin las palabras exactas. **Privacidad total:** las notas nunca salen de la máquina.
+- **`elfie-desktop/sidecars/rag.py`** (nuevo): embeddings vía Ollama + vector store **LanceDB** en `elfie-desktop/db/apuntes.lance`. Modelo de embeddings **`bge-m3`** (multilingüe; rankea español mucho mejor que `nomic-embed-text`, que quedó descartado por pobre en es-MX). Distancia **coseno** (los vectores no están normalizados → L2 rankeaba por magnitud). Respuesta generada por `qwen2.5:7b` (env `ELFIE_LLM_MODEL`) fundamentada SOLO en los apuntes recuperados; si el LLM falla, devuelve los apuntes crudos. Carga perezosa: si falta LanceDB/Ollama, degrada con `{ok:false}` sin tumbar el sidecar. Envs: `ELFIE_EMBED_MODEL`, `ELFIE_RAG_DB`, `ELFIE_OLLAMA`.
+- **`voice_server.py`**: 6 endpoints — `GET /rag/status`; `POST /rag/index` `/rag/index_batch` `/rag/query` `/rag/answer` `/rag/delete`.
+- **`app/elfie/rag.js`** (nuevo): puente `window.elfieRag` (`available/status/index/del/reindex/query/answer`). **NO-OP en web** (sin `__TAURI__` → null), igual que `desktop.js`.
+- **`apuntes.html`**: indexa al guardar (`guardar()` → `elfieRag.index`) y al borrar (`elfieRag.del`, ambas rutas). Panel **"Pregúntale a Elfie"** (`#rag-panel`, solo desktop): búsqueda semántica con respuesta + fuentes clicables (abren la nota) + botón **"Reindexar apuntes"** (backfill `index_batch` con `todasNotas`). El usuario debe reindexar una vez para poblar el índice con sus notas existentes.
+- **`actions.js`**: intent local `note_query` en `routeLocal` ("qué anotamos/anoté sobre X", "busca en mis apuntes X") → ejecutor llama `elfieRag.answer` y responde **hablando** (Kokoro). En web avisa que es función de escritorio.
+- ⚠️ **Cambio de modelo de embeddings rompe el índice** (bge-m3=1024-dim vs nomic=768): si se cambia, borrar `elfie-desktop/db/` y reindexar.
+
+### ✅ 6.2 — XTTS v2 (voz clonada de Elfie)
+
+- **Por qué venv aislado:** XTTS necesita **PyTorch**, pero el stack de voz (faster-whisper/CTranslate2 + kokoro-onnx) usa **numpy 2**; coqui-tts arrastra deps que lo degradarían. Solución: **`elfie-desktop/venv-xtts/`** separado (torch `2.11+cu128` para Blackwell sm_120 — **verificado: CUDA OK en la RTX 5060** — + `coqui-tts`). NO toca `venv-voice`.
+- **`elfie-desktop/sidecars/xtts_server.py`** (nuevo): microservicio HTTP en **:7332** (venv-xtts). `GET /health`, `POST /synth {text, speaker_wav, language, speed}` → escribe WAV en temp y lo devuelve. Modelo `xtts_v2` carga perezoso (~1.8 GB en GPU). `COQUI_TOS_AGREED=1` (licencia **CPML, no comercial** — uso personal).
+- **`voice_server.py`** (venv-voice): lanza `xtts_server` **perezosamente** (`ensure_xtts` → subprocess con el python de venv-xtts) al primer uso. `speak_dispatch` elige motor: `xtts` (si hay `speaker_wav`) con **fallback a Kokoro** si falla. `_play()` centraliza la reproducción + anti-feedback. Endpoints nuevos: `POST /voice/record {seconds,name}` (graba referencia del mic → `elfie-desktop/voices/<name>.wav`), `GET /voice/xtts/health` (proxy). `/tts` ahora acepta `engine` + `speaker_wav`.
+- **Frontend:** `elfie-config.js` → `voiceEngine: kokoro|navegador|xtts` + `xttsVoiceName`/`xttsSpeakerWav` (ruta LOCAL → solo localStorage, no Supabase). `desktop.js` → `say()` manda `engine:"xtts"` + `speaker_wav` cuando el motor es xtts. `elfie.html` → botón XTTS en el selector + tarjeta **"Voz clonada · XTTS"**: graba 8 s, crea perfil en `voice_profiles` (Supabase, metadata) + activa, lista perfiles (usar/eliminar), prueba inmediata.
+- **Flujo:** el usuario graba ~8 s de la voz objetivo (la suya o un clip ante el mic) → se guarda local + activa → `say()` la usa. **Verificado:** cold-start ~95 s (carga modelo), **warm ~6 s**, VRAM ~2.4 GB (total 6.4/8 GB con Whisper+Kokoro+Ollama; cabe). XTTS se descarga al detener el servicio (estado perezoso por defecto → Kokoro).
+- **Stack de deps (no obvio, costó resolverlo):** `venv-xtts` con **torch 2.11.0+cu128** (Blackwell sm_120) + **coqui-tts 0.26.2** (NO la 0.27.x: exige `torchcodec`+FFmpeg) + **transformers 4.51.3** (la 0.26.2 la fija; >4.57/5.x rompe por `isin_mps_friendly`/`is_torchcodec_available`). `torchaudio 2.11` solo carga audio vía torchcodec → **shim en `xtts_server.load()`: `torchaudio.load = soundfile`** (libsndfile, sin FFmpeg). `load()` con `_load_lock` (precarga + 1er synth no cargan dos veces → era la causa de timeouts).
+- ⏭️ **Pendiente F6:** —  **Obsidian: descartado** (Sylft no lo usa). **Fase 6 completa.**
+
+## Fase 7 — Módulo Utilidades
+
+> Tres frentes: **chat con memoria** (7.1), **generación de imágenes anime** (7.2) y **extras** (visión de pantalla, avatar de Dalia, briefing hablado…). Restricción rectora: la **VRAM de 8 GB compartida** (Whisper+Kokoro+Ollama+XTTS no caben todos calientes). 7.2 exigirá un orquestador de GPU que descargue Ollama antes de generar imagen — **aún no implementado**.
+
+### ✅ 7.1 — Chat conversacional con Elfie (memoria + personalidad + TTS)
+
+- **Por qué:** hasta ahora Elfie solo hacía comandos de un disparo (intents) y Q&A de apuntes (RAG). Faltaba conversación multi-turno con memoria y personalidad.
+- **`elfie-desktop/sidecars/chat.py`** (nuevo): chat sobre Ollama **`/api/chat`** (qwen2.5:7b, no-streaming, `keep_alive 10m`). Personalidad inyectada en el system prompt vía `tone` (reusa `ElfieConfig`). **Memoria de 2 capas:** (a) corto plazo = historial de turnos que manda el cliente (últimos `MAX_TURNS=10`); (b) largo plazo = hechos durables embebidos con **bge-m3** en LanceDB (tabla **`memoria`**, MISMA DB que el RAG de apuntes, `elfie-desktop/db/`), recuperados por coseno (`recall`, score ≥0.45) e inyectados al prompt como `RECUERDOS`. Reutiliza `rag._embed` y `rag.DB_DIR`. Funciones: `reply`, `remember`, `recall`, `forget`, `mem_list`, `status`. Degrada con `{ok:false}` si Ollama/LanceDB fallan.
+- **`voice_server.py`**: `import chat` + endpoints `GET /chat/status` `/chat/memories`; `POST /chat/send` `/chat/remember` `/chat/recall` `/chat/forget`.
+- **`app/elfie/chat.js`** (nuevo): puente `window.elfieChat` (`available/status/send/remember/memories/forget/speak/stopSpeak`). **NO-OP en web** (sin `__TAURI__`). Centraliza el **TTS frase-a-frase** del chat leyendo `ElfieConfig` (Kokoro/XTTS), sin depender de `desktop.js`.
+- **`app/elfie-chat.html`** (nuevo, móvil+desktop): página de chat autónoma (login propio, burbujas tú/Elfie, selector de personalidad, toggle Voz, **push-to-talk 🎤** vía `/stt`, botón Nueva, panel **Memoria** con olvidar). Persiste la conversación en Supabase (`elfie_chat_sessions`/`elfie_chat_messages`); al abrir recupera la última sesión. En web avisa que el chat conversacional es del escritorio (escribe pero Elfie no responde sin Ollama).
+- **Migración `..0019_elfie_chat.sql`:** `elfie_chat_sessions` + `elfie_chat_messages` (role user/assistant), RLS `owner_all`. La memoria de largo plazo NO está en Supabase (vive on-device en LanceDB).
+- **Voz/navegación:** intent local `navigate→chat` en `actions.js` ("Dalia, hablemos / charlemos / abre el chat"); `PAGINAS.chat = elfie-chat.html`. Enlace "Chat con Elfie" en el sidebar de `index.html` y en el navbar de la página.
+- **Verificado:** sintaxis de sidecars OK (`py_compile`); página carga en web sin errores de consola, login visible, `elfieChat.available()=false` correcto, personalidades cargadas. La respuesta del LLM se prueba en el Elfie de escritorio con Ollama.
+
+### ✅ Wake word «Dalia» también en el detector NATIVO
+
+- Antes la wake word web (`wakeword.js`) usaba «Dalia» pero el detector **nativo** (Vosk, `voice_server.py`) solo disparaba con «Elfie». Ahora `WAKE_RE` y `_WAKE_STRIP` aceptan ambas + mis-hears de Vosk en es (`dalia/dalía/talía/valía/daría`). Reiniciar el sidecar para que tome el cambio.
+
+### ⏭️ Pendiente Fase 7
+
+- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (descargar Ollama antes de generar). Migración `..0020_elfie_images.sql` + `app/elfie-galeria.html` + intent `generate_image`.
+- **7.3 — Extras sugeridos:** visión de pantalla (qwen2-vl/llava sobre `elfieSys.screenshot`), avatar anime de Dalia (sinergia con 7.2), briefing hablado matutino, diario por voz, RAG de PDFs.
 
 ### Decisiones abiertas (resolver al implementar)
 

@@ -11,16 +11,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script src="config.js"></script>
 <script src="ai/actions.js"></script>
 <script src="ai/voice.js"></script>
 <script src="ai/wakeword.js"></script>
 <script src="ai/gcal.js"></script>
+<script src="elfie/rag.js"></script>
+<script src="elfie/elfie-config.js"></script>
+<script src="elfie/routines.js"></script>
+<script src="elfie/monitor.js"></script>
+<script src="elfie/desktop.js"></script>
 <style>
   :root {
-    --bg: #0B0D12; --panel: #10131B; --panel2: #141823; --border: #1D2230;
-    --text: #E8EAF0; --muted: #8A93A6; --dim: #5A6275;
-    --blue: #7DA2D8; --green: #5FB97E; --yellow: #D2A547; --red: #D87070;
+    --bg: #0B0D12; --panel: #161416; --panel2: #1C1A1C; --border: #2A2529;
+    --text: #E8EAF0; --muted: #968D94; --dim: #7A6F78;
+    --blue: #D98AA0; --green: #5FB97E; --yellow: #D2A547; --red: #D87070;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { height: 100%; }
@@ -47,7 +53,7 @@
     display: flex; align-items: center; justify-content: center; overflow: hidden;
   }
   .brand .logo img { width: 100%; height: 100%; object-fit: contain; }
-  .brand .logo .fallback { display: none; font-family: "Source Serif 4", serif; font-size: 1.5rem; color: #1d3354; font-weight: 600; }
+  .brand .logo .fallback { display: none; font-family: "Source Serif 4", serif; font-size: 1.5rem; color: #3A2A30; font-weight: 600; }
   .brand h1 { font-size: 1rem; letter-spacing: 0.22em; }
   .brand small { display: block; color: var(--dim); font-size: 0.7rem; letter-spacing: 0.04em; margin-top: 2px; }
   .nav-label { padding: 14px 8px 6px; }
@@ -78,7 +84,7 @@
   .map-title {
     font-size: 2rem; font-weight: 500; letter-spacing: 0.32em; padding-left: 0.32em;
     color: var(--text); line-height: 1; font-family: "Source Serif 4", serif;
-    text-shadow: 0 0 26px rgba(125, 162, 216, 0.45), 0 0 6px rgba(125, 162, 216, 0.2);
+    text-shadow: 0 0 26px rgba(224, 140, 162, 0.45), 0 0 6px rgba(224, 140, 162, 0.2);
   }
   .dash-head .muted { color: var(--muted); font-size: 0.78rem; margin-top: 7px; }
   .seg { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
@@ -90,63 +96,128 @@
   .seg button.on { background: var(--panel2); color: var(--text); }
   .seg button:hover:not(.on) { color: var(--muted); }
 
-  /* Filas del dashboard */
-  .dash-top { display: grid; grid-template-columns: 2.4fr 1fr; gap: 16px; align-items: stretch; margin-bottom: 16px; }
-  .dash-bottom { display: grid; grid-template-columns: 1.2fr 1fr; gap: 16px; align-items: start; }
-  #rail { display: flex; flex-direction: column; gap: 16px; }
-  #map-block { display: flex; flex-direction: column; min-height: 0; }
-  .map-corner { position: absolute; top: 12px; left: 14px; z-index: 2; }
-  .map-legend {
-    position: absolute; bottom: 12px; right: 14px; z-index: 2; display: flex; align-items: center; gap: 8px;
-    font-family: "JetBrains Mono", monospace; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim);
-  }
-  .map-legend .dots { display: flex; gap: 3px; }
-  .map-legend .dots i { width: 6px; height: 6px; border-radius: 50%; }
-
-  /* Modos MANDO / DIARIO: ocultan la constelación y reparten los paneles */
-  #tab-dashboard.dm-mando #map-block,
-  #tab-dashboard.dm-diario #map-block { display: none; }
-  #tab-dashboard.dm-mando .dash-top,
-  #tab-dashboard.dm-diario .dash-top { display: block; }
-  #tab-dashboard.dm-mando #rail,
-  #tab-dashboard.dm-diario #rail { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; align-items: start; }
-  #tab-dashboard.dm-diario #panel-captura { display: none; }
-  #tab-dashboard.dm-diario .dash-bottom { grid-template-columns: 1fr; }
-
-  @media (max-width: 1080px) {
-    .dash-top, .dash-bottom { grid-template-columns: 1fr; }
-    #tab-dashboard.dm-mando #rail, #tab-dashboard.dm-diario #rail { grid-template-columns: 1fr; }
-  }
-  #map-wrap {
-    position: relative; border: 1px solid rgba(125, 162, 216, 0.22); border-radius: 14px;
+  /* ---------- CONSTELACIÓN: la runa al centro, los paneles en órbita ---------- */
+  .constelacion {
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr minmax(210px, 0.8fr) 1fr;
+    grid-template-rows: auto auto auto;
+    grid-template-areas:
+      "gym    runa   prog"
+      "tareas runa   brief"
+      "cap    cap    cap";
+    gap: 18px;
+    align-items: start;
+    padding: 24px;
+    border: 1px solid rgba(224, 140, 162, 0.16);
+    border-radius: 18px;
+    overflow: hidden;
     background:
-      linear-gradient(rgba(125, 162, 216, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(125, 162, 216, 0.04) 1px, transparent 1px),
-      radial-gradient(ellipse at center, #0E1119 0%, var(--bg) 78%);
-    background-size: 36px 36px, 36px 36px, 100% 100%;
-    box-shadow: inset 0 0 90px rgba(125, 162, 216, 0.06);
-    flex: 1; height: 100%; min-height: 440px; overflow: hidden;
+      linear-gradient(rgba(224, 140, 162, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(224, 140, 162, 0.03) 1px, transparent 1px),
+      radial-gradient(ellipse 55% 55% at 50% 47%, rgba(224, 140, 162, 0.08) 0%, transparent 70%),
+      radial-gradient(ellipse at center, #121012 0%, var(--bg) 88%);
+    background-size: 38px 38px, 38px 38px, 100% 100%, 100% 100%;
+    box-shadow: inset 0 0 120px rgba(224, 140, 162, 0.05);
   }
-  #map-wrap::before, #map-wrap::after {
-    content: ""; position: absolute; width: 16px; height: 16px;
-    pointer-events: none; z-index: 2;
+  /* esquinas HUD */
+  .constelacion::before, .constelacion::after {
+    content: ""; position: absolute; width: 16px; height: 16px; pointer-events: none; z-index: 3;
   }
-  #map-wrap::before {
-    top: 9px; left: 9px;
-    border-top: 2px solid rgba(125, 162, 216, 0.5); border-left: 2px solid rgba(125, 162, 216, 0.5);
+  .constelacion::before {
+    top: 10px; left: 10px;
+    border-top: 2px solid rgba(224, 140, 162, 0.5); border-left: 2px solid rgba(224, 140, 162, 0.5);
     border-top-left-radius: 5px;
   }
-  #map-wrap::after {
-    bottom: 9px; right: 9px;
-    border-bottom: 2px solid rgba(125, 162, 216, 0.5); border-right: 2px solid rgba(125, 162, 216, 0.5);
+  .constelacion::after {
+    bottom: 10px; right: 10px;
+    border-bottom: 2px solid rgba(224, 140, 162, 0.5); border-right: 2px solid rgba(224, 140, 162, 0.5);
     border-bottom-right-radius: 5px;
   }
-  #map { width: 100%; height: 100%; display: block; cursor: default; }
-  #map-tip {
-    position: absolute; pointer-events: none; background: var(--panel2);
-    border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px;
-    font-size: 0.75rem; color: var(--text); opacity: 0; transition: opacity 0.15s;
-    transform: translate(-50%, -130%); white-space: nowrap;
+  /* lienzo de líneas/estrellas detrás de los paneles */
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; pointer-events: none; }
+  .constelacion > .panel, .constelacion > #prts-core { position: relative; z-index: 1; }
+
+  .c-gym    { grid-area: gym; }
+  .c-prog   { grid-area: prog; }
+  .c-tareas { grid-area: tareas; }
+  .c-brief  { grid-area: brief; }
+  #panel-captura { grid-area: cap; }
+
+  /* NÚCLEO: la runa + auras de escucha/habla */
+  #prts-core {
+    grid-area: runa; align-self: stretch; justify-self: center;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 360px; width: 100%;
+  }
+  .core-stage { position: relative; display: flex; align-items: center; justify-content: center; width: 220px; height: 340px; }
+  .core-rune {
+    height: 100%; width: auto; object-fit: contain; z-index: 2; user-select: none;
+    filter: drop-shadow(0 0 18px rgba(224, 140, 162, 0.35)) drop-shadow(0 0 4px rgba(224, 140, 162, 0.25));
+    animation: rune-breathe 6s ease-in-out infinite;
+    transition: filter 0.4s ease;
+  }
+  .core-stage::before {
+    content: ""; position: absolute; width: 210px; height: 210px; border-radius: 50%; z-index: 0;
+    background: radial-gradient(circle, rgba(224, 140, 162, 0.16) 0%, transparent 68%);
+    animation: rune-breathe 6s ease-in-out infinite;
+  }
+  @keyframes rune-breathe {
+    0%, 100% { transform: scale(1);    opacity: 1; }
+    50%      { transform: scale(1.045); opacity: 0.9; }
+  }
+  /* anillos de estado: ocultos hasta que PRTS escucha/habla */
+  .core-ring {
+    position: absolute; left: 50%; top: 50%; width: 160px; height: 160px; margin: -80px 0 0 -80px;
+    border-radius: 50%; opacity: 0; pointer-events: none; z-index: 1;
+  }
+  @keyframes ring-ripple {
+    0%   { opacity: 0.65; transform: scale(0.5); }
+    100% { opacity: 0;    transform: scale(2.3); }
+  }
+  /* ESCUCHANDO → ámbar */
+  #prts-core.escuchando .core-rune {
+    filter: drop-shadow(0 0 26px rgba(210, 165, 71, 0.6)) drop-shadow(0 0 8px rgba(210, 165, 71, 0.4)) brightness(1.08);
+  }
+  #prts-core.escuchando .ring-listen { border: 1.5px solid rgba(210, 165, 71, 0.55); animation: ring-ripple 1.7s ease-out infinite; }
+  #prts-core.escuchando .ring-listen.d1 { animation-delay: 0.57s; }
+  #prts-core.escuchando .ring-listen.d2 { animation-delay: 1.13s; }
+  /* HABLANDO → rosa */
+  #prts-core.hablando .core-rune {
+    filter: drop-shadow(0 0 30px rgba(224, 140, 162, 0.7)) drop-shadow(0 0 10px rgba(224, 140, 162, 0.5)) brightness(1.1);
+  }
+  #prts-core.hablando .ring-speak { border: 1.5px solid rgba(224, 140, 162, 0.6); animation: ring-ripple 1.4s ease-out infinite; }
+  #prts-core.hablando .ring-speak.d1 { animation-delay: 0.47s; }
+  #prts-core.hablando .ring-speak.d2 { animation-delay: 0.94s; }
+
+  /* Modo MANDO: rejilla de paneles, sin runa ni campo */
+  #tab-dashboard.dm-mando #map,
+  #tab-dashboard.dm-mando #prts-core,
+  #tab-dashboard.dm-diario #map,
+  #tab-dashboard.dm-diario #prts-core { display: none; }
+  #tab-dashboard.dm-mando .constelacion {
+    grid-template-columns: repeat(3, 1fr); grid-template-areas: none;
+    background: none; box-shadow: none; border-color: var(--border);
+  }
+  #tab-dashboard.dm-mando .constelacion > .panel { grid-area: auto; }
+  #tab-dashboard.dm-mando #panel-captura { grid-column: 1 / -1; }
+  /* Modo DIARIO: una columna, briefing ancho, sin captura */
+  #tab-dashboard.dm-diario .constelacion {
+    grid-template-columns: 1fr; grid-template-areas: none;
+    background: none; box-shadow: none; border-color: var(--border);
+  }
+  #tab-dashboard.dm-diario .constelacion > .panel { grid-area: auto; }
+  #tab-dashboard.dm-diario #panel-captura { display: none; }
+
+  @media (max-width: 1024px) {
+    .constelacion {
+      grid-template-columns: 1fr;
+      grid-template-areas: "runa" "gym" "prog" "tareas" "brief" "cap";
+    }
+    #map { display: none; }
+    #prts-core { min-height: 220px; }
+    .core-stage { width: 160px; height: 250px; }
+    .core-stage::before { width: 150px; height: 150px; }
   }
 
   /* ---------- PANELES ---------- */
@@ -156,7 +227,7 @@
   .stack { display: flex; flex-direction: column; gap: 16px; }
 
   /* briefing PRTS  */
-  #prts-panel { border-color: #232A3D; background: linear-gradient(135deg, #11141d 0%, #10131B 100%); }
+  #prts-panel { border-color: #2A2529; background: linear-gradient(135deg, #161416 0%, #161416 100%); }
   #prts-briefing { color: var(--muted); font-size: 0.88rem; line-height: 1.5; }
   #prts-briefing .serif { color: var(--text); font-size: 1.02rem; }
   .pulse-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--blue); margin-right: 8px; animation: pulse 2.4s infinite; }
@@ -214,7 +285,7 @@
     font-family: "JetBrains Mono", monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
     transition: color 0.15s, border-color 0.15s;
   }
-  .back-dash:hover { color: var(--blue); border-color: rgba(125, 162, 216, 0.45); }
+  .back-dash:hover { color: var(--blue); border-color: rgba(224, 140, 162, 0.45); }
 
   .f-in, .f-sel {
     padding: 9px 11px; font-size: 0.88rem; font-family: inherit; border-radius: 8px;
@@ -259,7 +330,7 @@
     position: relative; border-left: 1px solid var(--border); cursor: pointer;
     background-image: repeating-linear-gradient(to bottom, rgba(29, 34, 48, 0.6) 0 1px, transparent 1px 40px);
   }
-  .wg-col.on { background-color: rgba(125, 162, 216, 0.05); }
+  .wg-col.on { background-color: rgba(224, 140, 162, 0.05); }
   .wg-block {
     position: absolute; left: 3px; right: 3px; border-radius: 5px;
     padding: 3px 6px; overflow: hidden; font-size: 0.68rem; line-height: 1.25;
@@ -269,7 +340,7 @@
   .wg-block small { display: block; font-family: "JetBrains Mono", monospace; font-size: 0.55rem; color: var(--muted); }
   .wg-block.dragging { cursor: grabbing; opacity: 0.9; z-index: 6; box-shadow: 0 8px 22px rgba(0,0,0,0.55); }
   .wg-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; }
-  .wg-col.drop-target { background-color: rgba(125, 162, 216, 0.13) !important; box-shadow: inset 0 0 0 1px rgba(125,162,216,0.4); }
+  .wg-col.drop-target { background-color: rgba(224, 140, 162, 0.13) !important; box-shadow: inset 0 0 0 1px rgba(224,140,162,0.4); }
   .sem-hint { margin-top: 8px; font-family: "JetBrains Mono", monospace; font-size: 0.56rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); }
   .leyenda { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
   .leyenda span {
@@ -330,7 +401,7 @@
     transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
   }
   .cap-mic svg { width: 16px; height: 16px; }
-  .cap-mic:hover { color: var(--blue); border-color: rgba(125, 162, 216, 0.45); box-shadow: 0 0 12px rgba(125, 162, 216, 0.18); }
+  .cap-mic:hover { color: var(--blue); border-color: rgba(224, 140, 162, 0.45); box-shadow: 0 0 12px rgba(224, 140, 162, 0.18); }
   .cap-item { display: flex; align-items: baseline; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
   .cap-item:last-child { border-bottom: none; }
   .cap-item .cuando { font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.08em; color: var(--dim); min-width: 78px; }
@@ -346,13 +417,13 @@
   .wake-dot.hot { background: var(--red); box-shadow: 0 0 9px rgba(216, 113, 113, 0.7); }
   .cap-proc {
     margin-top: 10px; width: 100%; padding: 7px; background: transparent; cursor: pointer;
-    border: 1px solid rgba(125, 162, 216, 0.45); border-radius: 8px; color: var(--blue);
+    border: 1px solid rgba(224, 140, 162, 0.45); border-radius: 8px; color: var(--blue);
     font-family: "JetBrains Mono", monospace; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase;
   }
   .cap-proc:disabled { opacity: 0.5; cursor: default; }
   .sug-card {
-    margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(125, 162, 216, 0.35);
-    border-radius: 10px; background: rgba(125, 162, 216, 0.06);
+    margin-top: 10px; padding: 10px 12px; border: 1px solid rgba(224, 140, 162, 0.35);
+    border-radius: 10px; background: rgba(224, 140, 162, 0.06);
   }
   .sug-card .sug-mod {
     font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.14em;
@@ -430,11 +501,53 @@
   #msg { margin-top: 10px; font-size: 0.85rem; color: var(--red); min-height: 1.2em; }
   .hidden { display: none !important; }
 
+  /* --- LevelUp + Recordatorios (vistas portadas al dashboard) --- */
+  .lu-sub { font-family: "JetBrains Mono", monospace; font-size: 0.56rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin: 12px 0 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { background: var(--panel2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 0.8rem; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .chip.on { border-color: var(--blue); color: var(--text); background: rgba(224,140,162,0.12); }
+  .editing-banner { display: none; font-family: "JetBrains Mono", monospace; font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--yellow); margin-bottom: 8px; }
+  .editing-banner a { color: var(--blue); }
+  .editing .editing-banner { display: block; }
+  .lu-mbtn { background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 6px; padding: 2px 9px; cursor: pointer; font-family: inherit; }
+  .lu-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+  .lu-stat { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .lu-stat .l { font-family: "JetBrains Mono", monospace; font-size: 0.56rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+  .lu-stat .v { font-family: "Source Serif 4", serif; font-size: 1.5rem; margin-top: 4px; }
+  .lu-stat .v.pos { color: var(--green); } .lu-stat .v.neg { color: var(--red); }
+  .lu-stat .s { font-size: 0.72rem; color: var(--muted); margin-top: 1px; }
+  .lcard .lc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; cursor: pointer; }
+  .lcard .lc-name { font-family: "Source Serif 4", serif; font-size: 1.1rem; }
+  .lcard .lc-meta { font-family: "JetBrains Mono", monospace; font-size: 0.6rem; color: var(--dim); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .lcard .lc-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .lcard.open .lc-detail { display: block; }
+  .lcard .acts, .ln .acts { display: flex; gap: 2px; flex: 0 0 auto; }
+  .lcard .acts button, .ln .acts button { background: transparent; border: none; color: var(--dim); cursor: pointer; font-size: 0.85rem; padding: 3px 5px; }
+  .lcard .acts button:hover, .ln .acts button:hover { color: var(--text); }
+  .ln { display: flex; align-items: center; gap: 10px; padding: 8px 2px; border-bottom: 1px solid var(--border); }
+  .ln:last-child { border-bottom: none; }
+  .ln .cuerpo { flex: 1; min-width: 0; }
+  .ln .nm { font-size: 0.88rem; word-break: break-word; } .ln .sb { font-family: "JetBrains Mono", monospace; font-size: 0.58rem; color: var(--dim); margin-top: 2px; }
+  .ln .sync { color: var(--green); } .ln .nosync { color: var(--dim); }
+  .pay { font-family: "JetBrains Mono", monospace; font-size: 0.62rem; letter-spacing: 0.06em; white-space: nowrap; }
+  .pay.pagado { color: var(--green); } .pay.parcial { color: var(--yellow); } .pay.pendiente { color: var(--red); }
+  .roster { display: flex; flex-wrap: wrap; gap: 6px; }
+  .roster label { display: flex; align-items: center; gap: 5px; font-size: 0.8rem; background: var(--panel2); border: 1px solid var(--border); border-radius: 999px; padding: 4px 10px; cursor: pointer; }
+  .lu-group { font-family: "JetBrains Mono", monospace; font-size: 0.6rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); margin: 18px 2px 6px; display: flex; gap: 8px; align-items: center; }
+  .lu-group .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 12px; }
+  .legend span { display: flex; align-items: center; gap: 6px; font-family: "JetBrains Mono", monospace; font-size: 0.6rem; color: var(--muted); }
+  .legend i { width: 9px; height: 9px; border-radius: 2px; }
+  .lu-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .venc { color: var(--red); }
+
   @media (max-width: 900px) {
     aside { display: none; }
     .grid { grid-template-columns: 1fr; }
     .week-layout { grid-template-columns: 1fr; }
     main { padding: 16px; }
+    .lu-stats { grid-template-columns: 1fr; }
+    .lu-2col { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -480,16 +593,32 @@
   <a class="nav-link" href="#insights" data-view="insights">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 6-8 3 4"/><path d="M3 21h18"/></svg>
     Insights</a>
-  <a class="nav-link" href="recordatorios.html">
+  <a class="nav-link" href="#recordatorios" data-view="recordatorios">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a1.7 1.7 0 0 1-3 0"/></svg>
     Recordatorios</a>
+  <a class="nav-link" href="elfie.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg>
+    Elfie</a>
+  <a class="nav-link" href="elfie-chat.html">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg>
+    Chat con Elfie</a>
 
   <div class="nav-label mono">Estudio &amp; academias</div>
   <a class="nav-link" href="apuntes.html">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
     Apuntes</a>
-  <a class="nav-link soon" href="#"><span>Alumnos</span><span class="tag">pronto</span></a>
   <a class="nav-link soon" href="#"><span>Contenido</span><span class="tag">pronto</span></a>
+
+  <div class="nav-label mono">LevelUp</div>
+  <a class="nav-link" href="#lu-maestros" data-view="lu-maestros">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M21 8v6M7 11v4c0 1 2.5 3 5 3s5-2 5-3v-4"/></svg>
+    Maestros</a>
+  <a class="nav-link" href="#lu-alumnos" data-view="lu-alumnos">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 7a3 3 0 0 1 0 6M21 20c0-2.5-1.3-4.2-3.5-4.8"/></svg>
+    Alumnos</a>
+  <a class="nav-link" href="#lu-admin" data-view="lu-admin">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/></svg>
+    Administración</a>
 
   <div class="nav-label mono">Salud &amp; finanzas</div>
   <a class="nav-link" href="gym.html">
@@ -529,61 +658,59 @@
     </div>
   </div>
 
-  <!-- Fila 1: constelación + riel (gym · progreso) -->
-  <div class="dash-top">
-    <div id="map-block">
-      <div id="map-wrap">
-        <div class="map-corner mono">Red de módulos · clic para navegar</div>
-        <div class="map-legend">
-          <span class="dots"><i style="background:var(--blue)"></i><i style="background:var(--yellow)"></i><i style="background:var(--dim)"></i></span>
-          12 módulos
-        </div>
-        <canvas id="map"></canvas>
-        <div id="map-tip"></div>
+  <!-- CONSTELACIÓN: la runa al centro, los paneles en órbita -->
+  <div class="constelacion">
+    <canvas id="map"></canvas>
+
+    <!-- NÚCLEO: runa + auras de escucha/habla -->
+    <div id="prts-core" title="PRTS">
+      <div class="core-stage">
+        <span class="core-ring ring-listen d0"></span>
+        <span class="core-ring ring-listen d1"></span>
+        <span class="core-ring ring-listen d2"></span>
+        <span class="core-ring ring-speak d0"></span>
+        <span class="core-ring ring-speak d1"></span>
+        <span class="core-ring ring-speak d2"></span>
+        <img class="core-rune" src="runa.png" alt="PRTS" draggable="false">
       </div>
     </div>
 
-    <div id="rail">
-      <!-- Hoy en el gym -->
-      <div class="panel">
-        <div class="panel-head">
-          <span class="mono">Gimnasio · hoy</span>
-          <a href="gym.html">abrir ›</a>
-        </div>
-        <div id="gym-hoy" class="future-note">Cargando…</div>
+    <!-- Gimnasio · hoy -->
+    <div class="panel c-gym">
+      <div class="panel-head">
+        <span class="mono">Gimnasio · hoy</span>
+        <a href="gym.html">abrir ›</a>
       </div>
-
-      <!-- Progreso semanal -->
-      <div class="panel">
-        <div class="panel-head"><span class="mono">Progreso semanal</span></div>
-        <div class="prow"><label>Gym</label><div class="bar"><i id="bar-gym" style="width:0%"></i></div><span id="txt-gym">—</span></div>
-        <div class="prow"><label>Tareas</label><div class="bar"><i id="bar-tareas" style="width:0%"></i></div><span id="txt-tareas">—</span></div>
-      </div>
-
-      <!-- Tareas prioritarias de hoy -->
-      <div class="panel" id="panel-tareas">
-        <div class="panel-head">
-          <span class="mono">Tareas prioritarias</span>
-          <a href="#tareas" data-view="tareas">ver todas ›</a>
-        </div>
-        <div id="lista-tareas"><div class="empty">Cargando…</div></div>
-      </div>
+      <div id="gym-hoy" class="future-note">Cargando…</div>
     </div>
-  </div>
 
-  <!-- Fila 2: briefing · captura -->
-  <div class="dash-bottom">
-      <!-- PRTS: briefing diario } -->
-      <div class="panel" id="prts-panel">
-        <div class="panel-head">
-          <span class="mono" style="color:var(--blue)"><span class="pulse-dot"></span>PRTS · Briefing del día</span>
-          <span class="mono" id="fecha-hoy"></span>
-        </div>
-        <div id="prts-briefing">
-          <span class="lead">Cargando el día…</span>
-        </div>
-        <div id="prts-alertas"></div>
+    <!-- Progreso semanal -->
+    <div class="panel c-prog">
+      <div class="panel-head"><span class="mono">Progreso semanal</span></div>
+      <div class="prow"><label>Gym</label><div class="bar"><i id="bar-gym" style="width:0%"></i></div><span id="txt-gym">—</span></div>
+      <div class="prow"><label>Tareas</label><div class="bar"><i id="bar-tareas" style="width:0%"></i></div><span id="txt-tareas">—</span></div>
+    </div>
+
+    <!-- Tareas prioritarias de hoy -->
+    <div class="panel c-tareas" id="panel-tareas">
+      <div class="panel-head">
+        <span class="mono">Tareas prioritarias</span>
+        <a href="#tareas" data-view="tareas">ver todas ›</a>
       </div>
+      <div id="lista-tareas"><div class="empty">Cargando…</div></div>
+    </div>
+
+    <!-- PRTS: briefing diario -->
+    <div class="panel c-brief" id="prts-panel">
+      <div class="panel-head">
+        <span class="mono" style="color:var(--blue)"><span class="pulse-dot"></span>PRTS · Briefing del día</span>
+        <span class="mono" id="fecha-hoy"></span>
+      </div>
+      <div id="prts-briefing">
+        <span class="lead">Cargando el día…</span>
+      </div>
+      <div id="prts-alertas"></div>
+    </div>
 
       <!-- PRTS: captura universal -->
       <div class="panel" id="panel-captura">
@@ -728,6 +855,105 @@
   </div>
 </div>
 
+<!-- VISTA RECORDATORIOS -->
+<div id="tab-recordatorios" class="hidden tab-fade">
+  <div class="view-head">
+    <div class="head-left"><button class="back-dash" data-view="dashboard">‹ Dashboard</button><h2>Recordatorios</h2></div>
+    <span class="mono" id="rec-gcal">—</span>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+    <div class="panel-head"><span class="mono">Nuevo recordatorio</span><button id="rec-gbtn" class="back-dash">Conectar Google</button></div>
+    <input id="rec-title" class="f-in" placeholder="¿De qué te recuerdo?" style="width:100%" autocomplete="off">
+    <div class="form-3" style="grid-template-columns:1fr 1fr auto">
+      <input id="rec-when" class="f-in" type="datetime-local">
+      <select id="rec-lead" class="f-sel"></select>
+      <button id="rec-add" class="f-btn">Crear</button>
+    </div>
+    <input id="rec-notes" class="f-in" placeholder="Nota (opcional)" style="width:100%;margin-top:8px" autocomplete="off">
+  </div>
+  <div class="panel">
+    <div class="panel-head"><span class="mono">Próximos</span></div>
+    <div id="rec-prox"></div>
+  </div>
+  <button id="rec-toggle" class="ghost-wide">Pasados y hechos (0)</button>
+  <div id="rec-pasados" class="panel hidden" style="margin-top:16px"></div>
+</div>
+
+<!-- VISTA LEVELUP · MAESTROS -->
+<div id="tab-lu-maestros" class="hidden tab-fade">
+  <div class="view-head">
+    <div class="head-left"><button class="back-dash" data-view="dashboard">‹ Dashboard</button><h2>LevelUp · Maestros</h2></div>
+    <span class="mono" id="lm-resumen"></span>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+    <div class="editing-banner" id="lm-editing">Editando maestro · <a href="#" id="lm-cancel">cancelar</a></div>
+    <input id="lm-name" class="f-in" placeholder="Nombre del maestro" style="width:100%" autocomplete="off">
+    <div class="lu-sub">Idiomas</div><div class="chips" id="lm-langs"></div>
+    <div class="lu-sub">Formatos</div><div class="chips" id="lm-formats"></div>
+    <div class="form-3" style="margin-top:10px">
+      <select id="lm-paytype" class="f-sel"><option value="mensual">Sueldo mensual</option><option value="por_hora">Por hora</option></select>
+      <input id="lm-payrate" class="f-in" type="number" min="0" step="0.01" placeholder="$ monto">
+      <button id="lm-save" class="f-btn">Agregar</button>
+    </div>
+    <input id="lm-notes" class="f-in" placeholder="Notas sobre el maestro (opcional)" style="width:100%;margin-top:8px" autocomplete="off">
+  </div>
+  <div id="lm-lista" class="proj-grid"></div>
+</div>
+
+<!-- VISTA LEVELUP · ALUMNOS -->
+<div id="tab-lu-alumnos" class="hidden tab-fade">
+  <div class="view-head">
+    <div class="head-left"><button class="back-dash" data-view="dashboard">‹ Dashboard</button><h2>LevelUp · Alumnos</h2></div>
+    <span class="mono"><button class="lu-mbtn" id="la-prev">‹</button> <span id="la-month">—</span> <button class="lu-mbtn" id="la-next">›</button></span>
+  </div>
+  <div class="panel" style="margin-bottom:16px">
+    <div class="editing-banner" id="la-editing">Editando alumno · <a href="#" id="la-cancel">cancelar</a></div>
+    <input id="la-name" class="f-in" placeholder="Nombre del alumno" style="width:100%" autocomplete="off">
+    <div class="form-4" style="margin-top:8px">
+      <input id="la-lang" class="f-in" placeholder="Idioma" autocomplete="off">
+      <input id="la-level" class="f-in" placeholder="Nivel" autocomplete="off">
+      <input id="la-hours" class="f-in" type="number" min="0" step="0.5" placeholder="Horas/sem">
+      <input id="la-fee" class="f-in" type="number" min="0" step="0.01" placeholder="$ mensual">
+    </div>
+    <div class="form-2" style="margin-top:8px"><select id="la-teacher" class="f-sel"></select><button id="la-save" class="f-btn">Agregar</button></div>
+    <input id="la-notes" class="f-in" placeholder="Notas (opcional)" style="width:100%;margin-top:8px" autocomplete="off">
+  </div>
+  <div class="chips" id="la-filtros" style="margin-bottom:12px"></div>
+  <div id="la-lista"></div>
+</div>
+
+<!-- VISTA LEVELUP · ADMINISTRACIÓN -->
+<div id="tab-lu-admin" class="hidden tab-fade">
+  <div class="view-head">
+    <div class="head-left"><button class="back-dash" data-view="dashboard">‹ Dashboard</button><h2>LevelUp · Administración</h2></div>
+    <span class="mono"><button class="lu-mbtn" id="ad-prev">‹</button> <span id="ad-month">—</span> <button class="lu-mbtn" id="ad-next">›</button></span>
+  </div>
+  <div class="lu-stats">
+    <div class="lu-stat"><div class="l">Ingresos</div><div class="v pos" id="ad-ing">$0</div><div class="s" id="ad-ing-s">cobrado</div></div>
+    <div class="lu-stat"><div class="l">Gastos</div><div class="v neg" id="ad-gas">$0</div><div class="s" id="ad-gas-s">sueldos + operación</div></div>
+    <div class="lu-stat"><div class="l">Neto</div><div class="v" id="ad-net">$0</div><div class="s">ingresos − gastos</div></div>
+  </div>
+  <div class="lu-2col">
+    <div class="panel"><div class="panel-head"><span class="mono">Ingresos vs gastos por maestro</span></div><canvas id="ad-chart-ms"></canvas></div>
+    <div class="panel"><div class="panel-head"><span class="mono">Gastos por categoría</span></div><canvas id="ad-chart-cat" style="max-height:240px"></canvas><div class="legend" id="ad-cat-leg"></div></div>
+  </div>
+  <div class="lu-2col" style="margin-top:16px">
+    <div class="panel"><div class="panel-head"><span class="mono">Por maestro</span></div><div id="ad-maestros"></div></div>
+    <div class="panel"><div class="panel-head"><span class="mono">Pagos pendientes</span></div><div id="ad-pend"></div></div>
+  </div>
+  <div class="panel" style="margin-top:16px">
+    <div class="panel-head"><span class="mono">Gastos de operación</span><span class="mono" id="ad-gas-total"></span></div>
+    <div class="chips" id="ad-gcats" style="margin-bottom:8px"></div>
+    <div class="form-4">
+      <input id="ad-gconcept" class="f-in" placeholder="Concepto (ej. libros B1)" autocomplete="off">
+      <input id="ad-gamount" class="f-in" type="number" min="0" step="0.01" placeholder="$ monto">
+      <input id="ad-gdate" class="f-in" type="date">
+      <button id="ad-gadd" class="f-btn">Agregar</button>
+    </div>
+    <div id="ad-glista" style="margin-top:10px"></div>
+  </div>
+</div>
+
 </main>
 
 <div id="rest"></div>
@@ -735,12 +961,15 @@
 <script>
 const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+window.sb = sb; // expuesto para el puente Elfie Desktop (elfie/desktop.js)
+window.elfieRoutines && window.elfieRoutines.load(); // rutinas desde Supabase (Routine Engine)
 const $ = (id) => document.getElementById(id);
 const esc = (s) => s.replace(/</g, "&lt;");
 const DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
 
 // ---------- VISTAS ----------
-const TABS = ["dashboard", "semana", "proyectos", "tareas", "insights"];
+const TABS = ["dashboard", "semana", "proyectos", "tareas", "insights",
+              "recordatorios", "lu-maestros", "lu-alumnos", "lu-admin"];
 function switchView(v) {
   if (!TABS.includes(v)) v = "dashboard";
   for (const t of TABS) {
@@ -752,6 +981,10 @@ function switchView(v) {
   if (v === "proyectos") cargarProyectos();
   if (v === "tareas") cargarTareasView();
   if (v === "insights") cargarInsights();
+  if (v === "recordatorios") cargarRecordatorios();
+  if (v === "lu-maestros") cargarLuMaestros();
+  if (v === "lu-alumnos") cargarLuAlumnos();
+  if (v === "lu-admin") cargarLuAdmin();
   history.replaceState(null, "", "#" + v);
 }
 
@@ -768,38 +1001,32 @@ $("btn-login").onclick = async () => {
 };
 $("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
 
-// ---------- MAPA DEL SISTEMA ----------
-// El nodo central es PRTS, la capa de IA que conecta todos los módulos.
-const NODOS = [
-  { id: "prts",      label: "PRTS",      sub: "Asistente · IA",      x: 0.50, y: 0.44, r: 30, core: true },
-  { id: "dashboard", label: "Dashboard", sub: "Vista general",       x: 0.50, y: 0.13, r: 17, href: "index.html", on: true },
-  { id: "semana",    label: "Semana",    sub: "Bloques de tiempo",   x: 0.26, y: 0.20, r: 15, view: "semana", on: true },
-  { id: "tareas",    label: "Tareas",    sub: "Pendientes del día",  x: 0.74, y: 0.20, r: 17, view: "tareas", on: true },
-  { id: "alumnos",   label: "Alumnos",   sub: "Wolves · LevelUp",    x: 0.20, y: 0.42, r: 15 },
-  { id: "proyectos", label: "Proyectos", sub: "Semestre actual",     x: 0.78, y: 0.46, r: 15, view: "proyectos", on: true },
-  { id: "dieta",     label: "Dieta",     sub: "Superávit +200",      x: 0.92, y: 0.50, r: 15, href: "dieta.html", on: true },
-  { id: "contenido", label: "Contenido", sub: "Instagram",           x: 0.12, y: 0.66, r: 13 },
-  { id: "finanzas",  label: "Finanzas",  sub: "Ingresos · Gastos",   x: 0.30, y: 0.70, r: 14, href: "finanzas.html", on: true },
-  { id: "recursos",  label: "Recursos",  sub: "Biblioteca digital",  x: 0.43, y: 0.78, r: 13 },
-  { id: "retro",     label: "Retro",     sub: "Revisión mensual",    x: 0.55, y: 0.83, r: 12 },
-  { id: "apuntes",   label: "Apuntes",   sub: "Plantilla 5 campos",  x: 0.62, y: 0.66, r: 16, href: "apuntes.html", on: true },
-  { id: "gym",       label: "Gimnasio",  sub: "Rutina 5 días",       x: 0.80, y: 0.72, r: 17, href: "gym.html", on: true },
+// ---------- CONSTELACIÓN ----------
+// La runa (HTML, #prts-core) es el núcleo visual; el lienzo dibuja detrás el
+// campo de estrellas y las líneas que la conectan con los paneles en órbita.
+// Las auras de escucha/habla viven en CSS (#prts-core.escuchando/.hablando),
+// sincronizadas aquí con PRTS_AI.attention / PRTS_AI.speaking.
+const CORE = { x: 0.5, y: 0.5 };
+// Anclas ~ donde caen los paneles (gym, progreso, tareas, briefing, captura).
+const ANCLAS = [
+  { x: 0.16, y: 0.17 }, { x: 0.84, y: 0.17 },
+  { x: 0.16, y: 0.50 }, { x: 0.84, y: 0.50 },
+  { x: 0.50, y: 0.89 },
 ];
-const ENLACES = [
-  ["prts","dashboard"],["prts","semana"],["prts","tareas"],["prts","alumnos"],
-  ["prts","proyectos"],["prts","finanzas"],["prts","recursos"],["prts","apuntes"],
-  ["prts","gym"],["prts","retro"],["prts","contenido"],
-  ["gym","dieta"],["alumnos","contenido"],["alumnos","finanzas"],
-  ["tareas","proyectos"],["apuntes","recursos"],["semana","tareas"],["proyectos","dieta"],
-];
-const nodo = (id) => NODOS.find(n => n.id === id);
-
-let canvas, ctx, W, H, dpr, hovered = null;
-let HEAT = {};   // id de módulo → nº de pendientes (calor del mapa)
-const particulas = ENLACES.map((e, i) => ({ e, t: Math.random(), v: 0.0012 + Math.random() * 0.002 }));
+let HEAT = {};   // calor por módulo (lo consume el briefing; reservado)
+let canvas, ctx, W, H, dpr;
+// partículas que viajan del núcleo hacia cada ancla
+const particulas = ANCLAS.flatMap((a, i) =>
+  Array.from({ length: 2 }, (_, k) => ({ a, t: (k / 2 + i * 0.13) % 1, v: 0.0016 + Math.random() * 0.0016 }))
+);
+// estrellas estáticas tenues del fondo
+const estrellas = Array.from({ length: 46 }, () => ({
+  x: Math.random(), y: Math.random(), r: Math.random() * 1.1 + 0.3, a: Math.random() * 0.3 + 0.07,
+}));
 
 function resizeMap() {
-  const wrap = $("map-wrap");
+  const wrap = document.querySelector(".constelacion");
+  if (!canvas || !wrap) return;
   dpr = window.devicePixelRatio || 1;
   W = wrap.clientWidth; H = wrap.clientHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
@@ -807,145 +1034,57 @@ function resizeMap() {
 }
 
 function drawMap(time) {
+  if (!ctx) return;
   ctx.clearRect(0, 0, W, H);
-  const px = (n) => ({ x: n.x * W, y: n.y * H });
+  const C = { x: CORE.x * W, y: CORE.y * H };
 
-  // enlaces
-  ctx.lineWidth = 1;
-  for (const [a, b] of ENLACES) {
-    const A = px(nodo(a)), B = px(nodo(b));
-    ctx.strokeStyle = "rgba(125,162,216,0.13)";
-    ctx.beginPath(); ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.stroke();
+  // estrellas de fondo (parpadeo suave)
+  for (const s of estrellas) {
+    const tw = s.a * (0.7 + 0.3 * Math.sin(time / 700 + s.x * 30));
+    ctx.fillStyle = `rgba(224,140,162,${Math.max(0, tw)})`;
+    ctx.beginPath(); ctx.arc(s.x * W, s.y * H, s.r, 0, 7); ctx.fill();
   }
-  // partículas
+  // líneas del núcleo a cada ancla + nodo-estrella en el extremo
+  for (const a of ANCLAS) {
+    const A = { x: a.x * W, y: a.y * H };
+    const grad = ctx.createLinearGradient(C.x, C.y, A.x, A.y);
+    grad.addColorStop(0, "rgba(224,140,162,0.22)");
+    grad.addColorStop(1, "rgba(224,140,162,0.04)");
+    ctx.strokeStyle = grad; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(C.x, C.y); ctx.lineTo(A.x, A.y); ctx.stroke();
+    ctx.fillStyle = "rgba(224,140,162,0.5)";
+    ctx.beginPath(); ctx.arc(A.x, A.y, 2.2, 0, 7); ctx.fill();
+    ctx.strokeStyle = "rgba(224,140,162,0.22)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(A.x, A.y, 5.5, 0, 7); ctx.stroke();
+  }
+  // partículas viajando hacia afuera, desvaneciéndose al llegar
   for (const p of particulas) {
     p.t += p.v; if (p.t > 1) p.t = 0;
-    const A = px(nodo(p.e[0])), B = px(nodo(p.e[1]));
-    const x = A.x + (B.x - A.x) * p.t, y = A.y + (B.y - A.y) * p.t;
-    ctx.fillStyle = "rgba(125,162,216,0.5)";
+    const A = { x: p.a.x * W, y: p.a.y * H };
+    const x = C.x + (A.x - C.x) * p.t, y = C.y + (A.y - C.y) * p.t;
+    ctx.fillStyle = `rgba(224,140,162,${0.5 * (1 - p.t)})`;
     ctx.beginPath(); ctx.arc(x, y, 1.6, 0, 7); ctx.fill();
   }
-  // Estado de voz del asistente: anima el núcleo PRTS
+
+  // sincroniza las auras CSS de la runa con el estado de voz
   // (attention = capturando comando por wake word; speaking = TTS contestando)
-  const atencion = !!(window.PRTS_AI && PRTS_AI.attention);
-  const hablando = !!(window.PRTS_AI && PRTS_AI.speaking);
-
-  // nodos
-  for (const n of NODOS) {
-    const P = px(n);
-    const pulso = n.core
-      ? 1 + (atencion ? 0.13 * Math.sin(time / 160) : hablando ? 0.09 * Math.sin(time / 110) : 0.06 * Math.sin(time / 600))
-      : 1;
-    const r = n.r * pulso;
-    const activo = n.core || n.on;
-    const hover = hovered === n;
-
-    const g = ctx.createRadialGradient(P.x, P.y, r * 0.2, P.x, P.y, r * (n.core ? 2.2 : 1.8));
-    g.addColorStop(0, n.core
-      ? (atencion ? "rgba(210,165,71,0.6)" : hablando ? "rgba(125,162,216,0.7)" : "rgba(125,162,216,0.55)")
-      : activo ? "rgba(125,162,216,0.35)" : "rgba(125,162,216,0.12)");
-    g.addColorStop(1, atencion && n.core ? "rgba(210,165,71,0)" : "rgba(125,162,216,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(P.x, P.y, r * (n.core ? 2.2 : 1.8), 0, 7); ctx.fill();
-
-    ctx.fillStyle = n.core ? "#22324C" : activo ? "#1B2536" : "#151A26";
-    ctx.strokeStyle = hover ? "#A9C4E8" : activo ? "rgba(125,162,216,0.65)" : "rgba(125,162,216,0.22)";
-    ctx.lineWidth = hover ? 1.8 : 1.2;
-    ctx.beginPath(); ctx.arc(P.x, P.y, r, 0, 7); ctx.fill(); ctx.stroke();
-
-    // anillo HUD exterior en nodos activos
-    if (activo && !n.core) {
-      ctx.strokeStyle = hover ? "rgba(169,196,232,0.55)" : "rgba(125,162,216,0.22)";
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(P.x, P.y, r + 4.5, 0, 7); ctx.stroke();
-    }
-    // calor: los módulos con pendientes irradian en ámbar
-    const calor = (activo && !n.core) ? Math.min(HEAT[n.id] || 0, 4) : 0;
-    if (calor > 0) {
-      const osc = Math.sin(time / 380 + n.x * 9);
-      const k = 0.16 + 0.085 * calor + 0.05 * osc;
-      const hg = ctx.createRadialGradient(P.x, P.y, r * 0.9, P.x, P.y, r * 2.7);
-      hg.addColorStop(0, `rgba(210,165,71,${Math.max(0, k)})`);
-      hg.addColorStop(1, "rgba(210,165,71,0)");
-      ctx.fillStyle = hg;
-      ctx.beginPath(); ctx.arc(P.x, P.y, r * 2.7, 0, 7); ctx.fill();
-      ctx.strokeStyle = `rgba(210,165,71,${0.38 + 0.2 * osc})`;
-      ctx.lineWidth = 1.3;
-      ctx.beginPath(); ctx.arc(P.x, P.y, r + 7.5, 0, 7); ctx.stroke();
-    }
-    // doble arco orbital giratorio en el núcleo (acelera al escuchar/hablar)
-    if (n.core) {
-      const a = time / (atencion || hablando ? 280 : 900);
-      const tono = atencion ? "210,165,71" : "125,162,216";
-      ctx.strokeStyle = `rgba(${tono},0.65)`;
-      ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.arc(P.x, P.y, r + 9, a, a + 1.15); ctx.stroke();
-      ctx.beginPath(); ctx.arc(P.x, P.y, r + 9, a + Math.PI, a + Math.PI + 1.15); ctx.stroke();
-      ctx.strokeStyle = `rgba(${tono},0.25)`;
-      ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.arc(P.x, P.y, r + 16, -a * 0.6, -a * 0.6 + 0.7); ctx.stroke();
-      ctx.beginPath(); ctx.arc(P.x, P.y, r + 16, -a * 0.6 + Math.PI, -a * 0.6 + Math.PI + 0.7); ctx.stroke();
-
-      // escuchando: anillo ámbar respirando alrededor del núcleo
-      if (atencion) {
-        const k = 0.45 + 0.3 * Math.sin(time / 170);
-        ctx.strokeStyle = `rgba(210,165,71,${Math.max(0, k)})`;
-        ctx.lineWidth = 1.6;
-        ctx.beginPath(); ctx.arc(P.x, P.y, r + 23, 0, 7); ctx.stroke();
-      }
-      // contestando: ondas de voz concéntricas que se expanden y desvanecen
-      if (hablando) {
-        for (let k = 0; k < 3; k++) {
-          const fase = ((time / 14) + k * 32) % 96;
-          const alfa = 0.5 * (1 - fase / 96);
-          ctx.strokeStyle = `rgba(125,162,216,${alfa})`;
-          ctx.lineWidth = 1.4;
-          ctx.beginPath(); ctx.arc(P.x, P.y, r + 6 + fase, 0, 7); ctx.stroke();
-        }
-      }
-    }
-
-    ctx.fillStyle = activo ? "#E8EAF0" : "#8A93A6";
-    ctx.font = `${n.core ? 600 : 500} ${n.core ? 13 : 10.5}px Inter, sans-serif`;
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(n.label, P.x, P.y);
-    ctx.fillStyle = "rgba(138,147,166,0.7)";
-    ctx.font = "7.5px 'JetBrains Mono', monospace";
-    ctx.fillText(n.sub.toUpperCase(), P.x, P.y + r + (n.core ? 24 : 15));
+  const core = document.getElementById("prts-core");
+  if (core) {
+    const atencion = !!(window.PRTS_AI && PRTS_AI.attention);
+    const hablando = !!(window.PRTS_AI && PRTS_AI.speaking);
+    core.classList.toggle("escuchando", atencion);
+    core.classList.toggle("hablando", hablando && !atencion);
   }
   requestAnimationFrame(drawMap);
 }
 
-function nodoEn(mx, my) {
-  for (const n of NODOS) {
-    const dx = mx - n.x * W, dy = my - n.y * H;
-    if (Math.hypot(dx, dy) <= n.r + 6) return n;
-  }
-  return null;
-}
-
 function initMapa() {
-  canvas = $("map"); ctx = canvas.getContext("2d");
+  canvas = document.getElementById("map");
+  if (!canvas) return;
+  ctx = canvas.getContext("2d");
   resizeMap();
-  new ResizeObserver(resizeMap).observe($("map-wrap"));
-  canvas.addEventListener("mousemove", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    hovered = nodoEn(e.clientX - rect.left, e.clientY - rect.top);
-    canvas.style.cursor = hovered && (hovered.href || hovered.view || hovered.core) ? "pointer" : "default";
-    const tip = $("map-tip");
-    if (hovered) {
-      tip.style.left = hovered.x * W + "px";
-      tip.style.top = hovered.y * H + "px";
-      tip.textContent = hovered.core ? "PRTS" :
-        (hovered.href || hovered.view) ? `${hovered.label} — abrir` : `${hovered.label} — próximamente`;
-      tip.style.opacity = 1;
-    } else tip.style.opacity = 0;
-  });
-  canvas.addEventListener("mouseleave", () => { hovered = null; $("map-tip").style.opacity = 0; });
-  canvas.addEventListener("click", () => {
-    if (hovered?.view) switchView(hovered.view);
-    else if (hovered?.href) location.href = hovered.href;
-  });
+  const wrap = document.querySelector(".constelacion");
+  if (wrap) new ResizeObserver(resizeMap).observe(wrap);
   requestAnimationFrame(drawMap);
 }
 
@@ -1393,9 +1532,17 @@ async function generarInsights() {
 
 // --- comandos (voz/texto) — router híbrido ---
 // Patrones locales sin LLM; solo lo freeform va a interpret-command.
+window.ejecutarComando = ejecutarComando; // expuesto para el puente Elfie Desktop (hoisted)
 async function ejecutarComando(texto, spoken) {
+  // Routine Engine: si el texto coincide con la frase de una rutina, ejecútala.
+  if (window.elfieRoutines && await window.elfieRoutines.tryRun(texto)) return;
   const local = PRTS_AI.routeLocal(texto);
   if (local) { await PRTS_AI.executeIntent(local, { spoken }); return; }
+  // Router híbrido (Elfie Desktop): Ollama local antes que Anthropic ($0 si resuelve).
+  if (window.elfieInterpret) {
+    const ai = await window.elfieInterpret(texto);
+    if (ai) { await PRTS_AI.executeIntent(ai, { spoken }); return; }
+  }
   notaPRTS("PRTS pensando…");
   try {
     const { data, error } = await sb.functions.invoke("interpret-command", { body: { text: texto } });
@@ -1417,7 +1564,7 @@ const ES_COMANDO = /^(hola\s+|hey\s+|oye\s+)?(prts|dal[ií]a)\b|^(abre|abrir|lan
 const ORDEN_SEM = [1, 2, 3, 4, 5, 6, 0];
 const DIAS_CORTO = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
 const ROLES_SEM = {
-  escuela:  { label: "Escuela",  color: "#7DA2D8" },
+  escuela:  { label: "Escuela",  color: "#D98AA0" },
   gym:      { label: "Gym",      color: "#6FB5AE" },
   wolves:   { label: "Wolves",   color: "#D2A547" },
   levelup:  { label: "LevelUp",  color: "#5FB97E" },
@@ -1785,7 +1932,7 @@ async function cargarProyectos() {
 
 // ---------- TAREAS (vista completa) ----------
 const ORIGENES_T = {
-  escuela:  { label: "Escuela",  color: "#7DA2D8" },
+  escuela:  { label: "Escuela",  color: "#D98AA0" },
   wolves:   { label: "Wolves",   color: "#D2A547" },
   levelup:  { label: "LevelUp",  color: "#5FB97E" },
   personal: { label: "Personal", color: "#B49FD9" },
@@ -1898,6 +2045,340 @@ async function cargarTareasView() {
   done.slice(0, 20).forEach(t => ld.appendChild(filaTareaV(t)));
   if (!done.length) ld.innerHTML = `<div class="empty">Nada completado todavía.</div>`;
 }
+
+// ============================================================
+//  VISTAS PORTADAS: Recordatorios + LevelUp (cada una en su IIFE
+//  para aislar nombres internos del resto de index.html).
+// ============================================================
+const LU_MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const LU_DIAS = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const LU_DIAS3 = ["dom","lun","mar","mié","jue","vie","sáb"];
+const escv = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+const hoyStr = () => new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+const mesActual = () => hoyStr().slice(0, 7);
+const money = (n) => "$" + (+n || 0).toLocaleString("es-MX", { maximumFractionDigits: 2 });
+const moneyR = (n) => "$" + Math.round(+n || 0).toLocaleString("es-MX");
+
+// -------------------- RECORDATORIOS --------------------
+const cargarRecordatorios = (() => {
+  const gcal = () => window.PRTS_AI && PRTS_AI.gcal;
+  const LEADS = [{ m: 0, l: "A la hora" }, { m: 10, l: "10 min antes" }, { m: 30, l: "30 min" }, { m: 60, l: "1 h" }, { m: 1440, l: "1 día" }];
+  let lista = [], editingId = null, wired = false;
+
+  function fmtCuando(iso) { const d = new Date(iso), p = (n) => String(n).padStart(2, "0"); return `${LU_DIAS3[d.getDay()]} ${d.getDate()} ${LU_MESES[d.getMonth()].slice(0,3)} · ${p(d.getHours())}:${p(d.getMinutes())}`; }
+  function defaultWhen() { const d = new Date(Date.now() + 36e5); d.setMinutes(Math.ceil(d.getMinutes()/5)*5, 0, 0); const p = (n) => String(n).padStart(2,"0"); return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; }
+
+  function pintarGcal() {
+    const g = gcal(), dot = $("rec-gcal"), btn = $("rec-gbtn");
+    if (!g || !g.available()) { dot.textContent = "Google Calendar: sin configurar"; btn.classList.add("hidden"); return; }
+    btn.classList.remove("hidden");
+    if (g.connected()) { dot.textContent = "● Calendar conectado"; btn.textContent = "Desconectar"; btn.onclick = () => { g.disconnect(); pintarGcal(); notaPRTS("Google Calendar desconectado."); }; }
+    else { dot.textContent = "○ sin conectar"; btn.textContent = "Conectar Google"; btn.onclick = async () => { btn.disabled = true; const ok = await g.connect(); btn.disabled = false; pintarGcal(); notaPRTS(ok ? "Google Calendar conectado." : "No se pudo conectar."); }; }
+  }
+  function reset() { editingId = null; $("rec-title").value = ""; $("rec-notes").value = ""; $("rec-when").value = defaultWhen(); $("rec-lead").value = "0"; $("rec-add").textContent = "Crear"; }
+  function editar(r) { editingId = r.id; $("rec-title").value = r.title; $("rec-notes").value = r.notes || ""; const d = new Date(r.remind_at), p = (n) => String(n).padStart(2,"0"); $("rec-when").value = `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`; $("rec-lead").value = String(r.lead_minutes || 0); $("rec-add").textContent = "Guardar"; $("rec-title").focus(); }
+  async function guardar() {
+    const title = $("rec-title").value.trim(), when = $("rec-when").value;
+    if (!title) { notaPRTS("Ponle un título."); return; }
+    if (!when) { notaPRTS("Elige fecha y hora."); return; }
+    const rem = { title, notes: $("rec-notes").value.trim() || null, remind_at: new Date(when).toISOString(), lead_minutes: +$("rec-lead").value || 0 };
+    $("rec-add").disabled = true; const g = gcal();
+    if (editingId) {
+      const prev = lista.find(r => r.id === editingId); let gid = prev && prev.google_event_id;
+      gid = gid ? (g && await g.updateEvent(gid, rem)) || gid : (g && await g.createEvent(rem));
+      await sb.from("reminders").update({ ...rem, google_event_id: gid }).eq("id", editingId);
+      notaPRTS("Recordatorio actualizado.");
+    } else {
+      const gid = g && await g.createEvent(rem);
+      await sb.from("reminders").insert({ ...rem, google_event_id: gid });
+      notaPRTS(gid ? "Listo · te avisará en el celular." : "Guardado (conecta Google para avisos al celular).");
+    }
+    $("rec-add").disabled = false; reset(); cargar();
+  }
+  async function completar(r) {
+    await sb.from("reminders").update({ status: r.status === "hecho" ? "pendiente" : "hecho" }).eq("id", r.id);
+    if (r.status !== "hecho" && r.google_event_id && new Date(r.remind_at) > new Date() && gcal()) { await gcal().deleteEvent(r.google_event_id); await sb.from("reminders").update({ google_event_id: null }).eq("id", r.id); }
+    cargar();
+  }
+  async function borrar(r) { if (!confirm("¿Eliminar este recordatorio?")) return; if (r.google_event_id && gcal()) await gcal().deleteEvent(r.google_event_id); await sb.from("reminders").delete().eq("id", r.id); if (editingId === r.id) reset(); cargar(); }
+
+  function fila(r) {
+    const ahora = new Date(), venc = new Date(r.remind_at) < ahora, lead = r.lead_minutes ? ` · avisa ${(LEADS.find(l => l.m === r.lead_minutes) || {}).l || r.lead_minutes + " min"}` : "";
+    const sync = r.google_event_id ? `<span class="sync">● Calendar</span>` : `<span class="nosync">○ solo PRTS</span>`;
+    const div = document.createElement("div"); div.className = "ln";
+    div.innerHTML = `<div class="cuerpo"><div class="nm">${escv(r.title)}${r.notes ? ` <span style="color:var(--dim)">· ${escv(r.notes)}</span>` : ""}</div>
+      <div class="sb"><span class="${venc && r.status === "pendiente" ? "venc" : ""}" style="color:${venc&&r.status==="pendiente"?"var(--red)":"var(--blue)"}">${fmtCuando(r.remind_at)}${lead}</span> · ${sync}</div></div>
+      <div class="acts"><button class="ok">${r.status === "hecho" ? "↺" : "✓"}</button><button class="ed">✎</button><button class="rm">✕</button></div>`;
+    div.querySelector(".ok").onclick = () => completar(r);
+    div.querySelector(".ed").onclick = () => editar(r);
+    div.querySelector(".rm").onclick = () => borrar(r);
+    return div;
+  }
+  async function cargar() {
+    if (!wired) {
+      $("rec-lead").innerHTML = LEADS.map(l => `<option value="${l.m}">${l.l}</option>`).join("");
+      $("rec-add").onclick = guardar; $("rec-title").onkeydown = (e) => { if (e.key === "Enter") guardar(); };
+      $("rec-toggle").onclick = () => $("rec-pasados").classList.toggle("hidden");
+      reset(); wired = true;
+    }
+    pintarGcal();
+    const { data } = await sb.from("reminders").select("*").order("remind_at", { ascending: true });
+    lista = data || [];
+    const ahora = new Date();
+    const prox = lista.filter(r => r.status === "pendiente" && new Date(r.remind_at) >= ahora);
+    const pasados = lista.filter(r => !(r.status === "pendiente" && new Date(r.remind_at) >= ahora)).sort((a, b) => b.remind_at.localeCompare(a.remind_at));
+    const cp = $("rec-prox"); cp.innerHTML = ""; prox.length ? prox.forEach(r => cp.appendChild(fila(r))) : cp.innerHTML = `<div class="empty">Sin recordatorios próximos.</div>`;
+    $("rec-toggle").textContent = `Pasados y hechos (${pasados.length})`;
+    const lp = $("rec-pasados"); lp.innerHTML = ""; pasados.slice(0, 40).forEach(r => lp.appendChild(fila(r)));
+    $("rec-gcal") && null;
+  }
+  return cargar;
+})();
+
+// -------------------- LEVELUP · MAESTROS --------------------
+const cargarLuMaestros = (() => {
+  const gcal = () => window.PRTS_AI && PRTS_AI.gcal;
+  const IDIOMAS = ["Inglés", "Francés", "Alemán", "Italiano", "Portugués"];
+  const FORMATOS = ["grupal", "particular"];
+  let teachers = [], students = [], classes = [], langSel = new Set(), fmtSel = new Set(), editingId = null, wired = false;
+  const openSet = new Set();
+  const hhmm = (t) => (t || "").slice(0, 5);
+  const addMin = (hm, min) => { const [h, m] = hm.split(":").map(Number); const d = new Date(2000, 0, 1, h, m + (+min || 0)); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; };
+
+  function chips() {
+    $("lm-langs").innerHTML = IDIOMAS.map(l => `<button type="button" class="chip ${langSel.has(l) ? "on" : ""}" data-l="${l}">${l}</button>`).join("");
+    $("lm-langs").querySelectorAll(".chip").forEach(b => b.onclick = () => { langSel.has(b.dataset.l) ? langSel.delete(b.dataset.l) : langSel.add(b.dataset.l); chips(); });
+    $("lm-formats").innerHTML = FORMATOS.map(f => `<button type="button" class="chip ${fmtSel.has(f) ? "on" : ""}" data-f="${f}">${f}</button>`).join("");
+    $("lm-formats").querySelectorAll(".chip").forEach(b => b.onclick = () => { fmtSel.has(b.dataset.f) ? fmtSel.delete(b.dataset.f) : fmtSel.add(b.dataset.f); chips(); });
+  }
+  function reset() { editingId = null; $("tab-lu-maestros").querySelector(".panel").classList.remove("editing"); $("lm-name").value = ""; $("lm-notes").value = ""; $("lm-payrate").value = ""; $("lm-paytype").value = "mensual"; langSel = new Set(); fmtSel = new Set(); chips(); $("lm-save").textContent = "Agregar"; }
+  function editar(t) { editingId = t.id; $("tab-lu-maestros").querySelector(".panel").classList.add("editing"); $("lm-name").value = t.name; $("lm-notes").value = t.notes || ""; $("lm-payrate").value = t.pay_rate || ""; $("lm-paytype").value = t.pay_type; langSel = new Set(t.languages || []); fmtSel = new Set(t.formats || []); chips(); $("lm-save").textContent = "Guardar"; $("lm-name").focus(); }
+  async function guardar() {
+    const name = $("lm-name").value.trim(); if (!name) { notaPRTS("Ponle nombre."); return; }
+    const row = { name, languages: [...langSel], formats: [...fmtSel], pay_type: $("lm-paytype").value, pay_rate: parseFloat($("lm-payrate").value) || 0, notes: $("lm-notes").value.trim() || null };
+    $("lm-save").disabled = true;
+    const { error } = editingId ? await sb.from("levelup_teachers").update(row).eq("id", editingId) : await sb.from("levelup_teachers").insert(row);
+    $("lm-save").disabled = false; if (error) { notaPRTS("Error: " + error.message); return; }
+    notaPRTS(editingId ? "Maestro actualizado." : "Maestro agregado."); reset(); cargar();
+  }
+  async function borrarMaestro(t) { if (!confirm(`¿Eliminar al maestro "${t.name}"?`)) return; await sb.from("levelup_teachers").delete().eq("id", t.id); cargar(); }
+
+  async function agregarClase(teacher, form) {
+    const title = form.querySelector(".c-title").value.trim(); if (!title) { notaPRTS("Título de la clase."); return; }
+    const kind = form.dataset.kind || "recurrente", start = form.querySelector(".c-start").value, dur = parseInt(form.querySelector(".c-dur").value) || 60;
+    if (!start) { notaPRTS("Hora de inicio."); return; }
+    const cls = { teacher_id: teacher.id, title, language: form.querySelector(".c-lang").value.trim() || null, level: form.querySelector(".c-level").value.trim() || null,
+      format: form.querySelector(".c-format").value, kind, start_time: start, duration_min: dur,
+      weekday: kind === "recurrente" ? +form.querySelector(".c-weekday").value : null, class_date: kind === "sesion" ? (form.querySelector(".c-date").value || null) : null };
+    if (kind === "sesion" && !cls.class_date) { notaPRTS("Fecha de la sesión."); return; }
+    let wb = null;
+    if (kind === "recurrente") { const r = await sb.from("week_blocks").insert({ weekday: cls.weekday, start_time: start, end_time: addMin(start, dur), role: "levelup", label: title }).select("id").single(); if (!r.error) wb = r.data.id; }
+    const gid = gcal() && await gcal().createClass(cls);
+    const ins = await sb.from("levelup_classes").insert({ ...cls, week_block_id: wb, google_event_id: gid }).select("id").single();
+    if (ins.error) { notaPRTS("Error: " + ins.error.message); return; }
+    const ids = [...form.querySelectorAll(".roster input:checked")].map(i => i.value);
+    if (ids.length) await sb.from("levelup_class_students").insert(ids.map(sid => ({ class_id: ins.data.id, student_id: sid })));
+    notaPRTS(gid ? "Clase creada (Semana + Calendar)." : "Clase creada (Semana)."); cargar();
+  }
+  async function borrarClase(c) { if (!confirm(`¿Eliminar la clase "${c.title}"?`)) return; if (c.week_block_id) await sb.from("week_blocks").delete().eq("id", c.week_block_id); if (c.google_event_id && gcal()) await gcal().deleteEvent(c.google_event_id); await sb.from("levelup_classes").delete().eq("id", c.id); notaPRTS("Clase eliminada."); cargar(); }
+
+  function classForm(teacher) {
+    const opts = LU_DIAS.map((d, i) => `<option value="${i}">${d}</option>`).join("");
+    const mis = students.filter(s => s.teacher_id === teacher.id);
+    const roster = mis.length ? mis.map(s => `<label><input type="checkbox" value="${s.id}">${escv(s.name)}</label>`).join("") : `<span class="empty">Sin alumnos (asígnalos en Alumnos).</span>`;
+    return `<div class="cl-form" data-kind="recurrente" style="margin-top:8px">
+      <div class="chips" style="margin-bottom:8px"><button type="button" class="chip on k-rec">Recurrente</button><button type="button" class="chip k-ses">Sesión</button></div>
+      <input class="c-title f-in" placeholder="Título (ej. Inglés B1 — grupo)" style="width:100%">
+      <div class="form-2" style="margin-top:8px"><input class="c-lang f-in" placeholder="Idioma"><input class="c-level f-in" placeholder="Nivel/tema"></div>
+      <div class="form-3" style="margin-top:8px"><select class="c-format f-sel"><option value="grupal">Grupal</option><option value="particular">Particular</option></select><select class="c-weekday f-sel">${opts}</select><input class="c-date f-in hidden" type="date"></div>
+      <div class="form-2" style="margin-top:8px"><input class="c-start f-in" type="time" value="19:00"><input class="c-dur f-in" type="number" min="15" step="15" value="60" title="Duración (min)"></div>
+      <div class="lu-sub">Alumnos en la clase</div><div class="roster">${roster}</div>
+      <button type="button" class="f-btn c-save" style="width:100%;margin-top:10px">Crear clase</button></div>`;
+  }
+  function render() {
+    $("lm-resumen").textContent = `${teachers.length} maestro${teachers.length === 1 ? "" : "s"}`;
+    const cont = $("lm-lista"); cont.innerHTML = "";
+    if (!teachers.length) { cont.innerHTML = `<div class="panel empty">Sin maestros todavía.</div>`; return; }
+    teachers.forEach(t => {
+      const cls = classes.filter(c => c.teacher_id === t.id), als = students.filter(s => s.teacher_id === t.id);
+      const sueldo = t.pay_type === "mensual" ? `${moneyR(t.pay_rate)}/mes` : `${moneyR(t.pay_rate)}/h`;
+      const card = document.createElement("div"); card.className = "panel lcard" + (openSet.has(t.id) ? " open" : "");
+      card.innerHTML = `<div class="lc-head"><div><div class="lc-name">${escv(t.name)}</div>
+        <div class="lc-meta"><span>${(t.languages||[]).join(", ") || "sin idiomas"}</span><span>${(t.formats||[]).join("·") || "—"}</span><span>${sueldo}</span></div>
+        <div class="lc-meta"><span>${als.length} alumno${als.length===1?"":"s"}</span><span>${cls.length} clase${cls.length===1?"":"s"}</span></div></div>
+        <div class="acts"><button class="ed">✎</button><button class="rm">✕</button></div></div>
+        <div class="lc-detail">${t.notes ? `<div class="muted" style="font-size:0.84rem;margin-bottom:8px">${escv(t.notes)}</div>` : ""}
+          <div class="lu-sub">Clases</div><div class="cl-list"></div><button class="ghost-wide toggle-cf" style="margin-top:8px">+ agregar clase</button><div class="cf-wrap hidden"></div>
+          <div class="lu-sub">Alumnos</div><div class="als"></div></div>`;
+      const cl = card.querySelector(".cl-list");
+      cl.innerHTML = cls.length ? cls.map(c => { const cu = c.kind === "recurrente" ? `${LU_DIAS3[c.weekday]} ${hhmm(c.start_time)}` : `${c.class_date} ${hhmm(c.start_time)}`;
+        return `<div class="ln"><div class="cuerpo"><div class="nm">${escv(c.title)}</div><div class="sb">${cu} · ${c.duration_min}min · ${c.format}${c.kind==="recurrente"?" · semanal":""} · <span class="${c.google_event_id?"sync":"nosync"}">${c.google_event_id?"● Calendar":"○ solo PRTS"}</span></div></div><div class="acts"><button class="rm" data-cid="${c.id}">✕</button></div></div>`; }).join("") : `<div class="empty">Sin clases.</div>`;
+      cl.querySelectorAll("[data-cid]").forEach(b => b.onclick = () => borrarClase(cls.find(c => c.id === b.dataset.cid)));
+      card.querySelector(".als").innerHTML = als.length ? als.map(s => `<div class="ln"><div class="cuerpo"><div class="nm">${escv(s.name)}</div><div class="sb">${escv(s.language||"")} ${escv(s.level||"")} · ${s.hours_per_week||0} h/sem</div></div></div>`).join("") : `<div class="empty">Sin alumnos asignados.</div>`;
+      card.querySelector(".lc-head").onclick = (e) => { if (e.target.closest(".acts")) return; openSet.has(t.id) ? openSet.delete(t.id) : openSet.add(t.id); card.classList.toggle("open"); };
+      card.querySelector(".ed").onclick = (e) => { e.stopPropagation(); editar(t); };
+      card.querySelector(".rm").onclick = (e) => { e.stopPropagation(); borrarMaestro(t); };
+      const wrap = card.querySelector(".cf-wrap");
+      card.querySelector(".toggle-cf").onclick = () => {
+        wrap.classList.toggle("hidden");
+        if (!wrap.dataset.built) { wrap.innerHTML = classForm(t); wrap.dataset.built = "1"; const form = wrap.querySelector(".cl-form");
+          form.querySelector(".k-rec").onclick = () => { form.dataset.kind = "recurrente"; form.querySelector(".k-rec").classList.add("on"); form.querySelector(".k-ses").classList.remove("on"); form.querySelector(".c-weekday").classList.remove("hidden"); form.querySelector(".c-date").classList.add("hidden"); };
+          form.querySelector(".k-ses").onclick = () => { form.dataset.kind = "sesion"; form.querySelector(".k-ses").classList.add("on"); form.querySelector(".k-rec").classList.remove("on"); form.querySelector(".c-weekday").classList.add("hidden"); form.querySelector(".c-date").classList.remove("hidden"); };
+          form.querySelector(".c-save").onclick = () => agregarClase(t, form); }
+      };
+      cont.appendChild(card);
+    });
+  }
+  async function cargar() {
+    if (!wired) { chips(); reset(); $("lm-save").onclick = guardar; $("lm-cancel").onclick = (e) => { e.preventDefault(); reset(); }; wired = true; }
+    const [tt, ss, cc] = await Promise.all([sb.from("levelup_teachers").select("*").order("name"), sb.from("levelup_students").select("*").order("name"), sb.from("levelup_classes").select("*").order("start_time")]);
+    teachers = tt.data || []; students = ss.data || []; classes = cc.data || []; render();
+  }
+  return cargar;
+})();
+
+// -------------------- LEVELUP · ALUMNOS --------------------
+const cargarLuAlumnos = (() => {
+  let teachers = [], students = [], pagos = [], curMonth = "", filtro = "todos", editingId = null, wired = false;
+  const openSet = new Set();
+  const tName = (id) => { const t = teachers.find(x => x.id === id); return t ? t.name : "Sin maestro"; };
+  function pagoDe(sid) { return pagos.find(p => p.student_id === sid && p.period === curMonth); }
+  function estado(s) { const p = pagoDe(s.id), due = p ? +p.amount_due : +s.monthly_fee, paid = p ? +p.amount_paid : 0; return { p, due, paid, falta: Math.max(0, due - paid), e: paid <= 0 ? "pendiente" : paid >= due ? "pagado" : "parcial" }; }
+
+  function teacherSel() { $("la-teacher").innerHTML = `<option value="">Sin maestro</option>` + teachers.map(t => `<option value="${t.id}">${escv(t.name)}</option>`).join(""); }
+  function reset() { editingId = null; $("tab-lu-alumnos").querySelector(".panel").classList.remove("editing"); ["la-name","la-lang","la-level","la-hours","la-fee","la-notes"].forEach(id => $(id).value = ""); $("la-teacher").value = ""; $("la-save").textContent = "Agregar"; }
+  function editar(s) { editingId = s.id; $("tab-lu-alumnos").querySelector(".panel").classList.add("editing"); $("la-name").value = s.name; $("la-lang").value = s.language || ""; $("la-level").value = s.level || ""; $("la-hours").value = s.hours_per_week || ""; $("la-fee").value = s.monthly_fee || ""; $("la-teacher").value = s.teacher_id || ""; $("la-notes").value = s.notes || ""; $("la-save").textContent = "Guardar"; $("la-name").focus(); }
+  async function guardar() {
+    const name = $("la-name").value.trim(); if (!name) { notaPRTS("Ponle nombre."); return; }
+    const row = { name, language: $("la-lang").value.trim() || null, level: $("la-level").value.trim() || null, hours_per_week: parseFloat($("la-hours").value) || 0, monthly_fee: parseFloat($("la-fee").value) || 0, teacher_id: $("la-teacher").value || null, notes: $("la-notes").value.trim() || null };
+    $("la-save").disabled = true;
+    const { error } = editingId ? await sb.from("levelup_students").update(row).eq("id", editingId) : await sb.from("levelup_students").insert(row);
+    $("la-save").disabled = false; if (error) { notaPRTS("Error: " + error.message); return; }
+    notaPRTS(editingId ? "Alumno actualizado." : "Alumno agregado."); reset(); cargar();
+  }
+  async function borrar(s) { if (!confirm(`¿Eliminar al alumno "${s.name}"?`)) return; await sb.from("levelup_students").delete().eq("id", s.id); cargar(); }
+  async function registrarPago(s, monto, fecha) {
+    const ex = pagoDe(s.id), paid = (ex ? +ex.amount_paid : 0) + (+monto || 0);
+    const { error } = await sb.from("levelup_payments").upsert({ student_id: s.id, period: curMonth, amount_due: ex ? +ex.amount_due : (+s.monthly_fee || 0), amount_paid: paid, paid_at: fecha || hoyStr() }, { onConflict: "user_id,student_id,period" });
+    if (error) { notaPRTS("Error: " + error.message); return; } notaPRTS("Pago registrado."); cargar();
+  }
+  function filtros() {
+    const items = [{ id: "todos", name: "Todos" }, ...teachers, { id: "none", name: "Sin maestro" }];
+    $("la-filtros").innerHTML = items.map(t => `<button class="chip ${filtro === t.id ? "on" : ""}" data-f="${t.id}">${escv(t.name)}</button>`).join("");
+    $("la-filtros").querySelectorAll(".chip").forEach(b => b.onclick = () => { filtro = b.dataset.f; filtros(); render(); });
+  }
+  function card(s) {
+    const { p, due, paid, falta, e } = estado(s);
+    const d = document.createElement("div"); d.className = "panel lcard" + (openSet.has(s.id) ? " open" : "");
+    d.innerHTML = `<div class="lc-head"><div><div class="lc-name">${escv(s.name)}</div><div class="lc-meta"><span>${escv(s.language||"")} ${escv(s.level||"")}</span><span>${s.hours_per_week||0} h/sem</span><span>${money(s.monthly_fee)}/mes</span></div></div>
+      <div style="text-align:right"><div class="pay ${e}">${e==="pagado"?"Pagado":e==="parcial"?"Falta "+money(falta):"Pendiente"}</div><div class="acts"><button class="ed">✎</button><button class="rm">✕</button></div></div></div>
+      <div class="lc-detail"><div class="lu-sub">Pago de ${LU_MESES[+curMonth.slice(5)-1]} ${curMonth.slice(0,4)}</div>
+      <div class="muted" style="font-size:0.85rem">Cobro ${money(due)} · pagado ${money(paid)}${falta>0?` · falta <b style="color:var(--red)">${money(falta)}</b>`:""}${p&&p.paid_at?` · último ${p.paid_at}`:""}</div>
+      <div class="form-3" style="grid-template-columns:1fr 1fr auto;margin-top:10px"><input class="p-monto f-in" type="number" min="0" step="0.01" placeholder="$ monto" value="${falta>0?falta:""}"><input class="p-fecha f-in" type="date" value="${hoyStr()}"><button class="f-btn p-save">Registrar</button></div>
+      <div class="lu-sub">Historial</div><div class="p-hist"></div></div>`;
+    d.querySelector(".lc-head").onclick = (ev) => { if (ev.target.closest(".acts")) return; openSet.has(s.id) ? openSet.delete(s.id) : openSet.add(s.id); d.classList.toggle("open"); };
+    d.querySelector(".ed").onclick = (ev) => { ev.stopPropagation(); editar(s); };
+    d.querySelector(".rm").onclick = (ev) => { ev.stopPropagation(); borrar(s); };
+    d.querySelector(".p-save").onclick = () => registrarPago(s, d.querySelector(".p-monto").value, d.querySelector(".p-fecha").value);
+    const hist = pagos.filter(x => x.student_id === s.id).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 12);
+    d.querySelector(".p-hist").innerHTML = hist.length ? hist.map(x => `<div class="ln"><div class="cuerpo"><div class="sb">${x.period} · ${money(x.amount_paid)} / ${money(x.amount_due)}${x.paid_at?" · "+x.paid_at:""}</div></div></div>`).join("") : `<div class="empty">Sin pagos.</div>`;
+    return d;
+  }
+  function render() {
+    $("la-month").textContent = `${LU_MESES[+curMonth.slice(5)-1]} ${curMonth.slice(0,4)}`;
+    $("la-next").disabled = curMonth >= mesActual();
+    const cont = $("la-lista"); cont.innerHTML = "";
+    let lista = students.slice();
+    if (filtro === "none") lista = lista.filter(s => !s.teacher_id); else if (filtro !== "todos") lista = lista.filter(s => s.teacher_id === filtro);
+    if (!lista.length) { cont.innerHTML = `<div class="panel empty">Sin alumnos${filtro !== "todos" ? " para este filtro" : ""}.</div>`; return; }
+    const grupos = {}; lista.forEach(s => { (grupos[s.teacher_id || "none"] = grupos[s.teacher_id || "none"] || []).push(s); });
+    [...teachers.map(t => t.id), "none"].filter(id => grupos[id]).forEach(tid => {
+      const h = document.createElement("div"); h.className = "lu-group"; h.innerHTML = `<span class="dot"></span>${escv(tid === "none" ? "Sin maestro" : tName(tid))} · ${grupos[tid].length}`; cont.appendChild(h);
+      grupos[tid].forEach(s => cont.appendChild(card(s)));
+    });
+  }
+  function shift(d) { const x = new Date(curMonth + "-01T12:00:00"); x.setMonth(x.getMonth() + d); const nm = x.toISOString().slice(0, 7); if (nm > mesActual()) return; curMonth = nm; render(); }
+  async function cargar() {
+    if (!wired) { curMonth = mesActual(); $("la-save").onclick = guardar; $("la-cancel").onclick = (e) => { e.preventDefault(); reset(); }; $("la-prev").onclick = () => shift(-1); $("la-next").onclick = () => shift(1); wired = true; }
+    const [tt, ss, pp] = await Promise.all([sb.from("levelup_teachers").select("*").order("name"), sb.from("levelup_students").select("*").order("name"), sb.from("levelup_payments").select("*")]);
+    teachers = tt.data || []; students = ss.data || []; pagos = pp.data || []; teacherSel(); filtros(); render();
+  }
+  return cargar;
+})();
+
+// -------------------- LEVELUP · ADMINISTRACIÓN --------------------
+const cargarLuAdmin = (() => {
+  const SEM = 4.33, CATS = ["Clases muestra", "Marketing", "Materiales/Libros", "Productos visuales", "Renta", "Otros"];
+  const COLS = ["#D98AA0", "#D2A547", "#5FB97E", "#B49FD9", "#D87070", "#6FB5AE", "#C7A26F", "#7A6F78"];
+  let teachers = [], students = [], classes = [], pagos = [], expenses = [], curMonth = "", catSel = CATS[0], wired = false, chMS = null, chCat = null;
+  const pagoMes = (s) => { const p = pagos.find(x => x.student_id === s.id && x.period === curMonth); return { due: p ? +p.amount_due : +s.monthly_fee, paid: p ? +p.amount_paid : 0 }; };
+  const horas = (tid) => classes.filter(c => c.teacher_id === tid && c.kind === "recurrente").reduce((a, c) => a + (c.duration_min || 0) / 60, 0);
+  const sueldo = (t) => t.pay_type === "mensual" ? (+t.pay_rate || 0) : (+t.pay_rate || 0) * horas(t.id) * SEM;
+  const mesExpenses = () => expenses.filter(e => (e.entry_date || "").slice(0, 7) === curMonth);
+
+  function chipsCat() { $("ad-gcats").innerHTML = CATS.map(c => `<button class="chip ${c === catSel ? "on" : ""}" data-c="${c}">${c}</button>`).join(""); $("ad-gcats").querySelectorAll(".chip").forEach(b => b.onclick = () => { catSel = b.dataset.c; chipsCat(); }); }
+  async function addGasto() {
+    const amount = parseFloat($("ad-gamount").value); if (!(amount > 0)) { notaPRTS("Monto válido."); return; }
+    const { error } = await sb.from("levelup_expenses").insert({ entry_date: $("ad-gdate").value || hoyStr(), category: catSel, concept: $("ad-gconcept").value.trim() || null, amount });
+    if (error) { notaPRTS("Error: " + error.message); return; } $("ad-gconcept").value = ""; $("ad-gamount").value = ""; notaPRTS("Gasto registrado."); cargar();
+  }
+  async function delGasto(id) { await sb.from("levelup_expenses").delete().eq("id", id); cargar(); }
+
+  function render() {
+    $("ad-month").textContent = `${LU_MESES[+curMonth.slice(5)-1]} ${curMonth.slice(0,4)}`;
+    $("ad-next").disabled = curMonth >= mesActual();
+    const activos = students.filter(s => s.status !== "inactivo");
+    let totIng = 0, totSal = 0;
+    const porT = teachers.map(t => { const als = activos.filter(s => s.teacher_id === t.id); const ing = als.reduce((a, s) => a + pagoMes(s).paid, 0); const sal = sueldo(t); totIng += ing; totSal += sal; return { t, nAl: als.length, nCl: classes.filter(c => c.teacher_id === t.id).length, ing, sal }; });
+    totIng += activos.filter(s => !s.teacher_id).reduce((a, s) => a + pagoMes(s).paid, 0);
+    const gExp = mesExpenses(); const totExp = gExp.reduce((a, e) => a + +e.amount, 0); const totGas = totSal + totExp;
+    const totDue = activos.reduce((a, s) => a + pagoMes(s).due, 0);
+
+    $("ad-ing").textContent = moneyR(totIng); $("ad-ing-s").textContent = `de ${moneyR(totDue)} esperado`;
+    $("ad-gas").textContent = moneyR(totGas); $("ad-gas-s").textContent = `sueldos ${moneyR(totSal)} + op. ${moneyR(totExp)}`;
+    $("ad-net").textContent = moneyR(totIng - totGas); $("ad-net").className = "v " + (totIng - totGas >= 0 ? "pos" : "neg");
+    $("ad-gas-total").textContent = moneyR(totExp);
+
+    const filas = porT.filter(x => x.nAl || x.nCl);
+    $("ad-maestros").innerHTML = filas.length ? filas.map(x => `<div class="ln"><div class="cuerpo"><div class="nm">${escv(x.t.name)}</div><div class="sb">${x.nAl} alumno${x.nAl===1?"":"s"} · ${x.nCl} clase${x.nCl===1?"":"s"} · ${horas(x.t.id)} h/sem</div></div><div class="montos" style="text-align:right;font-family:'JetBrains Mono',monospace;font-size:0.62rem"><span style="color:var(--green)">+${moneyR(x.ing)}</span> · <span style="color:var(--red)">−${moneyR(x.sal)}</span></div></div>`).join("") : `<div class="empty">Sin actividad.</div>`;
+
+    // chart ingresos vs sueldos por maestro
+    const labels = filas.map(x => x.t.name);
+    if (chMS) chMS.destroy();
+    chMS = new Chart($("ad-chart-ms"), { type: "bar", data: { labels: labels.length ? labels : ["—"], datasets: [
+      { label: "Ingresos", data: filas.map(x => x.ing), backgroundColor: "rgba(95,185,126,0.8)", borderRadius: 4 },
+      { label: "Sueldo", data: filas.map(x => x.sal), backgroundColor: "rgba(216,112,112,0.8)", borderRadius: 4 }] },
+      options: { plugins: { legend: { labels: { color: "#968D94", boxWidth: 12, boxHeight: 8, usePointStyle: true } }, tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${moneyR(c.raw)}` } } }, scales: { x: { grid: { display: false } }, y: { grid: { color: "#2A2529" }, ticks: { callback: (v) => moneyR(v) } } } } });
+
+    // chart gastos por categoría (sueldos + categorías de operación)
+    const catData = {}; if (totSal > 0) catData["Sueldos"] = totSal; gExp.forEach(e => catData[e.category] = (catData[e.category] || 0) + +e.amount);
+    const cats = Object.keys(catData), vals = cats.map(c => catData[c]), cols = cats.map((_, i) => COLS[i % COLS.length]);
+    if (chCat) chCat.destroy();
+    chCat = new Chart($("ad-chart-cat"), { type: "doughnut", data: { labels: cats.length ? cats : ["Sin gastos"], datasets: [{ data: vals.length ? vals : [1], backgroundColor: cols.length ? cols : ["#2E3140"], borderColor: "#161416", borderWidth: 2 }] }, options: { cutout: "62%", plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.label}: ${moneyR(c.raw)}` } } } } });
+    const tot = vals.reduce((a, b) => a + b, 0) || 1;
+    $("ad-cat-leg").innerHTML = cats.length ? cats.map((c, i) => `<span><i style="background:${cols[i]}"></i>${escv(c)} · ${Math.round(catData[c]/tot*100)}%</span>`).join("") : `<span class="empty">Sin gastos este mes.</span>`;
+
+    // pendientes
+    const pend = activos.map(s => ({ s, ...pagoMes(s) })).map(x => ({ ...x, falta: Math.max(0, x.due - x.paid) })).filter(x => x.falta > 0).sort((a, b) => b.falta - a.falta);
+    $("ad-pend").innerHTML = pend.length ? pend.map(x => `<div class="ln"><div class="cuerpo"><div class="nm">${escv(x.s.name)}</div><div class="sb">${escv(x.s.teacher_id ? (teachers.find(t=>t.id===x.s.teacher_id)||{}).name || "" : "sin maestro")}</div></div><div class="pay pendiente">${moneyR(x.falta)}</div></div>`).join("") : `<div class="empty">Todos al corriente. 🎉</div>`;
+
+    // lista de gastos
+    $("ad-glista").innerHTML = gExp.length ? [...gExp].sort((a, b) => (b.entry_date||"").localeCompare(a.entry_date||"")).map(e => `<div class="ln"><div class="cuerpo"><div class="nm">${escv(e.category)}${e.concept?` · ${escv(e.concept)}`:""}</div><div class="sb">${e.entry_date}</div></div><div class="pay" style="color:var(--red)">−${moneyR(e.amount)}</div><div class="acts"><button class="rm" data-eid="${e.id}">✕</button></div></div>`).join("") : `<div class="empty">Sin gastos de operación este mes.</div>`;
+    $("ad-glista").querySelectorAll("[data-eid]").forEach(b => b.onclick = () => delGasto(b.dataset.eid));
+  }
+  function shift(d) { const x = new Date(curMonth + "-01T12:00:00"); x.setMonth(x.getMonth() + d); const nm = x.toISOString().slice(0, 7); if (nm > mesActual()) return; curMonth = nm; render(); }
+  async function cargar() {
+    if (!wired) {
+      curMonth = mesActual(); $("ad-gdate").value = hoyStr(); chipsCat();
+      $("ad-gadd").onclick = addGasto; $("ad-prev").onclick = () => shift(-1); $("ad-next").onclick = () => shift(1);
+      if (window.Chart) { Chart.defaults.color = "#968D94"; Chart.defaults.borderColor = "#2A2529"; Chart.defaults.font.family = "'JetBrains Mono', monospace"; Chart.defaults.font.size = 10; }
+      wired = true;
+    }
+    const [tt, ss, cc, pp, ee] = await Promise.all([sb.from("levelup_teachers").select("*").order("name"), sb.from("levelup_students").select("*"), sb.from("levelup_classes").select("*"), sb.from("levelup_payments").select("*"), sb.from("levelup_expenses").select("*")]);
+    teachers = tt.data || []; students = ss.data || []; classes = cc.data || []; pagos = pp.data || []; expenses = ee.data || []; render();
+  }
+  return cargar;
+})();
 
 // ---------- ARRANQUE ----------
 async function init() {

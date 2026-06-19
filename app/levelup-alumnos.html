@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · LevelUp · Alumnos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  .sep { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 12px 0 8px; }
+  .row2 { display: flex; gap: 8px; } .row2 > * { flex: 1; min-width: 0; }
+  .filtros { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; margin: 14px -16px 0; padding: 2px 16px 4px; }
+  .filtros::-webkit-scrollbar { display: none; }
+  .chip { flex: 0 0 auto; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; font-size: 0.82rem; color: var(--muted); cursor: pointer; white-space: nowrap; }
+  .chip.on { border-color: var(--accent-deep); color: var(--text); background: var(--accent-soft); }
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  .month-nav .mlabel { font-family: var(--serif); font-size: 18px; text-transform: capitalize; }
+  .month-nav button { width: 36px; height: 36px; padding: 0; font-size: 17px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); border-radius: 9px; }
+  .month-nav button:disabled { opacity: .35; }
+  .grupo { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); margin: 20px 2px 4px; display: flex; gap: 8px; align-items: center; }
+  .grupo .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .a-card .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; cursor: pointer; }
+  .a-card .nombre { font-family: var(--serif); font-size: 1.1rem; }
+  .a-card .meta { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 3px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .pay { font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .pay.pagado { color: var(--ok); } .pay.parcial { color: var(--warn); } .pay.pendiente { color: var(--danger); }
+  .a-card .detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .a-card.open .detail { display: block; }
+  .mini { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 10px 0 6px; }
+  .acts { display: flex; gap: 2px; } .acts button { background: transparent; border: none; color: var(--faint); padding: 4px 6px; font-size: 0.9rem; cursor: pointer; }
+  .empty { color: var(--faint); font-size: 0.88rem; padding: 8px 0; }
+  .editing-banner { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); margin-bottom: 8px; display: none; }
+  .editing .editing-banner { display: block; }
+  .pago-hist { font-family: var(--mono); font-size: 10.5px; color: var(--muted); display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid var(--line); }
+</style>
+</head>
+<body>
+
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">LevelUp · Alumnos</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<div id="view-app" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· LevelUp</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+  <h1 class="page-title">Alumnos</h1>
+  <div class="mono-label page-sub">Por maestro · cobro mensual</div>
+
+  <!-- Alta / edición de alumno -->
+  <div class="card" id="form-card">
+    <div class="editing-banner">Editando alumno · <a href="#" id="cancel-edit" style="color:var(--accent)">cancelar</a></div>
+    <input type="text" id="a-name" placeholder="Nombre del alumno" autocomplete="off" style="width:100%">
+    <div class="row2" style="margin-top:8px"><input type="text" id="a-lang" placeholder="Idioma"><input type="text" id="a-level" placeholder="Nivel"></div>
+    <div class="row2" style="margin-top:8px">
+      <input type="number" id="a-hours" inputmode="decimal" step="0.5" min="0" placeholder="Horas/semana">
+      <input type="number" id="a-fee" inputmode="decimal" step="0.01" min="0" placeholder="$ cobro mensual">
+    </div>
+    <select id="a-teacher" style="width:100%;margin-top:8px"></select>
+    <input type="text" id="a-notes" placeholder="Notas (opcional)" style="width:100%;margin-top:8px">
+    <button class="btn-primary w100" id="a-save">Agregar alumno</button>
+  </div>
+
+  <!-- Mes de cobro -->
+  <div class="month-nav">
+    <button id="m-prev">‹</button><div class="mlabel" id="m-label">—</div><button id="m-next">›</button>
+  </div>
+  <!-- Filtro por maestro -->
+  <div class="filtros" id="filtros"></div>
+
+  <div id="lista-alumnos"></div>
+</div>
+
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Inicio</span></a>
+    <a class="nav-item" href="levelup-maestros.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M21 8v6M7 11v4c0 1 2.5 3 5 3s5-2 5-3v-4"/></svg><span>Maestros</span></a>
+    <a class="nav-item on" href="levelup-alumnos.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 7a3 3 0 0 1 0 6M21 20c0-2.5-1.3-4.2-3.5-4.8"/></svg><span>Alumnos</span></a>
+    <a class="nav-item" href="levelup-admin.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/></svg><span>Admin</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s || "").replace(/</g, "&lt;");
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+let teachers = [], students = [], pagos = [];
+let curMonth = "", filtro = "todos", editingId = null;
+const openSet = new Set();
+
+function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("show"); setTimeout(() => e.classList.remove("show"), 1900); }
+function hoyMX() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); }
+function thisMonth() { return hoyMX().slice(0, 7); }
+function money(n) { return "$" + (+n || 0).toLocaleString("es-MX", { maximumFractionDigits: 2 }); }
+function nombreMaestro(id) { const t = teachers.find(x => x.id === id); return t ? t.name : "Sin maestro"; }
+
+$("btn-login").onclick = async () => { const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value }); if (error) $("msg").textContent = error.message; else init(); };
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- FORM ALUMNO ----------
+function pintarTeacherSelect() {
+  $("a-teacher").innerHTML = `<option value="">Sin maestro</option>` + teachers.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join("");
+}
+function resetForm() {
+  editingId = null; $("form-card").classList.remove("editing");
+  ["a-name","a-lang","a-level","a-hours","a-fee","a-notes"].forEach(id => $(id).value = "");
+  $("a-teacher").value = ""; $("a-save").textContent = "Agregar alumno";
+}
+function editAlumno(s) {
+  editingId = s.id; $("form-card").classList.add("editing");
+  $("a-name").value = s.name; $("a-lang").value = s.language || ""; $("a-level").value = s.level || "";
+  $("a-hours").value = s.hours_per_week || ""; $("a-fee").value = s.monthly_fee || "";
+  $("a-teacher").value = s.teacher_id || ""; $("a-notes").value = s.notes || "";
+  $("a-save").textContent = "Guardar cambios";
+  $("form-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+async function guardarAlumno() {
+  const name = $("a-name").value.trim();
+  if (!name) { toast("Ponle nombre"); return; }
+  const row = { name, language: $("a-lang").value.trim() || null, level: $("a-level").value.trim() || null,
+    hours_per_week: parseFloat($("a-hours").value) || 0, monthly_fee: parseFloat($("a-fee").value) || 0,
+    teacher_id: $("a-teacher").value || null, notes: $("a-notes").value.trim() || null };
+  $("a-save").disabled = true;
+  const { error } = editingId ? await sb.from("levelup_students").update(row).eq("id", editingId)
+                              : await sb.from("levelup_students").insert(row);
+  $("a-save").disabled = false;
+  if (error) { toast("Error: " + error.message); return; }
+  toast(editingId ? "Alumno actualizado" : "Alumno agregado");
+  resetForm(); cargar();
+}
+async function borrarAlumno(s) {
+  if (!confirm(`¿Eliminar al alumno "${s.name}"? Se borran también sus pagos.`)) return;
+  await sb.from("levelup_students").delete().eq("id", s.id);
+  cargar();
+}
+
+// ---------- PAGOS ----------
+function pagoDe(studentId) { return pagos.find(p => p.student_id === studentId && p.period === curMonth); }
+function estadoPago(s) {
+  const p = pagoDe(s.id);
+  const due = p ? +p.amount_due : +s.monthly_fee;
+  const paid = p ? +p.amount_paid : 0;
+  const falta = Math.max(0, due - paid);
+  const estado = paid <= 0 ? "pendiente" : paid >= due ? "pagado" : "parcial";
+  return { p, due, paid, falta, estado };
+}
+async function registrarPago(s, monto, fecha) {
+  const { due } = estadoPago(s);
+  const existing = pagoDe(s.id);
+  const paid = (existing ? +existing.amount_paid : 0) + (+monto || 0);
+  const row = { student_id: s.id, period: curMonth, amount_due: existing ? +existing.amount_due : (+s.monthly_fee || 0), amount_paid: paid, paid_at: fecha || hoyMX() };
+  const { error } = await sb.from("levelup_payments").upsert(row, { onConflict: "user_id,student_id,period" });
+  if (error) { toast("Error: " + error.message); return; }
+  toast("Pago registrado");
+  cargar();
+}
+
+// ---------- RENDER ----------
+function pintarFiltros() {
+  const items = [{ id: "todos", name: "Todos" }, ...teachers, { id: "none", name: "Sin maestro" }];
+  $("filtros").innerHTML = items.map(t => `<button class="chip ${filtro === t.id ? "on" : ""}" data-f="${t.id}">${esc(t.name)}</button>`).join("");
+  $("filtros").querySelectorAll(".chip").forEach(b => b.onclick = () => { filtro = b.dataset.f; pintarFiltros(); render(); });
+}
+function cardAlumno(s) {
+  const { due, paid, falta, estado } = estadoPago(s);
+  const p = pagoDe(s.id);
+  const card = document.createElement("div");
+  card.className = "card a-card" + (openSet.has(s.id) ? " open" : "");
+  card.innerHTML = `
+    <div class="head">
+      <div><div class="nombre">${esc(s.name)}</div>
+        <div class="meta"><span>${esc(s.language||"")} ${esc(s.level||"")}</span><span>${s.hours_per_week||0} h/sem</span><span>${money(s.monthly_fee)}/mes</span></div></div>
+      <div style="text-align:right">
+        <div class="pay ${estado}">${estado === "pagado" ? "Pagado" : estado === "parcial" ? "Falta " + money(falta) : "Pendiente"}</div>
+        <div class="acts"><button class="edit" title="Editar">✎</button><button class="del" title="Eliminar">✕</button></div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="mini">Pago de ${MESES[+curMonth.slice(5)-1]} ${curMonth.slice(0,4)}</div>
+      <div class="muted" style="font-size:0.85rem">Cobro ${money(due)} · pagado ${money(paid)}${falta>0?` · falta <b style="color:var(--danger)">${money(falta)}</b>`:""}${p&&p.paid_at?` · último pago ${p.paid_at}`:""}</div>
+      <div class="row2" style="margin-top:10px">
+        <input class="p-monto" type="number" inputmode="decimal" step="0.01" min="0" placeholder="$ monto" value="${falta>0?falta:""}">
+        <input class="p-fecha" type="date" value="${hoyMX()}">
+      </div>
+      <button class="btn-primary w100 p-save">Registrar pago</button>
+      <div class="mini">Historial</div>
+      <div class="p-hist"></div>
+    </div>`;
+  card.querySelector(".head").onclick = (e) => { if (e.target.closest(".acts")) return; openSet.has(s.id) ? openSet.delete(s.id) : openSet.add(s.id); card.classList.toggle("open"); };
+  card.querySelector(".edit").onclick = (e) => { e.stopPropagation(); editAlumno(s); };
+  card.querySelector(".del").onclick = (e) => { e.stopPropagation(); borrarAlumno(s); };
+  card.querySelector(".p-save").onclick = () => registrarPago(s, card.querySelector(".p-monto").value, card.querySelector(".p-fecha").value);
+  const hist = pagos.filter(x => x.student_id === s.id).sort((a, b) => b.period.localeCompare(a.period)).slice(0, 12);
+  card.querySelector(".p-hist").innerHTML = hist.length
+    ? hist.map(x => `<div class="pago-hist"><span>${x.period}</span><span>${money(x.amount_paid)} / ${money(x.amount_due)}${x.paid_at?" · "+x.paid_at:""}</span></div>`).join("")
+    : `<div class="empty">Sin pagos registrados.</div>`;
+  return card;
+}
+function render() {
+  $("m-label").textContent = `${MESES[+curMonth.slice(5)-1]} ${curMonth.slice(0,4)}`;
+  $("m-next").disabled = curMonth >= thisMonth();
+  const cont = $("lista-alumnos"); cont.innerHTML = "";
+  let lista = students.slice();
+  if (filtro === "none") lista = lista.filter(s => !s.teacher_id);
+  else if (filtro !== "todos") lista = lista.filter(s => s.teacher_id === filtro);
+  if (!lista.length) { cont.innerHTML = `<div class="card empty">Sin alumnos${filtro!=="todos"?" para este filtro":""}.</div>`; return; }
+  // agrupar por maestro
+  const grupos = {};
+  lista.forEach(s => { (grupos[s.teacher_id || "none"] = grupos[s.teacher_id || "none"] || []).push(s); });
+  const orden = [...teachers.map(t => t.id), "none"].filter(id => grupos[id]);
+  orden.forEach(tid => {
+    const h = document.createElement("div"); h.className = "grupo";
+    h.innerHTML = `<span class="dot"></span>${esc(tid === "none" ? "Sin maestro" : nombreMaestro(tid))} · ${grupos[tid].length}`;
+    cont.appendChild(h);
+    grupos[tid].forEach(s => cont.appendChild(cardAlumno(s)));
+  });
+}
+
+function shiftMonth(d) {
+  const x = new Date(curMonth + "-01T12:00:00"); x.setMonth(x.getMonth() + d);
+  const nm = x.toISOString().slice(0, 7);
+  if (nm > thisMonth()) return;
+  curMonth = nm; render();
+}
+
+async function cargar() {
+  const [tt, ss, pp] = await Promise.all([
+    sb.from("levelup_teachers").select("*").order("name"),
+    sb.from("levelup_students").select("*").order("name"),
+    sb.from("levelup_payments").select("*"),
+  ]);
+  teachers = tt.data || []; students = ss.data || []; pagos = pp.data || [];
+  pintarTeacherSelect(); pintarFiltros(); render();
+}
+
+function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+async function init() {
+  show("view-app");
+  curMonth = thisMonth();
+  $("a-save").onclick = guardarAlumno;
+  $("cancel-edit").onclick = (e) => { e.preventDefault(); resetForm(); };
+  $("m-prev").onclick = () => shiftMonth(-1);
+  $("m-next").onclick = () => shiftMonth(1);
+  cargar();
+}
+(async () => { const { data: { session } } = await sb.auth.getSession(); session ? init() : show("view-login"); })();
+</script>
+</body>
+</html>

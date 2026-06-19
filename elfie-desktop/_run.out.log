@@ -1,0 +1,10 @@
+[elfie] sidecar de voz lanzado (pid 14320)
+[voz] sidecar Elfie en http://127.0.0.1:7331
+[voz] CUDA DLLs: cublas/bin
+[voz] CUDA DLLs: cuda_nvrtc/bin
+[voz] CUDA DLLs: cuda_runtime/bin
+[voz] CUDA DLLs: cudnn/bin
+[voz] modelo Whisper: C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\models\whisper-large-v3-turbo
+[voz] Vosk cargado (wake word 'Elfie')
+[voz] Whisper en GPU (float16)
+[voz] Kokoro cargado

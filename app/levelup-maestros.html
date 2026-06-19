@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · LevelUp · Maestros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="ai/gcal.js"></script>
+<style>
+  .sep { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 12px 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip { background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; font-size: 0.82rem; color: var(--muted); cursor: pointer; }
+  .chip.on { border-color: var(--accent-deep); color: var(--text); background: var(--accent-soft); }
+  .row2 { display: flex; gap: 8px; } .row2 > * { flex: 1; min-width: 0; }
+  .t-card .head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; cursor: pointer; }
+  .t-card .nombre { font-family: var(--serif); font-size: 1.2rem; }
+  .t-card .meta { font-family: var(--mono); font-size: 10px; letter-spacing: 0.06em; color: var(--faint); margin-top: 3px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .t-card .detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .t-card.open .detail { display: block; }
+  .mini { font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); margin: 10px 0 6px; }
+  .cl { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .cl:last-of-type { border-bottom: none; }
+  .cl .cuerpo { flex: 1; min-width: 0; }
+  .cl .ct { font-size: 0.9rem; } .cl .cs { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 2px; }
+  .cl .sync { color: var(--ok); } .cl .nosync { color: var(--faint); }
+  .cl .x, .acts button { background: transparent; border: none; color: var(--faint); padding: 4px 6px; font-size: 0.9rem; cursor: pointer; }
+  .acts { display: flex; gap: 2px; }
+  .roster { display: flex; flex-wrap: wrap; gap: 6px; }
+  .roster label { display: flex; align-items: center; gap: 5px; font-size: 0.82rem; background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer; }
+  .roster input { accent-color: var(--accent-deep); }
+  .seg2 { display: flex; gap: 6px; margin-bottom: 8px; }
+  .seg2 button { flex: 1; padding: 8px; font-size: 13px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); border-radius: 9px; }
+  .seg2 button.on { background: var(--text); border-color: var(--text); color: var(--bg); }
+  .empty { color: var(--faint); font-size: 0.88rem; padding: 8px 0; }
+  .ghost-add { width: 100%; margin-top: 10px; padding: 9px; background: transparent; border: 1px dashed var(--line); color: var(--faint); font-size: 13px; font-weight: 600; border-radius: 10px; }
+  .editing-banner { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--warn); margin-bottom: 8px; display: none; }
+  .editing .editing-banner { display: block; }
+</style>
+</head>
+<body>
+
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">LevelUp · Maestros</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<div id="view-app" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· LevelUp</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+  <h1 class="page-title">Maestros</h1>
+  <div class="mono-label page-sub">Clases, idiomas, formatos y alumnos</div>
+
+  <!-- Alta / edición de maestro -->
+  <div class="card" id="form-card">
+    <div class="editing-banner">Editando maestro · <a href="#" id="cancel-edit" style="color:var(--accent)">cancelar</a></div>
+    <input type="text" id="m-name" placeholder="Nombre del maestro" autocomplete="off" style="width:100%">
+    <div class="sep">Idiomas</div>
+    <div class="chips" id="m-langs"></div>
+    <div class="sep">Formatos</div>
+    <div class="chips" id="m-formats"></div>
+    <div class="sep">Sueldo</div>
+    <div class="row2">
+      <select id="m-paytype"><option value="mensual">Mensual</option><option value="por_hora">Por hora</option></select>
+      <input type="number" id="m-payrate" inputmode="decimal" step="0.01" min="0" placeholder="$ monto">
+    </div>
+    <input type="text" id="m-notes" placeholder="Notas sobre el maestro (opcional)" style="width:100%;margin-top:8px">
+    <button class="btn-primary w100" id="m-save">Agregar maestro</button>
+  </div>
+
+  <div id="lista-maestros"></div>
+</div>
+
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Inicio</span></a>
+    <a class="nav-item on" href="levelup-maestros.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M21 8v6M7 11v4c0 1 2.5 3 5 3s5-2 5-3v-4"/></svg><span>Maestros</span></a>
+    <a class="nav-item" href="levelup-alumnos.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 7a3 3 0 0 1 0 6M21 20c0-2.5-1.3-4.2-3.5-4.8"/></svg><span>Alumnos</span></a>
+    <a class="nav-item" href="levelup-admin.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/></svg><span>Admin</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const gcal = PRTS_AI.gcal;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s || "").replace(/</g, "&lt;");
+
+const IDIOMAS = ["Inglés", "Francés", "Alemán", "Italiano", "Portugués"];
+const FORMATOS = ["grupal", "particular"];
+const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DIAS3 = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+
+let teachers = [], students = [], classes = [], roster = [];
+let langSel = new Set(), fmtSel = new Set(), editingId = null;
+const openSet = new Set();
+
+function toast(t) { const e = $("toast"); e.textContent = t; e.classList.add("show"); setTimeout(() => e.classList.remove("show"), 1900); }
+const hhmm = (t) => (t || "").slice(0, 5);
+function addMin(hm, min) { const [h, m] = hm.split(":").map(Number); const d = new Date(2000, 0, 1, h, m + (+min || 0)); return `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; }
+
+$("btn-login").onclick = async () => { const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value }); if (error) $("msg").textContent = error.message; else init(); };
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// ---------- FORM MAESTRO ----------
+function pintarChipsForm() {
+  $("m-langs").innerHTML = IDIOMAS.map(l => `<button class="chip ${langSel.has(l) ? "on" : ""}" data-l="${l}">${l}</button>`).join("");
+  $("m-langs").querySelectorAll(".chip").forEach(b => b.onclick = () => { const l = b.dataset.l; langSel.has(l) ? langSel.delete(l) : langSel.add(l); pintarChipsForm(); });
+  $("m-formats").innerHTML = FORMATOS.map(f => `<button class="chip ${fmtSel.has(f) ? "on" : ""}" data-f="${f}">${f}</button>`).join("");
+  $("m-formats").querySelectorAll(".chip").forEach(b => b.onclick = () => { const f = b.dataset.f; fmtSel.has(f) ? fmtSel.delete(f) : fmtSel.add(f); pintarChipsForm(); });
+}
+function resetForm() {
+  editingId = null; $("form-card").classList.remove("editing");
+  $("m-name").value = ""; $("m-notes").value = ""; $("m-payrate").value = ""; $("m-paytype").value = "mensual";
+  langSel = new Set(); fmtSel = new Set(); pintarChipsForm();
+  $("m-save").textContent = "Agregar maestro";
+}
+function editTeacher(t) {
+  editingId = t.id; $("form-card").classList.add("editing");
+  $("m-name").value = t.name; $("m-notes").value = t.notes || ""; $("m-payrate").value = t.pay_rate || ""; $("m-paytype").value = t.pay_type;
+  langSel = new Set(t.languages || []); fmtSel = new Set(t.formats || []); pintarChipsForm();
+  $("m-save").textContent = "Guardar cambios";
+  $("form-card").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+async function guardarMaestro() {
+  const name = $("m-name").value.trim();
+  if (!name) { toast("Ponle nombre"); return; }
+  const row = { name, languages: [...langSel], formats: [...fmtSel], pay_type: $("m-paytype").value, pay_rate: parseFloat($("m-payrate").value) || 0, notes: $("m-notes").value.trim() || null };
+  $("m-save").disabled = true;
+  const { error } = editingId ? await sb.from("levelup_teachers").update(row).eq("id", editingId)
+                              : await sb.from("levelup_teachers").insert(row);
+  $("m-save").disabled = false;
+  if (error) { toast("Error: " + error.message); return; }
+  toast(editingId ? "Maestro actualizado" : "Maestro agregado");
+  resetForm(); cargar();
+}
+async function borrarMaestro(t) {
+  if (!confirm(`¿Eliminar al maestro "${t.name}"? Sus alumnos quedarán sin maestro asignado.`)) return;
+  await sb.from("levelup_teachers").delete().eq("id", t.id);
+  cargar();
+}
+
+// ---------- CLASES ----------
+async function agregarClase(teacher, form) {
+  const title = form.querySelector(".c-title").value.trim();
+  if (!title) { toast("Título de la clase"); return; }
+  const kind = form.dataset.kind || "recurrente";
+  const start = form.querySelector(".c-start").value;
+  const dur = parseInt(form.querySelector(".c-dur").value) || 60;
+  if (!start) { toast("Hora de inicio"); return; }
+  const cls = {
+    teacher_id: teacher.id, title,
+    language: form.querySelector(".c-lang").value.trim() || null,
+    level: form.querySelector(".c-level").value.trim() || null,
+    format: form.querySelector(".c-format").value,
+    kind, start_time: start, duration_min: dur,
+    weekday: kind === "recurrente" ? +form.querySelector(".c-weekday").value : null,
+    class_date: kind === "sesion" ? (form.querySelector(".c-date").value || null) : null,
+  };
+  if (kind === "sesion" && !cls.class_date) { toast("Fecha de la sesión"); return; }
+
+  // 1) Bloque en Semana (solo recurrente)
+  let weekBlockId = null;
+  if (kind === "recurrente") {
+    const r = await sb.from("week_blocks").insert({ weekday: cls.weekday, start_time: start, end_time: addMin(start, dur), role: "levelup", label: title }).select("id").single();
+    if (!r.error) weekBlockId = r.data.id;
+  }
+  // 2) Evento en Google Calendar
+  const gid = await gcal.createClass(cls);
+  // 3) Clase
+  const ins = await sb.from("levelup_classes").insert({ ...cls, week_block_id: weekBlockId, google_event_id: gid }).select("id").single();
+  if (ins.error) { toast("Error: " + ins.error.message); return; }
+  // 4) Roster (alumnos seleccionados)
+  const ids = [...form.querySelectorAll(".roster input:checked")].map(i => i.value);
+  if (ids.length) await sb.from("levelup_class_students").insert(ids.map(sid => ({ class_id: ins.data.id, student_id: sid })));
+  toast(gid ? "Clase creada (Semana + Calendar)" : "Clase creada (Semana)");
+  cargar();
+}
+async function borrarClase(c) {
+  if (!confirm(`¿Eliminar la clase "${c.title}"?`)) return;
+  if (c.week_block_id) await sb.from("week_blocks").delete().eq("id", c.week_block_id);
+  if (c.google_event_id) await gcal.deleteEvent(c.google_event_id);
+  await sb.from("levelup_classes").delete().eq("id", c.id);
+  toast("Clase eliminada");
+  cargar();
+}
+
+// ---------- RENDER ----------
+function classFormHTML(teacher) {
+  const opts = DIAS.map((d, i) => `<option value="${i}">${d}</option>`).join("");
+  const misAlumnos = students.filter(s => s.teacher_id === teacher.id);
+  const roster = misAlumnos.length
+    ? misAlumnos.map(s => `<label><input type="checkbox" value="${s.id}">${esc(s.name)}</label>`).join("")
+    : `<span class="empty">Sin alumnos aún (asígnalos en Alumnos).</span>`;
+  return `<div class="cl-form" data-kind="recurrente">
+    <div class="seg2"><button type="button" class="k-rec on" data-k="recurrente">Recurrente</button><button type="button" class="k-ses" data-k="sesion">Sesión</button></div>
+    <input class="c-title" type="text" placeholder="Título (ej. Inglés B1 — grupo)" style="width:100%">
+    <div class="row2" style="margin-top:8px"><input class="c-lang" type="text" placeholder="Idioma"><input class="c-level" type="text" placeholder="Nivel/tema"></div>
+    <div class="row2" style="margin-top:8px">
+      <select class="c-format"><option value="grupal">Grupal</option><option value="particular">Particular</option></select>
+      <select class="c-weekday">${opts}</select>
+      <input class="c-date hidden" type="date">
+    </div>
+    <div class="row2" style="margin-top:8px"><input class="c-start" type="time" value="19:00"><input class="c-dur" type="number" min="15" step="15" value="60" title="Duración (min)"></div>
+    <div class="mini">Alumnos en la clase</div>
+    <div class="roster">${roster}</div>
+    <button type="button" class="btn-primary w100 c-save">Crear clase</button>
+  </div>`;
+}
+
+function render() {
+  const cont = $("lista-maestros"); cont.innerHTML = "";
+  if (!teachers.length) { cont.innerHTML = `<div class="card empty">Sin maestros todavía. Agrega el primero arriba.</div>`; return; }
+  teachers.forEach(t => {
+    const cls = classes.filter(c => c.teacher_id === t.id);
+    const als = students.filter(s => s.teacher_id === t.id);
+    const card = document.createElement("div");
+    card.className = "card t-card" + (openSet.has(t.id) ? " open" : "");
+    const sueldo = t.pay_type === "mensual" ? `$${(+t.pay_rate).toLocaleString("es-MX")}/mes` : `$${(+t.pay_rate).toLocaleString("es-MX")}/h`;
+    card.innerHTML = `
+      <div class="head">
+        <div><div class="nombre">${esc(t.name)}</div>
+          <div class="meta"><span>${(t.languages||[]).join(", ") || "sin idiomas"}</span><span>${(t.formats||[]).join("·") || "—"}</span><span>${sueldo}</span></div>
+          <div class="meta"><span>${als.length} alumno${als.length===1?"":"s"}</span><span>${cls.length} clase${cls.length===1?"":"s"}</span></div>
+        </div>
+        <div class="acts"><button class="edit" title="Editar">✎</button><button class="del" title="Eliminar">✕</button></div>
+      </div>
+      <div class="detail">
+        ${t.notes ? `<div class="muted" style="font-size:0.84rem;margin-bottom:8px">${esc(t.notes)}</div>` : ""}
+        <div class="mini">Clases</div>
+        <div class="cl-list"></div>
+        <button class="ghost-add toggle-cf">+ agregar clase</button>
+        <div class="cf-wrap hidden"></div>
+        <div class="mini">Alumnos</div>
+        <div class="als">${als.length ? als.map(s => `<div class="cl"><div class="cuerpo"><div class="ct">${esc(s.name)}</div><div class="cs">${esc(s.language||"")} ${esc(s.level||"")} · ${s.hours_per_week||0} h/sem</div></div></div>`).join("") : `<div class="empty">Sin alumnos asignados.</div>`}</div>
+      </div>`;
+
+    // clases list
+    const cl = card.querySelector(".cl-list");
+    cl.innerHTML = cls.length ? cls.map(c => {
+      const cuando = c.kind === "recurrente" ? `${DIAS3[c.weekday]} ${hhmm(c.start_time)}` : `${c.class_date} ${hhmm(c.start_time)}`;
+      return `<div class="cl"><div class="cuerpo"><div class="ct">${esc(c.title)}</div>
+        <div class="cs">${cuando} · ${c.duration_min}min · ${c.format}${c.kind==="recurrente"?" · semanal":""} · <span class="${c.google_event_id?"sync":"nosync"}">${c.google_event_id?"● Calendar":"○ solo PRTS"}</span></div></div>
+        <button class="x" data-cid="${c.id}" title="Eliminar">✕</button></div>`;
+    }).join("") : `<div class="empty">Sin clases.</div>`;
+    cl.querySelectorAll("[data-cid]").forEach(b => b.onclick = () => borrarClase(cls.find(c => c.id === b.dataset.cid)));
+
+    // header toggles detail
+    card.querySelector(".head").onclick = (e) => { if (e.target.closest(".acts")) return; openSet.has(t.id) ? openSet.delete(t.id) : openSet.add(t.id); card.classList.toggle("open"); };
+    card.querySelector(".edit").onclick = (e) => { e.stopPropagation(); editTeacher(t); };
+    card.querySelector(".del").onclick = (e) => { e.stopPropagation(); borrarMaestro(t); };
+
+    // add-class form
+    const wrap = card.querySelector(".cf-wrap");
+    card.querySelector(".toggle-cf").onclick = () => {
+      wrap.classList.toggle("hidden");
+      if (!wrap.dataset.built) {
+        wrap.innerHTML = classFormHTML(t); wrap.dataset.built = "1";
+        const form = wrap.querySelector(".cl-form");
+        form.querySelector(".k-rec").onclick = () => { form.dataset.kind = "recurrente"; form.querySelector(".k-rec").classList.add("on"); form.querySelector(".k-ses").classList.remove("on"); form.querySelector(".c-weekday").classList.remove("hidden"); form.querySelector(".c-date").classList.add("hidden"); };
+        form.querySelector(".k-ses").onclick = () => { form.dataset.kind = "sesion"; form.querySelector(".k-ses").classList.add("on"); form.querySelector(".k-rec").classList.remove("on"); form.querySelector(".c-weekday").classList.add("hidden"); form.querySelector(".c-date").classList.remove("hidden"); };
+        form.querySelector(".c-save").onclick = () => agregarClase(t, form);
+      }
+    };
+    cont.appendChild(card);
+  });
+}
+
+async function cargar() {
+  const [tt, ss, cc] = await Promise.all([
+    sb.from("levelup_teachers").select("*").order("name"),
+    sb.from("levelup_students").select("*").order("name"),
+    sb.from("levelup_classes").select("*").order("start_time"),
+  ]);
+  teachers = tt.data || []; students = ss.data || []; classes = cc.data || [];
+  render();
+}
+
+function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+async function init() {
+  show("view-app");
+  pintarChipsForm(); resetForm();
+  $("m-save").onclick = guardarMaestro;
+  $("cancel-edit").onclick = (e) => { e.preventDefault(); resetForm(); };
+  cargar();
+}
+(async () => { const { data: { session } } = await sb.auth.getSession(); session ? init() : show("view-login"); })();
+</script>
+</body>
+</html>

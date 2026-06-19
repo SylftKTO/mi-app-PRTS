@@ -3,20 +3,20 @@
    Tokens y componentes comunes a todos los módulos.
    ============================================================ */
 :root {
-  --bg: #0B0D12;
-  --surface: #10131A;
-  --surface-2: #171B25;
-  --surface-3: #1D2230;
-  --line: #1E2330;
-  --text: #E8EAF1;
-  --muted: #9AA1B3;
-  --faint: #767D92;
-  --accent: #8FAEDC;
-  --accent-deep: #4E6FA8;
-  --accent-soft: rgba(143, 174, 220, 0.12);
-  --ok: #85C49E;
-  --warn: #D9A763;
-  --danger: #D9786C;
+  --bg: #0D0C0E;
+  --surface: #161416;
+  --surface-2: #1F1C1F;
+  --surface-3: #2A2529;
+  --line: #2C2730;
+  --text: #ECE8EA;
+  --muted: #ADA3AA;
+  --faint: #837A82;
+  --accent: #E68AA2;
+  --accent-deep: #B04A62;
+  --accent-soft: rgba(230, 138, 162, 0.12);
+  --ok: #C99BB0;
+  --warn: #E0A06A;
+  --danger: #E0626C;
   --radius: 14px;
   --nav-h: 64px;
   --serif: 'Source Serif 4', Georgia, serif;

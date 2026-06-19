@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<title>SYLFT · Elfie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  .wrap { max-width: 720px; margin: 0 auto; padding: 22px 18px 90px; }
+  .ehead { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .ehead h1 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 0; }
+  .back { color: var(--muted); text-decoration: none; font-size: 14px; }
+  .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin-top: 14px; }
+  .card h2 { font-family: var(--serif); font-weight: 500; font-size: 16px; margin: 0 0 4px; }
+  .card .hint { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+  .row:first-of-type { border-top: none; }
+  .row label { font-size: 14px; }
+  .row .desc { color: var(--muted); font-size: 12px; }
+  select, input[type="text"], input[type="number"] {
+    background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 9px;
+    padding: 8px 10px; font: inherit; min-width: 150px;
+  }
+  input[type="range"] { width: 150px; accent-color: var(--accent, #E68AA2); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { padding: 8px 14px; font-size: 13px; font-weight: 600; background: var(--bg); border: none; color: var(--muted); cursor: pointer; }
+  .seg button.on { background: var(--text); color: var(--bg); }
+  .sw { position: relative; width: 44px; height: 26px; flex: none; }
+  .sw input { opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .sw .track { position: absolute; inset: 0; background: var(--line); border-radius: 13px; transition: .15s; pointer-events: none; }
+  .sw .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; background: var(--text); border-radius: 50%; transition: .15s; pointer-events: none; }
+  .sw input:checked ~ .track { background: var(--accent, #E68AA2); }
+  .sw input:checked ~ .knob { left: 21px; }
+  .btn { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 9px; padding: 8px 14px; font: inherit; cursor: pointer; }
+  .btn.primary { background: var(--accent, #B04A62); color: #fff; border-color: transparent; }
+  .pchips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+  .pchip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; font-size: 13px; cursor: pointer; background: var(--bg); color: var(--text); }
+  .pchip.on { background: var(--text); color: var(--bg); border-color: var(--text); }
+  .pchip .x { opacity: .5; }
+  .addp { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .addp input { flex: 1; }
+  .kbd { font-family: var(--mono, ui-monospace, monospace); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 12px; }
+  .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .badge.ok { color: var(--ok); border-color: var(--ok); }
+</style>
+</head>
+<body>
+
+<div id="gate" class="wrap" style="display:none">
+  <div class="ehead"><h1>Elfie</h1></div>
+  <div class="sub">Inicia sesión desde el <a class="back" href="index.html">dashboard</a> para configurar Elfie.</div>
+</div>
+
+<div id="app" class="wrap" style="display:none">
+  <div class="ehead">
+    <a class="back" href="index.html">‹ Dashboard</a>
+  </div>
+  <div class="ehead"><h1>Elfie</h1> <span id="sc-badge" class="badge">sidecar…</span></div>
+  <div class="sub">Personalidad, modelo de IA y funciones. Apaga lo que no uses para liberar GPU/RAM a otros proyectos.</div>
+
+  <!-- Personalidad -->
+  <div class="card">
+    <h2>Personalidad</h2>
+    <div class="hint">Define el tono de las respuestas habladas de Elfie.</div>
+    <div id="pchips" class="pchips"></div>
+    <div class="addp">
+      <input type="text" id="np-name" placeholder="Nombre (ej. Motivadora)">
+      <input type="text" id="np-tone" placeholder="Tono (ej. enérgica y alentadora)">
+      <button class="btn" id="np-add">Agregar</button>
+    </div>
+  </div>
+
+  <!-- Modelo de IA -->
+  <div class="card">
+    <h2>Modelo de IA</h2>
+    <div class="hint">Intérprete de comandos y modelo local. Cambia a Anthropic para liberar la GPU.</div>
+    <div class="row">
+      <div><label>Intérprete</label><div class="desc">Local = Ollama ($0, usa GPU) · Anthropic = Claude API</div></div>
+      <div class="seg" id="seg-interp">
+        <button data-v="local">Local</button><button data-v="anthropic">Anthropic</button>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Modelo local</label><div class="desc">qwen2.5 = mejor clasificación · phi3.5 = más rápido</div></div>
+      <select id="sel-model">
+        <option value="phi3.5">phi3.5 (rápido)</option>
+        <option value="qwen2.5:7b">qwen2.5:7b (recomendado)</option>
+        <option value="llama3.1:8b">llama3.1:8b (no descargado)</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Voz -->
+  <div class="card">
+    <h2>Voz</h2>
+    <div class="hint">Motor de síntesis y velocidad.</div>
+    <div class="row">
+      <div><label>Motor TTS</label><div class="desc">Kokoro = local GPU · XTTS = voz clonada · Navegador = sin GPU</div></div>
+      <div class="seg" id="seg-engine">
+        <button data-v="kokoro">Kokoro</button><button data-v="xtts">XTTS</button><button data-v="navegador">Navegador</button>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Velocidad</label><div class="desc"><span id="spd-val">1.00</span>×</div></div>
+      <input type="range" id="spd" min="0.7" max="1.3" step="0.05">
+    </div>
+    <div class="row">
+      <div><label>Voz activada</label><div class="desc">Apágala para personalidad silenciosa</div></div>
+      <span class="sw"><input type="checkbox" id="sw-tts"><span class="track"></span><span class="knob"></span></span>
+    </div>
+    <button class="btn primary" id="btn-test" style="margin-top:10px">Probar voz</button>
+  </div>
+
+  <!-- Voz clonada (XTTS v2) -->
+  <div class="card" id="card-xtts">
+    <h2>Voz clonada · XTTS</h2>
+    <div class="hint">Graba ~8 s de la voz que quieres que use Elfie (lee algo en voz clara). Se clona <b>localmente</b>, sin nube. Luego elige <b>XTTS</b> como motor.</div>
+    <div class="addp">
+      <input type="text" id="xtts-name" placeholder="Nombre del perfil (ej. Mi voz)">
+      <button class="btn" id="xtts-rec">● Grabar 8 s</button>
+    </div>
+    <div id="xtts-status" class="note"></div>
+    <div id="xtts-list" class="pchips"></div>
+    <div class="note">El perfil activo se usa cuando el motor es XTTS. La primera síntesis tarda (carga el modelo ~1.8 GB en GPU).</div>
+  </div>
+
+  <!-- Funciones -->
+  <div class="card">
+    <h2>Funciones</h2>
+    <div class="hint">Activa o desactiva manualmente para administrar recursos.</div>
+    <div class="row">
+      <div><label>Escucha continua «Elfie»</label><div class="desc">Wake word on-device (opt-in). Mantiene el mic activo.</div></div>
+      <span class="sw"><input type="checkbox" id="sw-wake"><span class="track"></span><span class="knob"></span></span>
+    </div>
+    <div class="row">
+      <div><label>Voz push-to-talk (Alt+E)</label><div class="desc">Mantén Alt+E para dictar un comando</div></div>
+      <span class="sw"><input type="checkbox" id="sw-voice"><span class="track"></span><span class="knob"></span></span>
+    </div>
+    <div class="row">
+      <div><label>Widget de métricas</label><div class="desc">Panel flotante CPU/GPU/RAM en el dashboard</div></div>
+      <span class="sw"><input type="checkbox" id="sw-metrics"><span class="track"></span><span class="knob"></span></span>
+    </div>
+    <div class="row">
+      <div><label>Monitor del sistema</label><div class="desc">Historial + persistencia de métricas</div></div>
+      <span class="sw"><input type="checkbox" id="sw-monitor"><span class="track"></span><span class="knob"></span></span>
+    </div>
+  </div>
+
+  <!-- Accesos -->
+  <div class="card">
+    <h2>Accesos</h2>
+    <div class="hint">Herramientas de Elfie en el dashboard.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" id="go-rutinas">Rutinas</button>
+      <button class="btn" id="go-monitor">Monitor</button>
+    </div>
+    <div class="note">Atajos globales: <span class="kbd">Ctrl+Space</span> captura · <span class="kbd">Alt+E</span> voz · <span class="kbd">Ctrl+Shift+R</span> rutinas</div>
+  </div>
+</div>
+
+<script src="elfie/elfie-config.js"></script>
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+window.sb = sb;
+const $ = (id) => document.getElementById(id);
+const TAURI = !!window.__TAURI__;
+const VOICE_URL = "http://127.0.0.1:7331";
+const C = window.ElfieConfig;
+
+async function sidecar(path, body) {
+  const r = await fetch(VOICE_URL + path, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return r.json();
+}
+
+// ---- Personalidad ----
+function renderPersonalities() {
+  const box = $("pchips");
+  box.innerHTML = "";
+  const all = C.personalities();
+  const custom = C.data.customPersonalities || {};
+  Object.keys(all).forEach((name) => {
+    const chip = document.createElement("div");
+    chip.className = "pchip" + (C.data.personality === name ? " on" : "");
+    chip.title = all[name];
+    chip.textContent = name;
+    chip.onclick = () => { C.data.personality = name; C.save(); renderPersonalities(); };
+    if (custom[name]) {
+      const x = document.createElement("span");
+      x.className = "x"; x.textContent = "×";
+      x.onclick = (e) => { e.stopPropagation(); delete custom[name]; if (C.data.personality === name) C.data.personality = "profesional"; C.save(); renderPersonalities(); };
+      chip.appendChild(x);
+    }
+    box.appendChild(chip);
+  });
+}
+$("np-add").onclick = () => {
+  const n = $("np-name").value.trim(), t = $("np-tone").value.trim();
+  if (!n || !t) return;
+  C.data.customPersonalities = C.data.customPersonalities || {};
+  C.data.customPersonalities[n] = t;
+  C.data.personality = n;
+  C.save();
+  $("np-name").value = ""; $("np-tone").value = "";
+  renderPersonalities();
+};
+
+// ---- Segmentos (intérprete, motor) ----
+function seg(id, value, on) {
+  const el = $(id);
+  el.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("on", b.dataset.v === value);
+    b.onclick = () => { on(b.dataset.v); el.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b)); };
+  });
+}
+
+// ---- Switch helper ----
+function sw(id, val, on) { const el = $(id); el.checked = !!val; el.onchange = () => on(el.checked); }
+
+// ---- Voz clonada (XTTS): grabar referencia + gestionar perfiles ----
+async function listProfiles() {
+  if (!window.sb) return [];
+  const { data } = await sb.from("voice_profiles").select("*").eq("engine", "xtts").order("created_at", { ascending: false });
+  return data || [];
+}
+
+async function renderVoiceProfiles() {
+  const box = $("xtts-list");
+  if (!box) return;
+  const profs = await listProfiles();
+  box.innerHTML = "";
+  if (!profs.length) { box.innerHTML = '<span class="note">Aún no hay perfiles. Graba uno arriba.</span>'; return; }
+  for (const p of profs) {
+    const chip = document.createElement("div");
+    const active = C.data.xttsVoiceName === p.name;
+    chip.className = "pchip" + (active ? " on" : "");
+    chip.textContent = p.name + (active ? " ✓" : "");
+    chip.title = "Usar este perfil";
+    chip.onclick = () => activarPerfil(p);
+    const x = document.createElement("span");
+    x.className = "x"; x.textContent = "×"; x.title = "Eliminar";
+    x.onclick = (e) => { e.stopPropagation(); eliminarPerfil(p); };
+    chip.appendChild(x);
+    box.appendChild(chip);
+  }
+}
+
+async function grabarPerfilVoz() {
+  if (!TAURI) { $("xtts-status").textContent = "La grabación es del Elfie de escritorio."; return; }
+  const name = $("xtts-name").value.trim();
+  if (!name) { $("xtts-status").textContent = "Ponle un nombre al perfil."; return; }
+  const st = $("xtts-status");
+  st.textContent = "● Grabando 8 s… habla claro ahora.";
+  $("xtts-rec").disabled = true;
+  let res;
+  try { res = await sidecar("/voice/record", { seconds: 8, name }); } catch (_) { res = null; }
+  $("xtts-rec").disabled = false;
+  if (!res || !res.ok || !res.path) { st.textContent = "No pude grabar (¿sidecar activo?)."; return; }
+  let row = { name, reference_audio_url: res.path };
+  if (window.sb) {
+    const { data } = await sb.from("voice_profiles")
+      .insert({ name, engine: "xtts", reference_audio_url: res.path, is_active: true }).select().single();
+    if (data) row = data;
+  }
+  $("xtts-name").value = "";
+  await activarPerfil(row);
+  st.textContent = "Perfil “" + name + "” activo. Probando voz (la 1ª vez tarda)…";
+  try { await sidecar("/tts", { text: "Hola Sylft, soy Elfie con tu nueva voz.", speed: C.data.voiceSpeed, engine: "xtts", speaker_wav: res.path }); } catch (_) {}
+  st.textContent = "Listo. Perfil activo: " + name;
+}
+
+async function activarPerfil(p) {
+  C.data.xttsVoiceName = p.name;
+  C.data.xttsSpeakerWav = p.reference_audio_url;
+  C.data.voiceEngine = "xtts";
+  C.save();
+  if (window.sb && p.id) {
+    await sb.from("voice_profiles").update({ is_active: false }).eq("engine", "xtts").neq("id", p.id);
+    await sb.from("voice_profiles").update({ is_active: true }).eq("id", p.id);
+  }
+  seg("seg-engine", "xtts", (v) => { C.data.voiceEngine = v; C.save(); });
+  renderVoiceProfiles();
+}
+
+async function eliminarPerfil(p) {
+  if (!confirm(`¿Eliminar el perfil de voz "${p.name}"?`)) return;
+  if (window.sb && p.id) await sb.from("voice_profiles").delete().eq("id", p.id);
+  if (C.data.xttsVoiceName === p.name) {
+    C.data.xttsVoiceName = ""; C.data.xttsSpeakerWav = "";
+    if (C.data.voiceEngine === "xtts") { C.data.voiceEngine = "kokoro"; seg("seg-engine", "kokoro", (v) => { C.data.voiceEngine = v; C.save(); }); }
+    C.save();
+  }
+  renderVoiceProfiles();
+}
+
+function render() {
+  renderPersonalities();
+  seg("seg-interp", C.data.interpreter, (v) => { C.data.interpreter = v; C.save(); });
+  $("sel-model").value = C.data.localModel;
+  $("sel-model").onchange = async () => {
+    C.data.localModel = $("sel-model").value; C.save();
+    if (TAURI) { try { await sidecar("/config", { model: C.data.localModel }); } catch (_) {} }
+  };
+  seg("seg-engine", C.data.voiceEngine, (v) => { C.data.voiceEngine = v; C.save(); });
+  $("spd").value = C.data.voiceSpeed;
+  $("spd-val").textContent = Number(C.data.voiceSpeed).toFixed(2);
+  $("spd").oninput = () => { C.data.voiceSpeed = parseFloat($("spd").value); $("spd-val").textContent = C.data.voiceSpeed.toFixed(2); };
+  $("spd").onchange = () => C.save();
+  sw("sw-tts", C.data.ttsEnabled, (v) => { C.data.ttsEnabled = v; C.save(); });
+
+  const f = C.data.features;
+  sw("sw-wake", f.wake, async (v) => { f.wake = v; C.save(); if (TAURI) { try { await sidecar(v ? "/wake/enable" : "/wake/disable"); } catch (_) {} } });
+  sw("sw-voice", f.voice, (v) => { f.voice = v; C.save(); });
+  sw("sw-metrics", f.metricsWidget, (v) => { f.metricsWidget = v; C.save(); });
+  sw("sw-monitor", f.monitor, (v) => { f.monitor = v; C.save(); });
+
+  $("btn-test").onclick = async () => {
+    if (!TAURI || C.data.voiceEngine === "navegador") {
+      if (window.speechSynthesis) { const u = new SpeechSynthesisUtterance("Hola Sylft, soy Elfie."); u.lang = "es-MX"; u.rate = C.data.voiceSpeed; speechSynthesis.speak(u); }
+      return;
+    }
+    const body = { text: "Hola Sylft, soy Elfie.", speed: C.data.voiceSpeed };
+    if (C.data.voiceEngine === "xtts" && C.data.xttsSpeakerWav) { body.engine = "xtts"; body.speaker_wav = C.data.xttsSpeakerWav; }
+    try { await sidecar("/tts", body); } catch (_) {}
+  };
+
+  // Voz clonada (XTTS): grabar referencia + gestionar perfiles
+  renderVoiceProfiles();
+  $("xtts-rec").onclick = grabarPerfilVoz;
+
+  $("go-rutinas").onclick = () => (location.href = "index.html?elfie=rutinas");
+  $("go-monitor").onclick = () => (location.href = "index.html?elfie=monitor");
+
+  // Estado del sidecar
+  if (TAURI) {
+    fetch(VOICE_URL + "/health").then((r) => r.json()).then((h) => {
+      const b = $("sc-badge");
+      b.textContent = "sidecar ok · " + (h.model || "—");
+      b.classList.add("ok");
+    }).catch(() => { $("sc-badge").textContent = "sidecar offline"; });
+  } else {
+    $("sc-badge").textContent = "modo web";
+  }
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { $("gate").style.display = "block"; return; }
+  $("app").style.display = "block";
+  render();
+})();
+</script>
+</body>
+</html>

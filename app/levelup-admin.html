@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0B0D12">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>SYLFT · LevelUp · Administración</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<script src="config.js"></script>
+<style>
+  .month-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; }
+  .month-nav .mlabel { font-family: var(--serif); font-size: 19px; text-transform: capitalize; }
+  .month-nav button { width: 38px; height: 38px; padding: 0; font-size: 18px; background: var(--surface); border: 1px solid var(--line); color: var(--muted); border-radius: 10px; }
+  .month-nav button:disabled { opacity: .35; }
+  .v.pos { color: var(--ok); } .v.neg { color: var(--danger); }
+  .tline { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .tline:last-child { border-bottom: none; }
+  .tline .cuerpo { flex: 1; min-width: 0; }
+  .tline .nombre { font-size: 0.95rem; }
+  .tline .sub { font-family: var(--mono); font-size: 10px; color: var(--faint); margin-top: 2px; }
+  .tline .montos { text-align: right; font-family: var(--mono); font-size: 11px; white-space: nowrap; }
+  .tline .montos .ing { color: var(--ok); } .tline .montos .sal { color: var(--danger); }
+  .pend { display: flex; justify-content: space-between; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; }
+  .pend:last-child { border-bottom: none; }
+  .pend .falta { font-family: var(--mono); color: var(--danger); white-space: nowrap; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; }
+  .legend span { display: flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .legend i { width: 9px; height: 9px; border-radius: 2px; }
+  .empty { color: var(--faint); font-size: 0.88rem; padding: 8px 0; }
+</style>
+</head>
+<body>
+
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Sylft</div>
+  <div class="mono-label" style="margin-top:6px">LevelUp · Administración</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<div id="view-app" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· LevelUp</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+  <h1 class="page-title">Administración</h1>
+  <div class="mono-label page-sub">Clases · alumnos · finanzas</div>
+
+  <div class="month-nav"><button id="m-prev">‹</button><div class="mlabel" id="m-label">—</div><button id="m-next">›</button></div>
+
+  <div class="stat-grid">
+    <div class="stat-card"><div class="l">Ingresos</div><div class="v pos" id="st-ing">$0</div><div class="s" id="st-ing-s">cobrado</div></div>
+    <div class="stat-card"><div class="l">Sueldos</div><div class="v neg" id="st-sal">$0</div><div class="s">a maestros</div></div>
+    <div class="stat-card"><div class="l">Neto</div><div class="v" id="st-net">$0</div><div class="s">ingresos − sueldos</div></div>
+  </div>
+  <div class="stat-grid" style="margin-top:10px">
+    <div class="stat-card"><div class="l">Alumnos</div><div class="v" id="st-al">0</div><div class="s" id="st-al-s">activos</div></div>
+    <div class="stat-card"><div class="l">Clases</div><div class="v" id="st-cl">0</div><div class="s" id="st-cl-s">semanales</div></div>
+    <div class="stat-card"><div class="l">Horas</div><div class="v" id="st-hr">0</div><div class="s">por semana</div></div>
+  </div>
+
+  <div class="card">
+    <div class="mono-label">Por maestro</div>
+    <div id="por-maestro"></div>
+  </div>
+
+  <div class="card">
+    <div class="mono-label">Ingresos vs sueldos por maestro</div>
+    <canvas id="chart-ms" style="margin-top:12px"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="mono-label">Estado de pagos</div>
+    <canvas id="chart-pagos" style="margin-top:12px;max-height:230px"></canvas>
+    <div class="legend" id="leg-pagos"></div>
+  </div>
+
+  <div class="card">
+    <div class="mono-label" style="margin-bottom:4px">Pagos pendientes</div>
+    <div id="pendientes"></div>
+  </div>
+</div>
+
+<nav class="navbar" id="navbar">
+  <div class="nav-inner">
+    <a class="nav-item" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg><span>Inicio</span></a>
+    <a class="nav-item" href="levelup-maestros.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 5-9 5-9-5 9-5z"/><path d="M21 8v6M7 11v4c0 1 2.5 3 5 3s5-2 5-3v-4"/></svg><span>Maestros</span></a>
+    <a class="nav-item" href="levelup-alumnos.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-5 6-5s6 1.7 6 5"/><path d="M17 7a3 3 0 0 1 0 6M21 20c0-2.5-1.3-4.2-3.5-4.8"/></svg><span>Alumnos</span></a>
+    <a class="nav-item on" href="levelup-admin.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="6"/><rect x="13" y="7" width="3" height="10"/></svg><span>Admin</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s || "").replace(/</g, "&lt;");
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const SEMANAS_MES = 4.33;
+const COLORS = ["#8FAEDC","#D9A763","#85C49E","#B49FD9","#D9786C","#6FA8C7","#C7A26F","#767D92"];
+
+let teachers = [], students = [], classes = [], pagos = [];
+let curMonth = "";
+let chMS = null, chPagos = null;
+
+function hoyMX() { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" }); }
+function thisMonth() { return hoyMX().slice(0, 7); }
+function money(n) { return "$" + Math.round(+n || 0).toLocaleString("es-MX"); }
+
+$("btn-login").onclick = async () => { const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value }); if (error) $("msg").textContent = error.message; else init(); };
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); location.reload(); };
+
+// pago computado del mes para un alumno
+function pagoMes(s) {
+  const p = pagos.find(x => x.student_id === s.id && x.period === curMonth);
+  const due = p ? +p.amount_due : +s.monthly_fee;
+  const paid = p ? +p.amount_paid : 0;
+  return { due, paid, falta: Math.max(0, due - paid) };
+}
+// horas semanales impartidas por un maestro (clases recurrentes)
+function horasMaestro(tid) {
+  return classes.filter(c => c.teacher_id === tid && c.kind === "recurrente").reduce((a, c) => a + (c.duration_min || 0) / 60, 0);
+}
+function sueldoMes(t) {
+  return t.pay_type === "mensual" ? (+t.pay_rate || 0) : (+t.pay_rate || 0) * horasMaestro(t.id) * SEMANAS_MES;
+}
+
+function render() {
+  $("m-label").textContent = `${MESES[+curMonth.slice(5)-1]} ${curMonth.slice(0,4)}`;
+  $("m-next").disabled = curMonth >= thisMonth();
+  const activos = students.filter(s => s.status !== "inactivo");
+
+  let totIng = 0, totSal = 0, totHr = 0;
+  const porT = teachers.map(t => {
+    const als = activos.filter(s => s.teacher_id === t.id);
+    const cls = classes.filter(c => c.teacher_id === t.id);
+    const ing = als.reduce((a, s) => a + pagoMes(s).paid, 0);
+    const due = als.reduce((a, s) => a + pagoMes(s).due, 0);
+    const sal = sueldoMes(t);
+    totIng += ing; totSal += sal; totHr += horasMaestro(t.id);
+    return { t, nAl: als.length, nCl: cls.length, ing, due, sal };
+  });
+  // alumnos sin maestro también suman ingresos
+  const sinM = activos.filter(s => !s.teacher_id);
+  const ingSinM = sinM.reduce((a, s) => a + pagoMes(s).paid, 0);
+  totIng += ingSinM;
+
+  $("st-ing").textContent = money(totIng);
+  const totDue = activos.reduce((a, s) => a + pagoMes(s).due, 0);
+  $("st-ing-s").textContent = `de ${money(totDue)} esperado`;
+  $("st-sal").textContent = money(totSal);
+  $("st-net").textContent = money(totIng - totSal);
+  $("st-net").className = "v " + (totIng - totSal >= 0 ? "pos" : "neg");
+  $("st-al").textContent = activos.length;
+  $("st-al-s").textContent = `${students.length} en total`;
+  const recur = classes.filter(c => c.kind === "recurrente").length;
+  $("st-cl").textContent = recur;
+  const nSes = classes.length - recur;
+  $("st-cl-s").textContent = `${nSes} ${nSes === 1 ? "sesión" : "sesiones"}`;
+  $("st-hr").textContent = totHr % 1 ? totHr.toFixed(1) : totHr;
+
+  // por maestro
+  const pm = $("por-maestro");
+  const filas = porT.filter(x => x.nAl || x.nCl);
+  pm.innerHTML = filas.length ? filas.map(x => `
+    <div class="tline"><div class="cuerpo">
+      <div class="nombre">${esc(x.t.name)}</div>
+      <div class="sub">${x.nAl} alumno${x.nAl===1?"":"s"} · ${x.nCl} clase${x.nCl===1?"":"s"} · ${horasMaestro(x.t.id)} h/sem</div>
+    </div><div class="montos"><span class="ing">+${money(x.ing)}</span> · <span class="sal">−${money(x.sal)}</span></div></div>`).join("")
+    : `<div class="empty">Sin maestros con actividad.</div>`;
+
+  // chart ingresos vs sueldos por maestro
+  const labels = filas.map(x => x.t.name);
+  if (chMS) chMS.destroy();
+  chMS = new Chart($("chart-ms"), {
+    type: "bar",
+    data: { labels: labels.length ? labels : ["—"], datasets: [
+      { label: "Ingresos", data: filas.map(x => x.ing), backgroundColor: "rgba(133,196,158,0.8)", borderRadius: 4 },
+      { label: "Sueldo", data: filas.map(x => x.sal), backgroundColor: "rgba(217,120,108,0.8)", borderRadius: 4 },
+    ] },
+    options: { plugins: { legend: { labels: { color: "#9AA1B3", boxWidth: 12, boxHeight: 8, usePointStyle: true } }, tooltip: { callbacks: { label: (c) => ` ${c.dataset.label}: ${money(c.raw)}` } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: "#1E2330" }, ticks: { callback: (v) => money(v) } } } },
+  });
+
+  // chart estado de pagos (conteo)
+  let pagados = 0, parciales = 0, pendientes = 0;
+  activos.forEach(s => { const { due, paid } = pagoMes(s); if (paid <= 0) pendientes++; else if (paid >= due) pagados++; else parciales++; });
+  if (chPagos) chPagos.destroy();
+  const datos = [pagados, parciales, pendientes], cols = ["#85C49E", "#D9A763", "#D9786C"], labs = ["Pagado", "Parcial", "Pendiente"];
+  chPagos = new Chart($("chart-pagos"), {
+    type: "doughnut",
+    data: { labels: labs, datasets: [{ data: datos, backgroundColor: cols, borderColor: "#10131A", borderWidth: 2 }] },
+    options: { cutout: "62%", plugins: { legend: { display: false } } },
+  });
+  $("leg-pagos").innerHTML = labs.map((l, i) => `<span><i style="background:${cols[i]}"></i>${l} · ${datos[i]}</span>`).join("");
+
+  // pendientes
+  const pend = activos.map(s => ({ s, ...pagoMes(s) })).filter(x => x.falta > 0).sort((a, b) => b.falta - a.falta);
+  $("pendientes").innerHTML = pend.length
+    ? pend.map(x => `<div class="pend"><span>${esc(x.s.name)} <span style="color:var(--faint);font-family:var(--mono);font-size:10px">${esc(teacherName(x.s.teacher_id))}</span></span><span class="falta">${money(x.falta)}</span></div>`).join("")
+    : `<div class="empty">Todos al corriente este mes. 🎉</div>`;
+}
+function teacherName(id) { const t = teachers.find(x => x.id === id); return t ? t.name : "sin maestro"; }
+
+function shiftMonth(d) {
+  const x = new Date(curMonth + "-01T12:00:00"); x.setMonth(x.getMonth() + d);
+  const nm = x.toISOString().slice(0, 7);
+  if (nm > thisMonth()) return;
+  curMonth = nm; render();
+}
+
+async function cargar() {
+  const [tt, ss, cc, pp] = await Promise.all([
+    sb.from("levelup_teachers").select("*").order("name"),
+    sb.from("levelup_students").select("*"),
+    sb.from("levelup_classes").select("*"),
+    sb.from("levelup_payments").select("*"),
+  ]);
+  teachers = tt.data || []; students = ss.data || []; classes = cc.data || []; pagos = pp.data || [];
+  render();
+}
+
+Chart.defaults.color = "#767D92";
+Chart.defaults.borderColor = "#1E2330";
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+Chart.defaults.font.size = 10;
+
+function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
+async function init() {
+  show("view-app");
+  curMonth = thisMonth();
+  $("m-prev").onclick = () => shiftMonth(-1);
+  $("m-next").onclick = () => shiftMonth(1);
+  cargar();
+}
+(async () => { const { data: { session } } = await sb.auth.getSession(); session ? init() : show("view-login"); })();
+</script>
+</body>
+</html>

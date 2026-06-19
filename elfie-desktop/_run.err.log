@@ -1,0 +1,50 @@
+Traceback (most recent call last):
+  File "C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\voice_server.py", line 492, in do_POST
+    self._send(
+  File "C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\voice_server.py", line 442, in _send
+    self.wfile.write(body)
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52034)
+Traceback (most recent call last):
+  File "C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\voice_server.py", line 492, in do_POST
+    self._send(
+  File "C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\voice_server.py", line 442, in _send
+    self.wfile.write(body)
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 755, in __init__
+    self.handle()
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\voice_server.py", line 515, in do_POST
+    self._send({"error": str(e)}, 500)
+  File "C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop\sidecars\voice_server.py", line 441, in _send
+    self.end_headers()
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\http\server.py", line 538, in end_headers
+    self.flush_headers()
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\http\server.py", line 542, in flush_headers
+    self.wfile.write(b"".join(self._headers_buffer))
+  File "C:\Users\Sylft\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 834, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] Se ha anulado una conexión establecida por el software en su equipo host
+----------------------------------------
+forrtl: error (200): program aborting due to window-CLOSE event
+Image              PC                Routine            Line        Source             
+KERNELBASE.dll     00007FFCA1AEC203  Unknown               Unknown  Unknown
+KERNEL32.DLL       00007FFCA28A7374  Unknown               Unknown  Unknown
+ntdll.dll          00007FFCA411CC91  Unknown               Unknown  Unknown
+[0618/135844.361:ERROR:ui\gfx\win\window_impl.cc:172] Failed to unregister class Chrome_WidgetWin_0. Error = 1411

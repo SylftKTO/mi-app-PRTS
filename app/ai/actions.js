@@ -62,7 +62,7 @@
     }
   }
   const VIEWS_INTERNAS = { dashboard: null, tareas: null, semana: null, proyectos: null }; // vistas SPA (switchView)
-  const PAGINAS = { gym: "gym.html", dieta: "dieta.html", apuntes: "apuntes.html", finanzas: "finanzas.html" }; // páginas propias
+  const PAGINAS = { gym: "gym.html", dieta: "dieta.html", apuntes: "apuntes.html", finanzas: "finanzas.html", chat: "elfie-chat.html" }; // páginas propias
   const ORIGENES = ["escuela", "wolves", "levelup", "personal"];
   const PRIORIDADES = ["alta", "media", "baja"];
 
@@ -325,6 +325,19 @@
                speak: "", confidence: 1 };
     }
 
+    // "hablemos" / "charlemos" / "abre el chat" / "quiero platicar" → Chat con Elfie
+    if (/^(?:hablemos|charlemos|platiquemos|quiero (?:hablar|platicar|charlar)|abre? el chat|abrir chat|vamos a (?:hablar|platicar|charlar))\b/.test(t)) {
+      return { intent: "navigate", params: { view: "chat" }, speak: "Vamos a platicar.", confidence: 1 };
+    }
+
+    // "¿qué anotamos sobre X?" / "busca en mis apuntes X" → RAG de Apuntes (Elfie Desktop)
+    if (/\bapuntes\b|\banotamos\b|\banot[ée]\b|\banotaste\b/.test(t)) {
+      let mm = t.match(/(?:sobre|acerca de|del|de la|de los|de|en)\s+(.+)$/);
+      if (!mm) mm = t.match(/apuntes\s+(.+)$/);
+      const topic = mm && mm[1] ? mm[1].trim().replace(/[?¿.!\s]+$/, "") : "";
+      if (topic) return { intent: "note_query", params: { q: topic }, speak: "", confidence: 1 };
+    }
+
     // --- Protocolos de respuesta simple (sin LLM, sin datos): hora, fecha, saludo… ---
     const di = (texto) => ({ intent: "say", params: {}, speak: texto, confidence: 1 });
     const ahora = new Date();
@@ -388,6 +401,21 @@
       case "say":      // protocolo de respuesta simple (local, sin LLM)
       case "ask": {    // pregunta cotidiana respondida por el LLM (en it.speak)
         notify(it.speak || "No tengo una respuesta para eso.");
+        return;
+      }
+      case "note_query": {  // RAG sobre Apuntes (Elfie Desktop): responde fundamentado en tus notas
+        const q = String(it.params?.q || "").trim();
+        if (!q) { notify("¿Sobre qué tema de tus apuntes?"); return; }
+        if (!(window.elfieRag && window.elfieRag.available())) {
+          notify("La búsqueda en tus apuntes es del Elfie de escritorio.");
+          return;
+        }
+        const r = await window.elfieRag.answer(q, 3);
+        if (!r || r.ok === false || !r.speak) {
+          notify(r && r.error ? "No pude consultar tus apuntes." : "No encontré nada en tus apuntes sobre eso.");
+          return;
+        }
+        notify(r.speak);
         return;
       }
       case "navigate": {

@@ -79,6 +79,15 @@
     return requestToken(false);   // silencioso (ya consentido en sesiones previas)
   }
 
+  // Próxima fecha (local) de un weekday a una hora; si es hoy pero ya pasó → la próxima semana.
+  function proximaOcurrencia(weekday, h, m) {
+    const d = new Date(); d.setHours(h, m, 0, 0);
+    let diff = (weekday - d.getDay() + 7) % 7;
+    if (diff === 0 && d < new Date()) diff = 7;
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
   // --- API pública ---
   PRTS_AI.gcal = {
     available: () => !!clientId(),
@@ -157,6 +166,50 @@
         });
         return r.ok || r.status === 410;   // 410 = ya borrado
       } catch { return false; }
+    },
+
+    // --- Clases LevelUp: evento con duración real y, si es recurrente, RRULE semanal ---
+    // cls = { title, language, level, format, kind, weekday, class_date, start_time, duration_min }
+    _eventoClase(cls) {
+      const [h, m] = String(cls.start_time).slice(0, 5).split(":").map(Number);
+      let start;
+      if (cls.kind === "recurrente") start = proximaOcurrencia(cls.weekday, h, m);
+      else { start = new Date(cls.class_date + "T00:00:00"); start.setHours(h, m, 0, 0); }
+      const end = new Date(start.getTime() + (Number(cls.duration_min) || 60) * 60000);
+      const ev = {
+        summary: "📘 " + (cls.title || "Clase LevelUp"),
+        description: [cls.language && ("Idioma: " + cls.language), cls.level && ("Nivel/tema: " + cls.level),
+          cls.format && ("Formato: " + cls.format)].filter(Boolean).join("\n") + "\n\nLevelUp · PRTS",
+        start: { dateTime: start.toISOString(), timeZone: TZ },
+        end: { dateTime: end.toISOString(), timeZone: TZ },
+        reminders: { useDefault: false, overrides: [{ method: "popup", minutes: 30 }] },
+      };
+      if (cls.kind === "recurrente") ev.recurrence = ["RRULE:FREQ=WEEKLY"];
+      return ev;
+    },
+    async createClass(cls) {
+      if (!this.connected() || !this.available()) return null;
+      try {
+        const token = await getToken();
+        const r = await fetch(API, {
+          method: "POST",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify(this._eventoClase(cls)),
+        });
+        return r.ok ? ((await r.json()).id || null) : null;
+      } catch { return null; }
+    },
+    async updateClass(eventId, cls) {
+      if (!eventId || !this.connected() || !this.available()) return null;
+      try {
+        const token = await getToken();
+        const r = await fetch(`${API}/${encodeURIComponent(eventId)}`, {
+          method: "PATCH",
+          headers: { Authorization: "Bearer " + token, "Content-Type": "application/json" },
+          body: JSON.stringify(this._eventoClase(cls)),
+        });
+        return r.ok ? eventId : null;
+      } catch { return null; }
     },
   };
 })();

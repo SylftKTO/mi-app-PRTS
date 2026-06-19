@@ -16,6 +16,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script src="config.js"></script>
+<script src="elfie/rag.js"></script>
 <style>
   .tools { display: flex; gap: 8px; margin-top: 14px; }
   .tools input[type="search"] { flex: 1; min-width: 0; }
@@ -26,6 +27,22 @@
     font-size: 0.78rem; color: var(--faint); line-height: 1.45;
   }
   .regla b { color: var(--muted); font-weight: 500; }
+
+  /* RAG · Pregúntale a Elfie (solo desktop) */
+  #rag-panel { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .rag-head { margin-bottom: 10px; color: var(--accent); }
+  .rag-head span { color: var(--faint); }
+  .rag-row { display: flex; gap: 8px; }
+  .rag-row input[type="search"] { flex: 1; min-width: 0; }
+  .rag-row button { white-space: nowrap; padding: 10px 16px; }
+  #rag-ans { margin-top: 12px; font-size: 0.92rem; line-height: 1.5; color: var(--text); }
+  #rag-ans.loading { color: var(--faint); }
+  #rag-ans .rag-src { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  #rag-ans .rag-src a { display: block; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 0.82rem; color: var(--muted); }
+  #rag-ans .rag-src a:hover { border-color: var(--accent); color: var(--text); }
+  #rag-ans .rag-src .src-tag { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+  .rag-reindex { display: inline-block; margin-top: 10px; color: var(--faint); cursor: pointer; }
+  .rag-reindex:hover { color: var(--muted); }
 
   /* lista */
   .note-card { cursor: pointer; }
@@ -116,6 +133,17 @@
   </div>
 
   <div class="regla"><b>Regla de los 10 minutos:</b> llena la plantilla justo al salir de clase, mientras el contexto sigue fresco. Enlaza temas con <b>[[doble corchete]]</b> y usa <b>$LaTeX$</b> en las fórmulas.</div>
+
+  <!-- RAG (solo Elfie Desktop): búsqueda semántica sobre los apuntes -->
+  <div id="rag-panel" class="hidden">
+    <div class="mono-label rag-head">Pregúntale a Elfie <span id="rag-count"></span></div>
+    <div class="rag-row">
+      <input type="search" id="rag-q" placeholder="¿Qué anotamos sobre…?">
+      <button class="btn-primary" id="rag-go">Preguntar</button>
+    </div>
+    <div id="rag-ans" class="hidden"></div>
+    <a href="#" id="rag-reindex" class="mono-label rag-reindex">Reindexar apuntes</a>
+  </div>
 
   <div id="grafo-wrap" class="hidden">
     <canvas id="grafo"></canvas>
@@ -403,6 +431,7 @@ async function guardar() {
     const idx = todasNotas.findIndex(n => n.id === notaActual.id);
     if (idx >= 0) Object.assign(todasNotas[idx], payload); else todasNotas.push({ ...notaActual });
     renderBacklinks();
+    window.elfieRag?.index(notaActual);  // RAG: reindexa la nota (desktop; no-op en web)
   }
 }
 
@@ -433,8 +462,10 @@ $("btn-volver").onclick = async (e) => {
   // descartar apuntes vacíos recién creados
   if (notaActual && !$("ed-topic").value.trim() && !$("ed-key").value.trim() &&
       !$("ed-summary").value.trim() && !$("ed-subject").value.trim()) {
-    await sb.from("notes").delete().eq("id", notaActual.id);
-    todasNotas = todasNotas.filter(n => n.id !== notaActual.id);
+    const vid = notaActual.id;
+    await sb.from("notes").delete().eq("id", vid);
+    todasNotas = todasNotas.filter(n => n.id !== vid);
+    window.elfieRag?.del(vid);  // RAG: quita la nota descartada del índice
   }
   notaActual = null;
   show("view-lista");
@@ -445,8 +476,10 @@ $("btn-volver").onclick = async (e) => {
 
 $("btn-borrar").onclick = async () => {
   if (!confirm("¿Eliminar este apunte definitivamente?")) return;
-  await sb.from("notes").delete().eq("id", notaActual.id);
-  todasNotas = todasNotas.filter(n => n.id !== notaActual.id);
+  const vid = notaActual.id;
+  await sb.from("notes").delete().eq("id", vid);
+  todasNotas = todasNotas.filter(n => n.id !== vid);
+  window.elfieRag?.del(vid);  // RAG: quita la nota del índice
   notaActual = null;
   toast("Apunte eliminado");
   show("view-lista");
@@ -529,6 +562,75 @@ $("grafo").addEventListener("click", (e) => {
   if (hit) abrirEditor(hit.n);
 });
 
+// ---------- RAG · Pregúntale a Elfie (solo Elfie Desktop) ----------
+async function refreshRagCount() {
+  const s = await window.elfieRag.status();
+  $("rag-count").textContent = s && s.ok ? `· ${s.count} en el índice` : "· índice no disponible";
+}
+
+function renderRagAnswer(r) {
+  const ans = $("rag-ans");
+  ans.innerHTML = "";
+  const p = document.createElement("div");
+  p.textContent = r.speak || "(sin respuesta)";
+  ans.appendChild(p);
+  if (r.results && r.results.length) {
+    const box = document.createElement("div");
+    box.className = "rag-src";
+    for (const h of r.results) {
+      const a = document.createElement("a");
+      a.href = "#";
+      const tag = document.createElement("span");
+      tag.className = "src-tag";
+      tag.textContent = `${h.subject || "—"} · ${h.topic || "—"} · ${Math.round((h.score || 0) * 100)}%`;
+      const body = document.createElement("div");
+      body.textContent = h.text || "";
+      a.append(tag, body);
+      a.onclick = (e) => {
+        e.preventDefault();
+        const nota = todasNotas.find((n) => n.id === h.id);
+        if (nota) abrirEditor(nota);
+      };
+      box.appendChild(a);
+    }
+    ans.appendChild(box);
+  }
+  renderMath(ans);
+}
+
+async function initRag() {
+  if (!(window.elfieRag && window.elfieRag.available())) return;
+  $("rag-panel").classList.remove("hidden");
+  refreshRagCount();
+
+  const preguntar = async () => {
+    const q = $("rag-q").value.trim();
+    if (!q) return;
+    const ans = $("rag-ans");
+    ans.classList.remove("hidden");
+    ans.classList.add("loading");
+    ans.textContent = "Elfie está pensando…";
+    const r = await window.elfieRag.answer(q, 3);
+    ans.classList.remove("loading");
+    if (!r || r.ok === false) {
+      ans.textContent = r && r.error ? "No pude consultar: " + r.error : "El sidecar de Elfie no respondió.";
+      return;
+    }
+    renderRagAnswer(r);
+  };
+  $("rag-go").onclick = preguntar;
+  $("rag-q").addEventListener("keydown", (e) => { if (e.key === "Enter") preguntar(); });
+
+  $("rag-reindex").onclick = async (e) => {
+    e.preventDefault();
+    $("rag-reindex").textContent = "Reindexando…";
+    const r = await window.elfieRag.reindex(todasNotas);
+    $("rag-reindex").textContent = "Reindexar apuntes";
+    refreshRagCount();
+    if (r) toast(`Indexados ${r.indexed}/${r.total} apuntes`);
+  };
+}
+
 // ---------- ARRANQUE ----------
 function resetListaView() {
   $("grafo-wrap").classList.add("hidden");
@@ -541,6 +643,7 @@ async function init() {
   resetListaView();
   await cargarTodas();
   cargarLista();
+  initRag();
 }
 
 (async () => {
