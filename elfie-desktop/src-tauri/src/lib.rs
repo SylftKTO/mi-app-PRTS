@@ -129,6 +129,7 @@ pub fn run() {
             system_control::screenshot,
             system_control::clipboard_read,
             system_control::clipboard_write,
+            system_control::foreground_app,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

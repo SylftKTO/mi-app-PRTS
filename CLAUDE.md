@@ -223,9 +223,17 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - **Decisión tomada:** el modo solo tiene efecto pleno en escritorio (en web no hay sidecar → los modelos locales no aplican). Modos en **localStorage** (no se añadió columna a Supabase para no romper el sync hasta `db:push`).
 - ⚠️ `sttContinuous` queda **plumbed pero sin comportamiento aún** (la escucha semi-continua real es un follow-up; hoy el modo conversación lo marca pero la voz sigue por wake word/push-to-talk).
 
+### ✅ 8.2 — Orquestador de recursos
+
+- **Reparto:** el **mecanismo de GPU** vive en el sidecar; la **política** (cuándo bajar de modo) en el frontend (que ya recibe métricas de `monitor.rs`).
+- **`elfie-desktop/sidecars/orchestrator.py`** (nuevo): semáforo de "dueño pesado" (`claim`/`release`), `unload_ollama()` (`ollama stop` → fallback keep_alive=0), `free_for(owner)` (descarga Ollama si la VRAM libre < umbral; **clave para 7.2 imágenes**), `gpu_vram()` vía nvidia-smi (sin deps). Nota: qwen+XTTS **sí coexisten** (~6.4/8 GB) → XTTS NO descarga Ollama; descargar se reserva para imágenes.
+- **`voice_server.py`:** `import orchestrator` + `GET /orchestrator/status`, `POST /orchestrator/claim|release|unload_ollama`. `ensure_xtts()` registra a XTTS como dueño (sin descargar Ollama).
+- **Rust:** comando `foreground_app()` (`system_control.rs`, feature `Win32_UI_WindowsAndMessaging` + sysinfo) → nombre del proceso en primer plano. Registrado en `lib.rs`.
+- **`app/elfie/desktop.js`:** `resourceGuard` sobre el evento `elfie:metrics` → si VRAM/CPU ≥90% sostenido (2 ticks) o hay juego/IDE en primer plano (`HEAVY_APPS`, throttle ~15 s) → `applyMode("bajos")` + `setWake(false)` + notifica; al despejarse (4 ticks) restaura el modo previo. Toggle **Auto-recursos** en Elfie Core (`features.autoResources`, default on). `elfieSys.foregroundApp`.
+- ⚠️ La regla "pausar Ollama al generar imagen" queda lista (`free_for`/`claim`) pero su consumidor real es la Fase 7.2 (aún no existe).
+
 ### ⏭️ Pendiente Fase 8
 
-- **8.2 — Orquestador de recursos:** `orchestrator.py` con semáforo de GPU + reglas (pausar Ollama al generar imagen, mutex XTTS, degradar a bajos recursos si CPU/VRAM altas, detectar juego/IDE en primer plano vía comando Rust `foreground_app()`, usar API externa si VRAM baja). Prerrequisito de 7.2.
 - **8.3a — Lore/Codex (`PRTS-NNN`):** migración `lore_entries` + `app/lore.html` + indexar en RAG/memoria para que Elfie conozca su propio lore.
 
 ### Decisiones abiertas (resolver al implementar)

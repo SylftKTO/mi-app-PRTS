@@ -86,6 +86,10 @@
       </div>
     </div>
     <div class="row"><div class="desc" id="mode-desc" style="max-width:100%;text-align:left">—</div></div>
+    <div class="row">
+      <div><label>Auto-recursos</label><div class="desc">Baja a "bajos" si la GPU/CPU se satura o hay un juego/IDE en primer plano</div></div>
+      <span class="sw"><input type="checkbox" id="sw-auto"><span class="track"></span><span class="knob"></span></span>
+    </div>
     <div id="core-status" class="core-status"></div>
   </div>
 
@@ -382,6 +386,8 @@ async function renderCore() {
     }
     render(); // refleja los knobs cambiados en las demás tarjetas
   });
+  C.data.features = C.data.features || {};
+  sw("sw-auto", C.data.features.autoResources !== false, (v) => { C.data.features.autoResources = v; C.save(); });
 
   const P = [];
   P.push(pill("Supabase", window.sb ? "ok" : "off", window.sb ? "conectado" : "—"));

@@ -234,3 +234,37 @@ pub fn clipboard_write(text: String) -> Result<(), String> {
         .and_then(|mut c| c.set_text(text))
         .map_err(|e| e.to_string())
 }
+
+/// Nombre (en minúsculas) del proceso de la ventana en primer plano. Vacío si no
+/// se puede determinar. Lo usa el orquestador de recursos (Fase 8.2) para detectar
+/// juego/IDE y bajar el modo de Elfie. No Windows → cadena vacía.
+#[cfg(windows)]
+#[tauri::command]
+pub fn foreground_app() -> Result<String, String> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+    let mut pid: u32 = 0;
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return Ok(String::new());
+        }
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+    }
+    if pid == 0 {
+        return Ok(String::new());
+    }
+    use sysinfo::{Pid, ProcessesToUpdate, System};
+    let mut sys = System::new();
+    sys.refresh_processes(ProcessesToUpdate::All, true);
+    let name = sys
+        .process(Pid::from_u32(pid))
+        .map(|p| p.name().to_string_lossy().to_string())
+        .unwrap_or_default();
+    Ok(name.to_lowercase())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+pub fn foreground_app() -> Result<String, String> {
+    Ok(String::new())
+}

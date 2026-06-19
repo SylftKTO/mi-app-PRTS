@@ -27,7 +27,7 @@
     xttsSpeakerWav: "",  // ruta LOCAL del audio de referencia (solo este equipo → localStorage)
     interpreter: "local", // local (Ollama) | anthropic (Claude API)
     localModel: "qwen2.5:7b", // phi3.5 | qwen2.5:7b | llama3.1:8b
-    features: { wake: false, voice: true, monitor: true, metricsWidget: true },
+    features: { wake: false, voice: true, monitor: true, metricsWidget: true, autoResources: true },
     customPersonalities: {}, // { nombre: "descripción del tono" }
     // Elfie Core (Fase 8.1): modo de operación. applyMode() ajusta varios knobs a la vez.
     mode: "normal",         // bajos | normal | conversacion

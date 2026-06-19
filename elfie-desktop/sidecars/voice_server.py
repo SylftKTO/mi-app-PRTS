@@ -22,6 +22,7 @@ import sounddevice as sd
 
 import rag  # RAG local de Apuntes (Fase 6): embeddings + LanceDB
 import chat  # Chat conversacional con memoria (Fase 7.1)
+import orchestrator  # Árbitro de GPU/VRAM (Fase 8.2)
 
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("ELFIE_VOICE_PORT", "7331"))
@@ -258,6 +259,11 @@ def ensure_xtts():
             script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xtts_server.py")
             _xtts_proc = subprocess.Popen([py, script], cwd=os.path.dirname(script))
             print(f"[voz] XTTS microservicio lanzado (pid {_xtts_proc.pid})", flush=True)
+            # Registra a XTTS como dueño pesado de la GPU (no descarga Ollama: coexisten).
+            try:
+                orchestrator.claim("xtts")
+            except Exception:
+                pass
     for _ in range(60):  # espera a que el HTTP levante (no a que cargue el modelo)
         try:
             requests.get(XTTS_URL + "/health", timeout=1)
@@ -700,6 +706,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(chat.status())
         elif self.path == "/chat/memories":
             self._send(chat.mem_list())
+        elif self.path == "/orchestrator/status":
+            self._send(orchestrator.status())
         elif self.path == "/voice/xtts/health":
             import requests
             try:
@@ -769,6 +777,14 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/chat/extract":
                 b = self._body()
                 self._send(chat.auto_extract(b.get("history") or [], b.get("model")))
+            elif self.path == "/orchestrator/claim":
+                b = self._body()
+                self._send(orchestrator.claim(b.get("owner", "?"), b.get("need_mb"), bool(b.get("free_ollama"))))
+            elif self.path == "/orchestrator/release":
+                b = self._body()
+                self._send(orchestrator.release(b.get("owner", "?")))
+            elif self.path == "/orchestrator/unload_ollama":
+                self._send(orchestrator.unload_ollama())
             else:
                 self._send({"error": "not found"}, 404)
         except Exception as e:

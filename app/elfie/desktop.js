@@ -176,6 +176,7 @@
     muteToggle: () => invoke("mute_toggle"),
     screenshot: (toClipboard = false) => invoke("screenshot", { toClipboard }),
     toggleFullscreen: () => invoke("toggle_fullscreen"),
+    foregroundApp: () => invoke("foreground_app"),
   };
 
   // --- Pantalla completa: F11 alterna; Escape sale (solo cuando está activa) ---
@@ -282,7 +283,42 @@
     if (on && !ex && document.body) buildMetricsWidget();
     else if (!on && ex) ex.remove();
   }
-  listen("elfie:metrics", (e) => renderMetrics(e.payload));
+  // --- Orquestador de recursos (Fase 8.2): auto-baja a "bajos" bajo presión ---
+  // Política en el cliente (ya recibe métricas). El mecanismo de GPU vive en el sidecar.
+  const HEAVY_APPS = ["code", "idea64", "pycharm", "rider64", "clion", "devenv",
+    "studio64", "unity", "unrealeditor", "godot", "blender"]; // IDEs/editores; los juegos los caza la métrica GPU
+  let _autoDown = false, _prevMode = null, _hiStreak = 0, _loStreak = 0, _fgTick = 0, _fgHeavy = false;
+
+  async function resourceGuard(m) {
+    const f = ELFIE_CFG.features || {};
+    if (!f.autoResources) return;
+    // chequeo de primer plano: throttle ~cada 5 ticks (~15 s) porque refresca procesos
+    if ((_fgTick++ % 5) === 0) {
+      try {
+        const fg = String(await invoke("foreground_app") || "").toLowerCase();
+        _fgHeavy = !!fg && HEAVY_APPS.some((a) => fg.includes(a));
+      } catch (_) { _fgHeavy = false; }
+    }
+    const vramPct = m.gpu_vram_total_gb ? (m.gpu_vram_used_gb / m.gpu_vram_total_gb) * 100 : 0;
+    const pressure = vramPct >= 90 || (m.cpu_percent || 0) >= 90 || _fgHeavy;
+    if (pressure) { _hiStreak++; _loStreak = 0; } else { _loStreak++; _hiStreak = 0; }
+
+    if (!_autoDown && _hiStreak >= 2 && ELFIE_CFG.mode !== "bajos") {
+      _prevMode = ELFIE_CFG.mode; _autoDown = true;
+      window.ElfieConfig.applyMode("bajos");
+      setWake(false);
+      notify("Elfie · recursos", _fgHeavy ? "App pesada en primer plano → modo bajos recursos." : "Carga alta → modo bajos recursos.");
+    } else if (_autoDown && _loStreak >= 4) {
+      _autoDown = false;
+      const back = _prevMode || "normal"; _prevMode = null;
+      window.ElfieConfig.applyMode(back);
+      setWake(!!(ELFIE_CFG.features && ELFIE_CFG.features.wake));
+      try { await voicePost("/config", { model: ELFIE_CFG.localModel }); } catch (_) {}
+      notify("Elfie · recursos", "Recursos liberados → modo " + back + ".");
+    }
+  }
+
+  listen("elfie:metrics", (e) => { renderMetrics(e.payload); resourceGuard(e.payload); });
 
   // --- Wake word "Elfie" (opt-in, on-device vía Vosk en el sidecar) ---
   let wakeOn = false;
