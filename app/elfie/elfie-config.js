@@ -15,6 +15,11 @@
 
   const DEFAULTS = {
     personality: "profesional",
+    // Perfil de personalidad (Fase 8.3b): ejes que componen el tono efectivo.
+    iniciativa: "media",        // baja | media | alta — cuánto propone por su cuenta
+    detalle: "normal",          // breve | normal | extenso — longitud de respuesta
+    confirmaciones: "normales", // estrictas | normales | mínimas — cuánto pregunta antes de actuar
+    personaDesc: "",            // arquetipo en texto libre (vacío = preset/identidad base)
     voiceEngine: "kokoro", // kokoro | navegador | xtts (voz clonada)
     voiceSpeed: 1.0,
     ttsEnabled: true,
@@ -24,6 +29,34 @@
     localModel: "qwen2.5:7b", // phi3.5 | qwen2.5:7b | llama3.1:8b
     features: { wake: false, voice: true, monitor: true, metricsWidget: true },
     customPersonalities: {}, // { nombre: "descripción del tono" }
+    // Elfie Core (Fase 8.1): modo de operación. applyMode() ajusta varios knobs a la vez.
+    mode: "normal",         // bajos | normal | conversacion
+    sttContinuous: false,   // escucha semi-continua (modo conversación)
+    memoryActive: true,     // memoria de largo plazo del chat
+  };
+
+  // Presets de modo: un cambio reconfigura wake/voz/intérprete/modelo/memoria de golpe.
+  const MODES = {
+    bajos:        { wake: false, voiceEngine: "navegador", interpreter: "anthropic", localModel: "phi3.5",    sttContinuous: false, memoryActive: false },
+    normal:       { wake: true,  voiceEngine: "kokoro",    interpreter: "local",     localModel: "qwen2.5:7b", sttContinuous: false, memoryActive: true  },
+    conversacion: { wake: true,  voiceEngine: "xtts",      interpreter: "local",     localModel: "qwen2.5:7b", sttContinuous: true,  memoryActive: true  },
+  };
+
+  // Ejes → frases que se inyectan al system prompt (chat.py / router) vía tone().
+  const EJE_INICIATIVA = {
+    baja: "Iniciativa baja: responde lo pedido, sin proponer de más.",
+    media: "Iniciativa media: sugiere algo útil solo cuando aporte.",
+    alta: "Iniciativa alta: anticipa necesidades y propón el siguiente paso.",
+  };
+  const EJE_DETALLE = {
+    breve: "Sé muy breve, 1-2 frases.",
+    normal: "",
+    extenso: "Puedes extenderte cuando ayude a entender.",
+  };
+  const EJE_CONFIRM = {
+    estrictas: "Confirma antes de cualquier acción que escriba o cambie datos.",
+    normales: "",
+    "mínimas": "Evita confirmaciones salvo en acciones irreversibles.",
   };
 
   function deepMerge(base, over) {
@@ -45,10 +78,36 @@
   function personalities() {
     return Object.assign({}, TONOS, data.customPersonalities || {});
   }
+  // Tono efectivo = arquetipo (texto libre o preset) + ejes de personalidad.
   function tone() {
-    return personalities()[data.personality] || TONOS.profesional;
+    const base = (data.personaDesc && data.personaDesc.trim())
+      || personalities()[data.personality] || TONOS.profesional;
+    return [
+      base,
+      EJE_INICIATIVA[data.iniciativa] || "",
+      EJE_DETALLE[data.detalle] || "",
+      EJE_CONFIRM[data.confirmaciones] || "",
+    ].filter(Boolean).join(" ");
   }
   data.tone = tone();
+
+  // Aplica un modo (Elfie Core): ajusta wake/voz/intérprete/modelo/memoria y persiste.
+  // Los efectos en el sidecar (wake enable/disable, /config) los aplica el consumidor
+  // que escuche 'elfie:cfg-changed' o el propio selector en elfie.html.
+  function applyMode(name) {
+    const m = MODES[name];
+    if (!m) return false;
+    data.mode = name;
+    data.features = data.features || {};
+    data.features.wake = m.wake;
+    data.voiceEngine = m.voiceEngine;
+    data.interpreter = m.interpreter;
+    data.localModel = m.localModel;
+    data.sttContinuous = m.sttContinuous;
+    data.memoryActive = m.memoryActive;
+    save();
+    return true;
+  }
 
   function save() {
     data.tone = tone();
@@ -58,6 +117,12 @@
         .from("elfie_config")
         .upsert({
           personality: data.personality,
+          persona: {
+            iniciativa: data.iniciativa,
+            detalle: data.detalle,
+            confirmaciones: data.confirmaciones,
+            desc: data.personaDesc,
+          },
           voice_engine: data.voiceEngine,
           voice_speed: data.voiceSpeed,
           tts_enabled: data.ttsEnabled,
@@ -69,5 +134,5 @@
     window.dispatchEvent(new CustomEvent("elfie:cfg-changed"));
   }
 
-  window.ElfieConfig = { TONOS, DEFAULTS, data, save, tone, personalities };
+  window.ElfieConfig = { TONOS, DEFAULTS, MODES, data, save, tone, personalities, applyMode };
 })();

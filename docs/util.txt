@@ -3,6 +3,9 @@ x7PlWRP4a4xAk7A1
 u3eDomGg079zv7Bg wolves
 cd C:\Users\Sylft\Desktop\Projects\mi-app-PRTS
 
+sh
+cd C:\Users\Sylft\Desktop\Projects\mi-app-PRTS\elfie-desktop && npm run dev 2>&1
+
 juancarloslr.kt@gmail.com
 kal98SiT
 
@@ -21,4 +24,10 @@ cd C:\Users\Sylft\Desktop\Projects\mi-app-personal
 npm run dev:frontend
 npm run dev:backend
 
+
+limpiar historial(sin push, la version de escritorio se queda para mi en mi computadora)
+cerrar memoria del chat
+Mejorar interfaz del chat(el chat solo existe para desktop)
+Wake word on-device real
+Spotify Web API
 

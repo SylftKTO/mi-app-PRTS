@@ -356,8 +356,114 @@ _WAKE_STRIP = re.compile(
     re.IGNORECASE,
 )
 
+# ---------------------------------------------------------------- Wake word REAL on-device (Porcupine)
+# Detector dedicado (no STT general): mucho más preciso y ligero que Vosk, 100% on-device.
+# Palabra personalizada «Dalia» = archivo .ppn generado gratis en console.picovoice.ai.
+# Si falta la AccessKey o el .ppn, se cae automáticamente al detector Vosk (degradación total).
+PICOVOICE_KEY = os.environ.get("ELFIE_PICOVOICE_KEY", "")
+PORCUPINE_PPN = os.environ.get(
+    "ELFIE_PORCUPINE_PPN", os.path.join(MODELS_DIR, "porcupine", "dalia.ppn")
+)
+PORCUPINE_SENS = float(os.environ.get("ELFIE_PORCUPINE_SENS", "0.6"))  # 0..1 (más alto = más sensible)
+_porcupine = None
+_porcupine_tried = False
+
+
+def load_porcupine():
+    """Crea el detector Porcupine si hay AccessKey + .ppn de 'Dalia'. Si no, None (→ Vosk)."""
+    global _porcupine, _porcupine_tried
+    if _porcupine_tried:
+        return _porcupine
+    _porcupine_tried = True
+    key = PICOVOICE_KEY
+    if not key:  # alternativa amigable: archivo local junto al .ppn (gitignored)
+        keyfile = os.path.join(MODELS_DIR, "porcupine", "accesskey.txt")
+        if os.path.exists(keyfile):
+            try:
+                key = open(keyfile, encoding="utf-8").read().strip()
+            except Exception:
+                key = ""
+    if not key or not os.path.exists(PORCUPINE_PPN):
+        return None
+    try:
+        import pvporcupine
+
+        kwargs = {
+            "access_key": key,
+            "keyword_paths": [PORCUPINE_PPN],
+            "sensitivities": [PORCUPINE_SENS],
+        }
+        model = os.environ.get("ELFIE_PORCUPINE_MODEL")  # .pv en español (opcional)
+        if model and os.path.exists(model):
+            kwargs["model_path"] = model
+        _porcupine = pvporcupine.create(**kwargs)
+        print("[voz] Porcupine cargado (wake word on-device 'Dalia')", flush=True)
+    except Exception as e:
+        print(f"[voz] Porcupine no disponible ({e}); uso Vosk", flush=True)
+        _porcupine = None
+    return _porcupine
+
+
+def _capture_after_wake():
+    """Tras detectar la wake word, graba el comando (float32) hasta ~1 s de silencio
+    y lo transcribe con Whisper. Stream propio (un pequeño hueco tras la palabra es ok)."""
+    BLOCK = 4000
+    BLOCK_S = BLOCK / SAMPLE_RATE
+    THRESH, SILENCE_END, MAX_CMD = 0.015, 1.0, 6.0
+    frames, spoke, silence = [], False, 0.0
+    with sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype="float32", blocksize=BLOCK) as st:
+        while not _ptt_active.is_set() and not _tts_active.is_set():
+            data, _ = st.read(BLOCK)
+            f = data.flatten().copy()
+            frames.append(f)
+            if _rms(f) > THRESH:
+                spoke, silence = True, 0.0
+            elif spoke:
+                silence += BLOCK_S
+            if (spoke and silence >= SILENCE_END) or (len(frames) * BLOCK_S >= MAX_CMD):
+                break
+    return transcribe_audio(np.concatenate(frames)) if spoke else ""
+
+
+def wake_loop_porcupine(pp):
+    """Escucha continua con Porcupine: detecta 'Dalia' → captura el comando → Whisper → cola."""
+    fl, sr = pp.frame_length, pp.sample_rate
+    while True:
+        if not _wake_enabled.is_set() or _ptt_active.is_set() or _tts_active.is_set():
+            time.sleep(0.15)
+            continue
+        try:
+            with sd.InputStream(samplerate=sr, channels=1, dtype="int16", blocksize=fl) as st:
+                while (
+                    _wake_enabled.is_set()
+                    and not _ptt_active.is_set()
+                    and not _tts_active.is_set()
+                ):
+                    data, _ = st.read(fl)
+                    if pp.process(data.flatten()) >= 0:
+                        print("[voz] wake (Porcupine) 'Dalia' detectada", flush=True)
+                        break
+            if not _wake_enabled.is_set():
+                continue
+            text = _WAKE_STRIP.sub("", _capture_after_wake().strip()).strip()
+            if text:
+                print(f"[voz] wake comando: {text!r}", flush=True)
+                _wake_queue.put(text)
+        except Exception as e:
+            print(f"[voz] porcupine loop error: {e}", flush=True)
+            time.sleep(0.5)
+
 
 def wake_loop():
+    """Dispatcher: usa Porcupine (on-device real) si está configurado; si no, Vosk."""
+    pp = load_porcupine()
+    if pp is not None:
+        wake_loop_porcupine(pp)
+    else:
+        wake_loop_vosk()
+
+
+def wake_loop_vosk():
     """Escucha continua con UN solo stream (sin reabrir → sin recortar el comando):
     Vosk detecta 'Elfie' → se acumula el audio siguiente hasta ~1 s de silencio →
     Whisper transcribe → cola. Descarta si no hubo voz real (evita alucinaciones)."""
@@ -577,6 +683,7 @@ class Handler(BaseHTTPRequestHandler):
                     "ok": True,
                     "whisper": _whisper is not None,
                     "wake": _wake_enabled.is_set(),
+                    "wake_engine": "porcupine" if _porcupine is not None else "vosk",
                     "model": LLM_MODEL,
                 }
             )
@@ -659,6 +766,9 @@ class Handler(BaseHTTPRequestHandler):
             elif self.path == "/chat/forget":
                 b = self._body()
                 self._send(chat.forget(b.get("id")))
+            elif self.path == "/chat/extract":
+                b = self._body()
+                self._send(chat.auto_extract(b.get("history") or [], b.get("model")))
             else:
                 self._send({"error": "not found"}, 404)
         except Exception as e:

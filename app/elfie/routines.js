@@ -66,6 +66,7 @@
     silenciar: "mute_toggle", mute: "mute_toggle", mute_toggle: "mute_toggle",
     decir: "say", say: "say",
     esperar: "wait", espera: "wait", wait: "wait",
+    modo: "set_mode", mode: "set_mode", set_mode: "set_mode",
   };
 
   function parseSteps(text) {
@@ -84,6 +85,7 @@
       else if (act === "navigate") step.params.view = val.toLowerCase();
       else if (act === "spotify_preset") step.params.preset = val || "foco";
       else if (act === "say") step.params.text = val;
+      else if (act === "set_mode") step.params.mode = val.toLowerCase();
       else if (act === "wait") step.delay_ms = parseInt(val) || 500;
       steps.push(step);
     }
@@ -98,6 +100,7 @@
         case "navigate": return "ir: " + (s.params.view || "");
         case "spotify_preset": return "spotify: " + (s.params.preset || "foco");
         case "say": return "decir: " + (s.params.text || "");
+        case "set_mode": return "modo: " + (s.params.mode || "");
         case "wait": return "esperar: " + (s.delay_ms || 0);
         case "mute_toggle": return "silenciar";
         case "screenshot": return "captura";
@@ -126,6 +129,7 @@
             await ai.executeIntent({ intent: "open", params: { deep_link: "spotify:preset:" + s.params.preset } }, { spoken: true });
           break;
         case "say": if (ai && ai.say) ai.say(s.params.text); break;
+        case "set_mode": if (window.ElfieConfig && window.ElfieConfig.applyMode) window.ElfieConfig.applyMode(s.params.mode); break;
         case "wait": break;
       }
     } catch (e) {

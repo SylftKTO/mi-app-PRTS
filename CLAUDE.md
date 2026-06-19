@@ -181,10 +181,52 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 - Antes la wake word web (`wakeword.js`) usaba «Dalia» pero el detector **nativo** (Vosk, `voice_server.py`) solo disparaba con «Elfie». Ahora `WAKE_RE` y `_WAKE_STRIP` aceptan ambas + mis-hears de Vosk en es (`dalia/dalía/talía/valía/daría`). Reiniciar el sidecar para que tome el cambio.
 
+### ✅ Wake word ON-DEVICE real (Picovoice Porcupine)
+
+- **Por qué:** Vosk es STT general usado como detector "suave" → más falsos positivos y más CPU. **Porcupine** es un detector dedicado: 100% on-device, muy preciso, bajísimo CPU. Cumple la Fase 5.1 del plan.
+- **`voice_server.py`:** `load_porcupine()` + `wake_loop_porcupine()` + dispatcher `wake_loop()` (Porcupine si está configurado; si no, `wake_loop_vosk()` — **degradación total**). `pvporcupine` instalado en `venv-voice`. Tras detectar, captura el comando en un stream propio y lo transcribe con Whisper (igual que Vosk). `/health` reporta `wake_engine: porcupine|vosk`.
+- **Setup del usuario (una vez):** en `console.picovoice.ai` (gratis) → obtener **AccessKey** + crear wake word personalizada **«Dalia»** (plataforma Windows) → descargar el `.ppn`. Colocar: `.ppn` en `elfie-desktop/models/porcupine/dalia.ppn` y la key en `elfie-desktop/models/porcupine/accesskey.txt` (o env `ELFIE_PICOVOICE_KEY`). Para una «Dalia» en español, descargar también `porcupine_params_es.pv` y apuntar `ELFIE_PORCUPINE_MODEL`. Envs: `ELFIE_PORCUPINE_PPN`, `ELFIE_PORCUPINE_SENS` (def 0.6).
+- ⚠️ `models/` está en `.gitignore` → el `.ppn` y la key se quedan locales (no se versionan). Mientras no exista key+`.ppn`, sigue usando Vosk.
+
+### ✅ Spotify Web API (control real de reproducción)
+
+- **Por qué:** antes solo se abrían deep links (`abrirSpotify`). Ahora control real por voz: buscar+reproducir, pausar, saltar, volumen. **Funciona en web y escritorio** (la Web API no es solo de escritorio).
+- **`app/ai/spotify.js`** (nuevo): OAuth **Authorization Code + PKCE** (sin secreto → seguro en cliente). Refresh token en `localStorage`, access token (~1 h) en memoria con renovado automático. Flujo por **popup** → `app/spotify-callback.html` (postMessage del `code` a la ventana padre). `PRTS_AI.spotify`: `available/connected/connect/disconnect`, `play/pause/resume/next/previous/volume/nudgeVolume/current/state`, `searchAndPlay(q,type)`, `playUri`. Errores tipados: `no_device` (sin dispositivo activo → el llamador abre la app), `premium` (requiere Premium), `auth`, `not_found`.
+- **`app/config.js`** → `SPOTIFY_CLIENT_ID` (público por PKCE, vacío por defecto). **Setup del usuario:** developer.spotify.com → Create app → copiar Client ID; en *Redirect URIs* agregar `<URL Vercel>/spotify-callback.html` y `http://localhost:3210/spotify-callback.html`.
+- **Voz (`actions.js`):** intents locales `spotify_ctl` (pause/resume/next/previous/vol_up/vol_down) y `spotify_play` (buscar+reproducir). Router: "pon/reproduce <X>", "pausa", "siguiente canción", "sube/baja el volumen", etc. Los presets ("pon música de estudio/foco/entreno") siguen como `open` deep link.
+- **UI:** tarjeta **Spotify** en `elfie.html` (Conectar/Desconectar + estado). `spotify.js` cargado en `index.html` y `elfie.html`.
+- **Degradación:** sin `SPOTIFY_CLIENT_ID` o sin conectar → `available()/connected()` false y se avisa; los presets siguen abriendo por deep link. ⚠ Reproducir requiere **Premium + dispositivo activo**; sin dispositivo, abre la app de Spotify y se reintenta.
+
 ### ⏭️ Pendiente Fase 7
 
-- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (descargar Ollama antes de generar). Migración `..0020_elfie_images.sql` + `app/elfie-galeria.html` + intent `generate_image`.
+- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (Fase 8.2, descargar Ollama antes de generar). Migración `..0022_elfie_images.sql` + `app/elfie-galeria.html` + intent `generate_image`.
 - **7.3 — Extras sugeridos:** visión de pantalla (qwen2-vl/llava sobre `elfieSys.screenshot`), avatar anime de Dalia (sinergia con 7.2), briefing hablado matutino, diario por voz, RAG de PDFs.
+
+## Fase 8 — Elfie Core, Orquestador y Lore
+
+> Plan completo en `docs/Fase8_Elfie_Core_Plan.md`. Origen: `PRTS.docx`. Unifica los knobs sueltos de Elfie bajo un estado central con modos, un árbitro de recursos para los 8 GB de VRAM, y formaliza la identidad/personalidad.
+
+### ✅ 8.3b — Perfil de personalidad estructurado
+
+- **Por qué:** la personalidad era un solo string de tono. Ahora es un perfil por **ejes** que compone el tono efectivo que ya fluye al chat (`chat.py`) y al router por la tubería `ElfieConfig.tone()`.
+- **`app/elfie/elfie-config.js`:** nuevos campos `iniciativa` (baja/media/alta), `detalle` (breve/normal/extenso), `confirmaciones` (estrictas/normales/mínimas), `personaDesc` (arquetipo libre). `tone()` compone: arquetipo (texto libre o preset) + frases por eje. Constantes `EJE_*`.
+- **`app/elfie.html`:** tarjeta Personalidad ampliada con 3 controles segmentados + textarea de arquetipo + **vista previa del tono** en vivo (`renderTone`). Sin cambios en el sidecar (el tono compuesto viaja por el canal existente).
+- **Migración `..0020_elfie_persona.sql`:** columna `persona jsonb` en `elfie_config` (sync best-effort; la feature funciona con localStorage).
+- **Pendiente decisión:** "¿personalidad basada en un personaje?" → arquetipo propio (evitar copyright). El campo `personaDesc` ya permite definirlo libre.
+
+### ✅ 8.1 — Elfie Core (estado + modos)
+
+- **`app/elfie/elfie-config.js`:** `mode` (bajos/normal/conversacion) + flags `sttContinuous`, `memoryActive`. `MODES` (preset por modo) y `applyMode(name)` reconfiguran wake/voz/intérprete/modelo/memoria de golpe y persisten.
+- **`app/elfie.html`:** tarjeta **Elfie Core** con selector de modo (segmentado) + descripción y **panel de semáforos** (`renderCore`): Supabase, STT·Whisper, Wake word (engine), IA local (ping a Ollama), TTS, Spotify, Calendar, y VRAM/CPU (vía `get_metrics` en escritorio). Fuentes: `/health`, puentes del cliente, Tauri invoke. En web los de sidecar muestran "escritorio".
+- **`app/elfie/routines.js`:** acción **`set_mode`** (alias `modo:`) → las rutinas pueden cambiar de modo (p. ej. "modo juego → bajos recursos").
+- **`app/elfie-chat.html`:** la extracción automática de memoria se **gatea con `memoryActive`** (off en modo bajos recursos).
+- **Decisión tomada:** el modo solo tiene efecto pleno en escritorio (en web no hay sidecar → los modelos locales no aplican). Modos en **localStorage** (no se añadió columna a Supabase para no romper el sync hasta `db:push`).
+- ⚠️ `sttContinuous` queda **plumbed pero sin comportamiento aún** (la escucha semi-continua real es un follow-up; hoy el modo conversación lo marca pero la voz sigue por wake word/push-to-talk).
+
+### ⏭️ Pendiente Fase 8
+
+- **8.2 — Orquestador de recursos:** `orchestrator.py` con semáforo de GPU + reglas (pausar Ollama al generar imagen, mutex XTTS, degradar a bajos recursos si CPU/VRAM altas, detectar juego/IDE en primer plano vía comando Rust `foreground_app()`, usar API externa si VRAM baja). Prerrequisito de 7.2.
+- **8.3a — Lore/Codex (`PRTS-NNN`):** migración `lore_entries` + `app/lore.html` + indexar en RAG/memoria para que Elfie conozca su propio lore.
 
 ### Decisiones abiertas (resolver al implementar)
 

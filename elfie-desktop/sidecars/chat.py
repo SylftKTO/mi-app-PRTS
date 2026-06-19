@@ -50,8 +50,12 @@ def _mem_connect():
         _mem_err = str(e)
 
 
+DEDUP_SCORE = 0.88   # si ya existe un recuerdo casi idéntico, no duplicar
+
+
 def remember(text, kind="hecho"):
-    """Guarda un hecho durable: lo embebe y lo añade al vector store."""
+    """Guarda un hecho durable: lo embebe y lo añade al vector store.
+    Deduplica: si ya hay un recuerdo casi idéntico (coseno ≥ DEDUP_SCORE) no lo repite."""
     _mem_connect()
     if _mem_err:
         return {"ok": False, "error": _mem_err}
@@ -59,13 +63,23 @@ def remember(text, kind="hecho"):
     if not text:
         return {"ok": False, "error": "texto vacio"}
     vec = rag._embed(text)
-    row = {"id": str(int(time.time() * 1000)), "text": text, "kind": kind or "hecho", "vector": vec}
     global _mem_tbl
     with _mem_lock:
         if _mem_tbl is None:
+            row = {"id": str(int(time.time() * 1000)), "text": text, "kind": kind or "hecho", "vector": vec}
             _mem_tbl = _mem_db.create_table(MEM_TABLE, data=[row])
-        else:
-            _mem_tbl.add([row])
+            return {"ok": True, "id": row["id"]}
+        # dedup contra el más cercano existente
+        try:
+            top = _mem_tbl.search(vec).metric("cosine").limit(1).to_list()
+            if top:
+                score = 1.0 - float(top[0].get("_distance", 1.0))
+                if score >= DEDUP_SCORE:
+                    return {"ok": True, "id": top[0].get("id"), "duplicate": True}
+        except Exception:
+            pass
+        row = {"id": str(int(time.time() * 1000)), "text": text, "kind": kind or "hecho", "vector": vec}
+        _mem_tbl.add([row])
     return {"ok": True, "id": row["id"]}
 
 
@@ -153,11 +167,52 @@ def _build_messages(history, tone):
     return msgs, recuerdos
 
 
+# Memoria EXPLÍCITA: "recuerda que…", "acuérdate de…", "no olvides que…", etc.
+import re as _re
+
+_MEM_CMD_RE = _re.compile(
+    r"^\s*(?:elfie|dalia)?[,\s]*"
+    r"(?:recu[eé]rda(?:me|te)?|acu[eé]rdate|ten en cuenta|toma nota|ap[uú]nta(?:me)?|guarda|no (?:te )?olvides)"
+    r"\s+(?:de\s+|que\s+|lo siguiente:?\s*)*(.+)$",
+    _re.IGNORECASE,
+)
+
+
+def detect_explicit_memory(text):
+    """Si el mensaje pide recordar algo, devuelve el hecho (sin el verbo); si no, None."""
+    m = _MEM_CMD_RE.match((text or "").strip())
+    if not m:
+        return None
+    fact = m.group(1).strip().rstrip(" .!¡¿?")
+    return fact if len(fact) >= 3 else None
+
+
+def _last_user(history):
+    for m in reversed(history or []):
+        if m.get("role") == "user":
+            return m.get("content", "") or ""
+    return ""
+
+
 def reply(history, tone="", model=None):
-    """Genera la respuesta de Elfie dado el historial de la conversación."""
+    """Genera la respuesta de Elfie dado el historial de la conversación.
+    Si el último mensaje pide recordar algo explícitamente, lo guarda primero
+    (deduplicado) y se lo indica al modelo para que lo confirme con naturalidad."""
     import requests
 
+    stored = None
+    fact = detect_explicit_memory(_last_user(history))
+    if fact:
+        rr = remember(fact)
+        if rr.get("ok"):
+            stored = fact
+
     msgs, recuerdos = _build_messages(history, tone)
+    if stored:
+        msgs[0]["content"] += (
+            f"\n\nNota: el usuario te pidió recordar «{stored}» y ya lo guardaste "
+            "en tu memoria de largo plazo. Confírmalo de forma breve y natural."
+        )
     try:
         r = requests.post(
             OLLAMA_CHAT_URL,
@@ -176,7 +231,59 @@ def reply(history, tone="", model=None):
             raise RuntimeError("respuesta vacía")
     except Exception as e:
         return {"ok": False, "error": str(e), "reply": ""}
-    return {"ok": True, "reply": text, "used_memories": recuerdos}
+    return {"ok": True, "reply": text, "used_memories": recuerdos, "stored_memory": stored}
+
+
+_EXTRACT_PROMPT = (
+    "Del siguiente diálogo, extrae SOLO hechos durables y personales sobre el usuario que "
+    "valga la pena recordar a largo plazo (preferencias, datos personales, rutinas, relaciones, "
+    "metas, decisiones). Ignora lo trivial, efímero, las preguntas y lo ya obvio. Devuelve un "
+    "hecho por línea, en tercera persona y conciso. Si no hay nada que valga la pena, responde "
+    "EXACTAMENTE: NONE. Máximo 3.\n\nDIÁLOGO:\n"
+)
+
+
+def auto_extract(history, model=None):
+    """Pasada ligera que detecta hechos durables del diálogo y los guarda (deduplicados).
+    Pensada para llamarse en segundo plano desde el cliente, sin frenar la respuesta."""
+    import requests
+
+    convo = "\n".join(
+        f"{'Usuario' if m.get('role') == 'user' else 'Elfie'}: {(m.get('content') or '').strip()}"
+        for m in (history or [])[-6:]
+        if (m.get("content") or "").strip()
+    )
+    if not convo.strip():
+        return {"ok": True, "stored": []}
+    try:
+        r = requests.post(
+            rag.OLLAMA_GEN_URL,
+            json={
+                "model": model or CHAT_MODEL,
+                "prompt": _EXTRACT_PROMPT + convo + "\n\nHECHOS:",
+                "stream": False,
+                "keep_alive": "10m",
+                "options": {"temperature": 0.1, "num_predict": 160},
+            },
+            timeout=60,
+        )
+        r.raise_for_status()
+        out = (r.json().get("response") or "").strip()
+    except Exception as e:
+        return {"ok": False, "error": str(e), "stored": []}
+    if not out or out.strip().upper().startswith("NONE"):
+        return {"ok": True, "stored": []}
+    stored = []
+    for line in out.splitlines():
+        f = line.strip().lstrip("-*•0123456789. ").strip().rstrip(" .")
+        if len(f) < 6 or f.upper() == "NONE":
+            continue
+        rr = remember(f)
+        if rr.get("ok") and not rr.get("duplicate"):
+            stored.append(f)
+        if len(stored) >= 3:
+            break
+    return {"ok": True, "stored": stored}
 
 
 def status():

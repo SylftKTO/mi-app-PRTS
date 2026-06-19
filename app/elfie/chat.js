@@ -80,6 +80,14 @@
       catch (_) { return null; }
     },
 
+    // Extracción automática de hechos durables (segundo plano, no bloquea el chat).
+    // Devuelve {ok, stored:[...]} o null. Pensada para fire-and-forget.
+    async extract(history) {
+      if (!isDesktop() || !history || !history.length) return null;
+      try { return await post("/chat/extract", { history }); }
+      catch (_) { return null; }
+    },
+
     // Locuta una respuesta completa, frase a frase. Devuelve cuando termina.
     async speak(text) {
       if (!isDesktop()) return;

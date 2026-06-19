@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Conectando Spotify…</title>
+<style>
+  body { margin: 0; height: 100vh; display: grid; place-items: center; background: #0D0C0E; color: #ECE8EA;
+    font-family: 'Inter', system-ui, sans-serif; }
+  .box { text-align: center; }
+  .box b { color: #E68AA2; }
+</style>
+</head>
+<body>
+<div class="box"><p>Conectando con <b>Spotify</b>…</p><p id="m" style="color:#837A82;font-size:.85rem">Puedes cerrar esta ventana.</p></div>
+<script>
+// Devuelve el código de autorización a la ventana que abrió el popup (mismo origen) y cierra.
+(function () {
+  const p = new URLSearchParams(location.search);
+  const payload = { type: "spotify-auth", code: p.get("code"), state: p.get("state"), error: p.get("error") };
+  try {
+    if (window.opener) {
+      window.opener.postMessage(payload, location.origin);
+      setTimeout(() => window.close(), 300);
+    } else {
+      document.getElementById("m").textContent = "Abre PRTS de nuevo para completar la conexión.";
+    }
+  } catch (e) {
+    document.getElementById("m").textContent = "No se pudo completar: " + e.message;
+  }
+})();
+</script>
+</body>
+</html>

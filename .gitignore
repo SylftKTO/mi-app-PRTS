@@ -29,4 +29,5 @@ elfie-desktop/src-tauri/target/
 elfie-desktop/db/
 elfie-desktop/voices/
 elfie-desktop/models/
+elfie-desktop/sidecars/models/
 _build.log

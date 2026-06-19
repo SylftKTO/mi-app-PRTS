@@ -12,6 +12,8 @@
 <link rel="stylesheet" href="styles.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="config.js"></script>
+<script src="ai/spotify.js"></script>
+<script src="ai/gcal.js"></script>
 <style>
   .wrap { max-width: 720px; margin: 0 auto; padding: 22px 18px 90px; }
   .ehead { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
@@ -47,6 +49,12 @@
   .pchip .x { opacity: .5; }
   .addp { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
   .addp input { flex: 1; }
+  .core-status { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px, 1fr)); gap: 8px; margin-top: 12px; }
+  .cs { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; font-size: 12px; }
+  .cs .sd { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+  .cs .sd.ok { background: var(--ok, #7Fd1a0); } .cs .sd.off { background: var(--faint, #837A82); } .cs .sd.na { background: var(--warn, #E0A06A); }
+  .cs .lbl { color: var(--muted); } .cs .val { margin-left: auto; color: var(--text); font-family: var(--mono); font-size: 11px; }
+  #mode-desc { max-width: 60%; text-align: right; }
   .kbd { font-family: var(--mono, ui-monospace, monospace); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 2px 7px; font-size: 12px; }
   .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
   .badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
@@ -67,16 +75,48 @@
   <div class="ehead"><h1>Elfie</h1> <span id="sc-badge" class="badge">sidecar…</span></div>
   <div class="sub">Personalidad, modelo de IA y funciones. Apaga lo que no uses para liberar GPU/RAM a otros proyectos.</div>
 
+  <!-- Elfie Core -->
+  <div class="card" id="card-core">
+    <h2>Elfie Core</h2>
+    <div class="hint">Estado de los subsistemas y modo de operación.</div>
+    <div class="row">
+      <div><label>Modo</label></div>
+      <div class="seg" id="seg-mode">
+        <button data-v="bajos">Bajos</button><button data-v="normal">Normal</button><button data-v="conversacion">Conversación</button>
+      </div>
+    </div>
+    <div class="row"><div class="desc" id="mode-desc" style="max-width:100%;text-align:left">—</div></div>
+    <div id="core-status" class="core-status"></div>
+  </div>
+
   <!-- Personalidad -->
   <div class="card">
     <h2>Personalidad</h2>
-    <div class="hint">Define el tono de las respuestas habladas de Elfie.</div>
+    <div class="hint">Arquetipo base + ejes que afinan cómo responde Elfie (en chat y por voz).</div>
     <div id="pchips" class="pchips"></div>
     <div class="addp">
       <input type="text" id="np-name" placeholder="Nombre (ej. Motivadora)">
       <input type="text" id="np-tone" placeholder="Tono (ej. enérgica y alentadora)">
       <button class="btn" id="np-add">Agregar</button>
     </div>
+
+    <div class="row">
+      <div><label>Iniciativa</label><div class="desc">Cuánto propone por su cuenta</div></div>
+      <div class="seg" id="seg-ini"><button data-v="baja">Baja</button><button data-v="media">Media</button><button data-v="alta">Alta</button></div>
+    </div>
+    <div class="row">
+      <div><label>Detalle</label><div class="desc">Longitud de las respuestas</div></div>
+      <div class="seg" id="seg-det"><button data-v="breve">Breve</button><button data-v="normal">Normal</button><button data-v="extenso">Extenso</button></div>
+    </div>
+    <div class="row">
+      <div><label>Confirmaciones</label><div class="desc">Cuánto pregunta antes de actuar</div></div>
+      <div class="seg" id="seg-conf"><button data-v="estrictas">Estrictas</button><button data-v="normales">Normales</button><button data-v="mínimas">Mínimas</button></div>
+    </div>
+    <div class="row" style="align-items:flex-start">
+      <div><label>Arquetipo</label><div class="desc">Texto libre (vacío = usa el preset de arriba)</div></div>
+      <textarea id="persona-desc" rows="2" style="flex:1;min-width:0" placeholder="Ej. cálida y curiosa, con humor seco…"></textarea>
+    </div>
+    <div class="note" id="tone-preview" style="white-space:normal"></div>
   </div>
 
   <!-- Modelo de IA -->
@@ -155,6 +195,18 @@
     </div>
   </div>
 
+  <!-- Spotify -->
+  <div class="card" id="card-spotify">
+    <h2>Spotify</h2>
+    <div class="hint">Control real por voz: «pon …», «pausa», «siguiente», «sube el volumen». Reproducir requiere Premium y un dispositivo activo.</div>
+    <div id="sp-estado" class="note">—</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+      <button class="btn" id="sp-connect">Conectar Spotify</button>
+      <button class="btn" id="sp-disconnect" style="display:none">Desconectar</button>
+    </div>
+    <div class="note" id="sp-help" style="display:none">Pega tu <span class="kbd">SPOTIFY_CLIENT_ID</span> en <span class="kbd">config.js</span> para habilitarlo.</div>
+  </div>
+
   <!-- Accesos -->
   <div class="card">
     <h2>Accesos</h2>
@@ -205,6 +257,7 @@ function renderPersonalities() {
     }
     box.appendChild(chip);
   });
+  if (typeof renderTone === "function") renderTone();
 }
 $("np-add").onclick = () => {
   const n = $("np-name").value.trim(), t = $("np-tone").value.trim();
@@ -305,8 +358,71 @@ async function eliminarPerfil(p) {
   renderVoiceProfiles();
 }
 
+function renderTone() {
+  const el = $("tone-preview");
+  if (el) el.textContent = "Tono efectivo: " + C.tone();
+}
+
+// ---- Elfie Core: modo + estado de subsistemas ----
+const MODE_DESC = {
+  bajos: "Sin wake word ni modelos locales pesados; captura por atajo, voz del sistema.",
+  normal: "Wake word activa, voz Kokoro, comandos e intérprete local.",
+  conversacion: "Escucha semi-continua, voz natural (XTTS), memoria activa; mayor consumo.",
+};
+function pill(label, state, val) {
+  return `<div class="cs"><span class="sd ${state}"></span><span class="lbl">${label}</span>${val ? `<span class="val">${val}</span>` : ""}</div>`;
+}
+async function renderCore() {
+  $("mode-desc").textContent = MODE_DESC[C.data.mode] || "";
+  seg("seg-mode", C.data.mode, async (v) => {
+    C.applyMode(v);
+    if (TAURI) {
+      try { await sidecar(C.data.features.wake ? "/wake/enable" : "/wake/disable"); } catch (_) {}
+      try { await sidecar("/config", { model: C.data.localModel }); } catch (_) {}
+    }
+    render(); // refleja los knobs cambiados en las demás tarjetas
+  });
+
+  const P = [];
+  P.push(pill("Supabase", window.sb ? "ok" : "off", window.sb ? "conectado" : "—"));
+  let h = null;
+  if (TAURI) { try { h = await (await fetch(VOICE_URL + "/health")).json(); } catch (_) {} }
+  if (TAURI) {
+    P.push(pill("STT · Whisper", h && h.whisper ? "ok" : "off", h && h.whisper ? "listo" : "—"));
+    P.push(pill("Wake word", h && h.wake ? "ok" : "off", h ? (h.wake_engine || "—") : "—"));
+    let ol = false; try { ol = (await fetch("http://127.0.0.1:11434/api/tags")).ok; } catch (_) {}
+    P.push(pill("IA local", ol ? "ok" : "off", ol ? (h && h.model) || "ollama" : "apagada"));
+  } else {
+    P.push(pill("STT · Whisper", "na", "escritorio"));
+    P.push(pill("Wake word", "na", "escritorio"));
+    P.push(pill("IA local", "na", "escritorio"));
+  }
+  P.push(pill("TTS", C.data.voiceEngine === "navegador" ? "off" : "ok", C.data.voiceEngine));
+  const sp = window.PRTS_AI && window.PRTS_AI.spotify;
+  P.push(pill("Spotify", sp && sp.connected() ? "ok" : "off", sp ? (sp.connected() ? "conectado" : (sp.available() ? "no conect." : "sin ID")) : "—"));
+  const gc = window.PRTS_AI && window.PRTS_AI.gcal;
+  const gcOn = gc && gc.connected && gc.connected();
+  P.push(pill("Calendar", gcOn ? "ok" : "off", gc ? (gcOn ? "conectado" : "no conect.") : "—"));
+  if (TAURI && window.__TAURI__) {
+    try {
+      const m = await window.__TAURI__.core.invoke("get_metrics");
+      if (m && m.gpu_vram_used_gb != null) P.push(pill("VRAM", "ok", `${m.gpu_vram_used_gb.toFixed(1)}/${(m.gpu_vram_total_gb || 0).toFixed(0)}G`));
+      if (m && m.cpu_percent != null) P.push(pill("CPU", "ok", `${m.cpu_percent.toFixed(0)}%`));
+    } catch (_) {}
+  }
+  $("core-status").innerHTML = P.join("");
+}
+
 function render() {
+  renderCore();
   renderPersonalities();
+  // Ejes de personalidad (Fase 8.3b)
+  seg("seg-ini", C.data.iniciativa, (v) => { C.data.iniciativa = v; C.save(); renderTone(); });
+  seg("seg-det", C.data.detalle, (v) => { C.data.detalle = v; C.save(); renderTone(); });
+  seg("seg-conf", C.data.confirmaciones, (v) => { C.data.confirmaciones = v; C.save(); renderTone(); });
+  $("persona-desc").value = C.data.personaDesc || "";
+  $("persona-desc").oninput = () => { C.data.personaDesc = $("persona-desc").value; C.save(); renderTone(); };
+  renderTone();
   seg("seg-interp", C.data.interpreter, (v) => { C.data.interpreter = v; C.save(); });
   $("sel-model").value = C.data.localModel;
   $("sel-model").onchange = async () => {
@@ -352,6 +468,31 @@ function render() {
     }).catch(() => { $("sc-badge").textContent = "sidecar offline"; });
   } else {
     $("sc-badge").textContent = "modo web";
+  }
+
+  // --- Spotify (Web API) ---
+  const sp = window.PRTS_AI && window.PRTS_AI.spotify;
+  const renderSp = () => {
+    const est = $("sp-estado");
+    if (!sp || !sp.available()) {
+      est.textContent = "○ No configurado";
+      $("sp-help").style.display = "block";
+      $("sp-connect").style.display = "none";
+      $("sp-disconnect").style.display = "none";
+      return;
+    }
+    const on = sp.connected();
+    est.textContent = on ? "● Conectado a Spotify" : "○ No conectado";
+    $("sp-connect").style.display = on ? "none" : "";
+    $("sp-disconnect").style.display = on ? "" : "none";
+  };
+  if ($("sp-connect")) {
+    $("sp-connect").onclick = async () => {
+      try { await sp.connect(); renderSp(); }
+      catch (e) { alert("No se pudo conectar con Spotify: " + (e && e.message || e)); }
+    };
+    $("sp-disconnect").onclick = () => { sp.disconnect(); renderSp(); };
+    renderSp();
   }
 }
 

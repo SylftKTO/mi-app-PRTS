@@ -310,12 +310,30 @@
     if (/clima|temperatura|va a llover|pronóstico/.test(t)) {
       return { intent: "weather", params: { location: null }, speak: "", confidence: 1 };
     }
-    m = t.match(/^pon (?:la )?música(?:\s+(?:de|para)\s+(estudio|estudiar|foco|concentra\w*|entrenar|entreno|gym))?/);
+    m = t.match(/^pon (?:la )?música(?:\s+(?:de|para)\s+(estudio|estudiar|foco|concentra\w*|entrenar|entreno|gym))?$/);
     if (m) {
       const ctx = /estudi/.test(m[1] || "") ? "estudio" : /foco|concentra/.test(m[1] || "") ? "foco"
                 : /entren|gym/.test(m[1] || "") ? "entreno" : "estudio";
       return { intent: "open", params: { target: "spotify", deep_link: "spotify:preset:" + ctx },
                speak: "Abriendo tu playlist de " + ctx + ".", confidence: 1 };
+    }
+    // --- Control de Spotify por la Web API (requiere conectar; si no, cae a deep link) ---
+    if (/^(pausa|pausar|detén|deten|para)( la)? (música|musica|canción|cancion|reproducción|reproduccion)|^pausa$/.test(t))
+      return { intent: "spotify_ctl", params: { op: "pause" }, speak: "", confidence: 1 };
+    if (/^(reanuda|continúa|continua|sigue|resume)( la)?( música| musica| canción| cancion)?$/.test(t))
+      return { intent: "spotify_ctl", params: { op: "resume" }, speak: "", confidence: 1 };
+    if (/^(siguiente|próxima|proxima|otra|salta|sáltate|saltate|cambia)( canción| cancion| de canción| de cancion)?$|^siguiente$/.test(t))
+      return { intent: "spotify_ctl", params: { op: "next" }, speak: "", confidence: 1 };
+    if (/^(anterior|regresa|atrás|atras|canción anterior|cancion anterior|la anterior)( canción| cancion)?$/.test(t))
+      return { intent: "spotify_ctl", params: { op: "previous" }, speak: "", confidence: 1 };
+    if (/(sube|súbele|subele|aumenta).*(volumen|música|musica)/.test(t))
+      return { intent: "spotify_ctl", params: { op: "vol_up" }, speak: "", confidence: 1 };
+    if (/(baja|bájale|bajale|reduce|disminuye).*(volumen|música|musica)/.test(t))
+      return { intent: "spotify_ctl", params: { op: "vol_down" }, speak: "", confidence: 1 };
+    // "pon/reproduce <canción o artista>" → buscar y reproducir
+    m = t.match(/^(?:pon|reproduce|toca|quiero (?:escuchar|oír|oir))\s+(?:la canción |la cancion |la rola |música de |musica de |algo de )?(.+)$/);
+    if (m && m[1] && m[1].trim().length > 1) {
+      return { intent: "spotify_play", params: { query: m[1].trim().replace(/[?¿.!\s]+$/, "") }, speak: "", confidence: 0.9 };
     }
     // "registra press banca 80 por 8" / "press banca 80 kg x 8" → serie de gym sin LLM
     m = t.match(/^(?:registra(?:r)?|anota(?:r)?|apunta(?:r)?)?\s*([a-záéíóúüñ][a-záéíóúüñ\s]*?)\s+(\d+(?:[.,]\d+)?)\s*(?:kg|kilos)?\s*(?:por|x|×)\s*(\d+)\b/);
@@ -372,6 +390,45 @@
         if (!DEEP_LINK_PREFIXES.some((p) => link.startsWith(p))) { notify("Deep link no permitido."); return; }
         notify(it.speak || "Abriendo…");
         abrirSpotify(link);
+        return;
+      }
+      case "spotify_ctl": {  // control de reproducción vía Web API
+        const sp = window.PRTS_AI && window.PRTS_AI.spotify;
+        if (!sp || !sp.connected()) { notify("Conecta Spotify en Elfie para controlar la reproducción."); return; }
+        const op = String(it.params?.op || "");
+        let r;
+        if (op === "pause") r = await sp.pause();
+        else if (op === "resume") r = await sp.resume();
+        else if (op === "next") r = await sp.next();
+        else if (op === "previous") r = await sp.previous();
+        else if (op === "vol_up") r = await sp.nudgeVolume(15);
+        else if (op === "vol_down") r = await sp.nudgeVolume(-15);
+        else { notify("No entendí el control."); return; }
+        if (r && r.ok) {
+          const msg = { pause: "Pausado.", resume: "Reanudando.", next: "Siguiente.", previous: "Anterior.",
+            vol_up: "Subiendo el volumen.", vol_down: "Bajando el volumen." }[op] || "Listo.";
+          notify(msg);
+        } else if (r && r.reason === "no_device") {
+          notify("No hay un dispositivo activo. Abre Spotify y reintenta.");
+          abrirSpotify("spotify:");
+        } else if (r && r.reason === "premium") {
+          notify("El control de reproducción requiere Spotify Premium.");
+        } else {
+          notify("No pude controlar Spotify.");
+        }
+        return;
+      }
+      case "spotify_play": {  // buscar y reproducir por nombre
+        const sp = window.PRTS_AI && window.PRTS_AI.spotify;
+        const q = String(it.params?.query || "").trim();
+        if (!q) { notify("¿Qué quieres escuchar?"); return; }
+        if (!sp || !sp.connected()) { notify("Conecta Spotify en Elfie para buscar y reproducir."); return; }
+        const r = await sp.searchAndPlay(q, "track");
+        if (r && r.ok) notify("Reproduciendo " + (r.name || q) + ".");
+        else if (r && r.reason === "no_device") { notify("No hay dispositivo activo. Abre Spotify y reintenta."); abrirSpotify("spotify:"); }
+        else if (r && r.reason === "premium") notify("Reproducir requiere Spotify Premium.");
+        else if (r && r.reason === "not_found") notify("No encontré “" + q + "” en Spotify.");
+        else notify("No pude reproducir eso.");
         return;
       }
       case "launch": {   // abrir app / web / carpeta de la whitelist de lanzadores
