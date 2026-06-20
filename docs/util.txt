@@ -12,7 +12,7 @@ kal98SiT
 npx serve app
 
 git add -A
-git commit -m "V1"
+git commit -m "Elfie V2"
 git push
 
 

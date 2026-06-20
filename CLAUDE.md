@@ -1,6 +1,6 @@
 # CLAUDE.md — PRTS
 
-Sistema personal de organización de Sergio (Sylft): estudiante TecNM Celaya, instructor (Wolves robótica / LevelUp idiomas), atleta de gym. Usuario único. Idioma: **español (es-MX)** — UI, commits y documentación en español.
+Sistema personal de organización de Sylft: estudiante TecNM Celaya, instructor (Wolves robótica / LevelUp idiomas), atleta de gym. Usuario único. Idioma: **español (es-MX)** — UI, commits y documentación en español.
 
 ## Stack
 
