@@ -97,12 +97,15 @@
         return;
       }
       window.PRTS_AI.speaking = true; // ondas de voz (auras rosa de la runa)
+      try { T.event.emit("elfie:say", { text }); } catch (_) {} // conduce la mascota
       try {
         const body = { text, speed: ELFIE_CFG.voiceSpeed };
         // Voz clonada: solo si hay perfil XTTS con audio de referencia (si no, Kokoro).
         if (ELFIE_CFG.voiceEngine === "xtts" && ELFIE_CFG.xttsSpeakerWav) {
           body.engine = "xtts";
           body.speaker_wav = ELFIE_CFG.xttsSpeakerWav;
+        } else if (ELFIE_CFG.voiceEngine === "piper") {
+          body.engine = "piper"; // voz ligera para confirmaciones (Fase 9.1)
         }
         const res = await voicePost("/tts", body);
         if (!res || res.ok !== true) throw new Error(res && res.error);
@@ -111,6 +114,7 @@
         if (originalSay) originalSay(text);
       } finally {
         window.PRTS_AI.speaking = false;
+        try { T.event.emit("elfie:speaking", false); } catch (_) {} // mascota → reposo
       }
     };
   }
@@ -177,7 +181,42 @@
     screenshot: (toClipboard = false) => invoke("screenshot", { toClipboard }),
     toggleFullscreen: () => invoke("toggle_fullscreen"),
     foregroundApp: () => invoke("foreground_app"),
+    // Mascota flotante (Fase 9.0)
+    petToggle: () => invoke("pet_toggle"),
+    petShow: () => invoke("pet_show"),
+    petHide: () => invoke("pet_hide"),
+    petSetSize: (size) => invoke("pet_set_size", { size }),
+    petClickThrough: (on) => invoke("pet_click_through", { on }),
   };
+
+  // --- Mascota: conduce su avatar y enruta sus acciones rápidas (Fase 9.0/9.1) ---
+  // Refleja la atención (wake) como estado "escuchando" de la mascota.
+  let _petListen = null;
+  setInterval(() => {
+    const a = !!(window.PRTS_AI && window.PRTS_AI.attention);
+    if (a !== _petListen) {
+      _petListen = a;
+      try { T.event.emit("elfie:listening", a); } catch (_) {}
+    }
+  }, 300);
+
+  // La mascota pide acciones a la ventana principal (el cerebro vive aquí).
+  listen("pet:action", (e) => {
+    const act = e && e.payload && e.payload.act;
+    try {
+      if (act === "capture") {
+        enfocarCaptura();
+      } else if (act === "voice") {
+        // Reanuda la escucha continua (wake word) si está disponible.
+        if (window.PRTS_AI && window.PRTS_AI.wakeResume) window.PRTS_AI.wakeResume();
+        else enfocarCaptura();
+      } else if (act === "chat") {
+        window.location.href = "elfie-chat.html";
+      } else if (act === "dashboard") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    } catch (err) { console.warn("[elfie] pet:action sin manejar:", act, err); }
+  });
 
   // --- Pantalla completa: F11 alterna; Escape sale (solo cuando está activa) ---
   let fsOn = false;

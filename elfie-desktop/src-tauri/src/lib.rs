@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    Emitter, Manager, WindowEvent,
+    Emitter, LogicalSize, Manager, WebviewUrl, WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_notification::NotificationExt;
 
@@ -62,6 +62,89 @@ fn toggle_fullscreen(app: tauri::AppHandle) -> bool {
     fullscreen_toggle(&app)
 }
 
+// ---------------------------------------------------------------- Mascota (Fase 9.0)
+/// Tamaño en px lógicos de la ventana mascota por modo.
+fn pet_size_px(size: &str) -> (f64, f64) {
+    match size {
+        "mini" => (150.0, 150.0),
+        "panel" => (320.0, 460.0),
+        _ => (220.0, 250.0), // normal
+    }
+}
+
+/// Crea la ventana flotante de la mascota (oculta, transparent, always-on-top). Idempotente.
+fn ensure_pet(app: &tauri::AppHandle) -> Option<tauri::WebviewWindow> {
+    if let Some(w) = app.get_webview_window("pet") {
+        return Some(w);
+    }
+    let (w, h) = pet_size_px("normal");
+    WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("pet.html".into()))
+        .title("Elfie")
+        .inner_size(w, h)
+        .decorations(false)
+        .transparent(true)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .shadow(false)
+        .resizable(false)
+        .visible(false)
+        .build()
+        .ok()
+}
+
+/// Alterna visibilidad de la mascota; la crea si no existe. Devuelve si quedó visible.
+fn pet_toggle_inner(app: &tauri::AppHandle) -> bool {
+    let win = match app.get_webview_window("pet").or_else(|| ensure_pet(app)) {
+        Some(w) => w,
+        None => return false,
+    };
+    if win.is_visible().unwrap_or(false) {
+        let _ = win.hide();
+        false
+    } else {
+        let _ = win.show();
+        let _ = win.set_focus();
+        true
+    }
+}
+
+#[tauri::command]
+fn pet_toggle(app: tauri::AppHandle) -> bool {
+    pet_toggle_inner(&app)
+}
+
+#[tauri::command]
+fn pet_show(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("pet").or_else(|| ensure_pet(&app)) {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+fn pet_hide(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("pet") {
+        let _ = w.hide();
+    }
+}
+
+#[tauri::command]
+fn pet_set_size(app: tauri::AppHandle, size: String) {
+    if let Some(w) = app.get_webview_window("pet") {
+        let (ww, hh) = pet_size_px(&size);
+        let _ = w.set_size(LogicalSize::new(ww, hh));
+        let _ = w.emit("pet:size", size);
+    }
+}
+
+/// Click-through: la mascota deja pasar el ratón (modo "solo avatar").
+#[tauri::command]
+fn pet_click_through(app: tauri::AppHandle, on: bool) {
+    if let Some(w) = app.get_webview_window("pet") {
+        let _ = w.set_ignore_cursor_events(on);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -76,10 +159,11 @@ pub fn run() {
         let sc_voice = Shortcut::new(Some(Modifiers::ALT), Code::KeyE);
         let sc_routine =
             Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyR);
+        let sc_pet = Shortcut::new(Some(Modifiers::CONTROL | Modifiers::SHIFT), Code::KeyE);
 
         builder = builder.plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts([sc_capture, sc_voice, sc_routine])
+                .with_shortcuts([sc_capture, sc_voice, sc_routine, sc_pet])
                 .expect("atajos globales válidos")
                 .with_handler(move |app, shortcut, event| {
                     let pressed = event.state() == ShortcutState::Pressed;
@@ -100,6 +184,8 @@ pub fn run() {
                         let _ = app.emit("elfie:open-capture", ());
                     } else if shortcut == &sc_routine {
                         let _ = app.emit("elfie:run-routine", ());
+                    } else if shortcut == &sc_pet {
+                        pet_toggle_inner(app);
                     }
                 })
                 .build(),
@@ -133,6 +219,11 @@ pub fn run() {
             system_control::clipboard_read,
             system_control::clipboard_write,
             system_control::foreground_app,
+            pet_toggle,
+            pet_show,
+            pet_hide,
+            pet_set_size,
+            pet_click_through,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {
@@ -159,9 +250,11 @@ pub fn run() {
                 MenuItem::with_id(app, "capture", "Captura rápida  ·  Ctrl+Space", true, None::<&str>)?;
             let mi_fullscreen =
                 MenuItem::with_id(app, "fullscreen", "Pantalla completa  ·  F11", true, None::<&str>)?;
+            let mi_pet =
+                MenuItem::with_id(app, "pet", "Mascota Elfie  ·  Ctrl+Shift+E", true, None::<&str>)?;
             let sep = PredefinedMenuItem::separator(app)?;
             let mi_quit = MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&mi_show, &mi_capture, &mi_fullscreen, &sep, &mi_quit])?;
+            let menu = Menu::with_items(app, &[&mi_show, &mi_capture, &mi_fullscreen, &mi_pet, &sep, &mi_quit])?;
 
             let _tray = TrayIconBuilder::with_id("elfie-tray")
                 .icon(app.default_window_icon().unwrap().clone())
@@ -176,6 +269,9 @@ pub fn run() {
                     }
                     "fullscreen" => {
                         fullscreen_toggle(app);
+                    }
+                    "pet" => {
+                        pet_toggle_inner(app);
                     }
                     "quit" => app.exit(0),
                     _ => {}
@@ -192,6 +288,10 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Mascota flotante (Fase 9.0): se crea oculta para recibir eventos del
+            // cerebro (elfie:state, etc.) desde el arranque; se muestra con Ctrl+Shift+E.
+            let _ = ensure_pet(app.handle());
 
             // Monitor de recursos: emite "elfie:metrics" cada 3 s.
             monitor::start(app.handle().clone());

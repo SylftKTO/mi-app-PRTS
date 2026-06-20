@@ -20,7 +20,7 @@
     detalle: "normal",          // breve | normal | extenso — longitud de respuesta
     confirmaciones: "normales", // estrictas | normales | mínimas — cuánto pregunta antes de actuar
     personaDesc: "",            // arquetipo en texto libre (vacío = preset/identidad base)
-    voiceEngine: "kokoro", // kokoro | navegador | xtts (voz clonada)
+    voiceEngine: "kokoro", // kokoro | navegador | xtts (voz clonada) | piper (ligera, Fase 9.1)
     voiceSpeed: 1.0,
     ttsEnabled: true,
     xttsVoiceName: "",   // nombre del perfil de voz activo (XTTS)
@@ -30,7 +30,7 @@
     features: { wake: false, voice: true, monitor: true, metricsWidget: true, autoResources: true },
     customPersonalities: {}, // { nombre: "descripción del tono" }
     // Elfie Core (Fase 8.1): modo de operación. applyMode() ajusta varios knobs a la vez.
-    mode: "normal",         // bajos | normal | conversacion
+    mode: "normal",         // bajos | normal | conversacion | mascota
     sttContinuous: false,   // escucha semi-continua (modo conversación)
     memoryActive: true,     // memoria de largo plazo del chat
   };
@@ -40,6 +40,8 @@
     bajos:        { wake: false, voiceEngine: "navegador", interpreter: "anthropic", localModel: "phi3.5",    sttContinuous: false, memoryActive: false },
     normal:       { wake: true,  voiceEngine: "kokoro",    interpreter: "local",     localModel: "qwen2.5:7b", sttContinuous: false, memoryActive: true  },
     conversacion: { wake: true,  voiceEngine: "xtts",      interpreter: "local",     localModel: "qwen2.5:7b", sttContinuous: true,  memoryActive: true  },
+    // Mascota (Fase 9.1): cerebro en la nube (Anthropic) + voz ligera Piper → GPU casi libre.
+    mascota:      { wake: true,  voiceEngine: "piper",     interpreter: "anthropic", localModel: "phi3.5",    sttContinuous: false, memoryActive: true  },
   };
 
   // Ejes → frases que se inyectan al system prompt (chat.py / router) vía tone().

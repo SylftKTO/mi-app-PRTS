@@ -293,13 +293,91 @@ def speak_xtts(text, speaker_wav, speed=1.0):
     return {"ok": True, "engine": "xtts"}
 
 
+# ---------------------------------------------------------------- TTS (Piper, voz ligera)
+# Piper corre en CPU (onnxruntime), arranque casi instantáneo, ~0 GPU. Ideal para
+# confirmaciones cortas de la mascota (Fase 9.1). Carga perezosa; si falta el modelo
+# o el paquete, degrada a Kokoro vía speak_dispatch (degradación total).
+_piper = None
+_piper_err = None
+PIPER_MODEL = os.environ.get("ELFIE_PIPER_MODEL", "")  # ruta al .onnx (voz es_MX)
+
+
+def load_piper():
+    global _piper, _piper_err
+    if _piper is not None or _piper_err is not None:
+        return _piper
+    try:
+        from piper import PiperVoice
+    except Exception:
+        try:
+            from piper.voice import PiperVoice  # variantes de versión del paquete
+        except Exception as e:
+            _piper_err = f"piper no instalado ({e})"
+            print(f"[voz] {_piper_err}", flush=True)
+            return None
+    model = PIPER_MODEL
+    if not model:
+        base = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "piper"
+        )
+        if os.path.isdir(base):
+            for f in sorted(os.listdir(base)):
+                if f.endswith(".onnx"):
+                    model = os.path.join(base, f)
+                    break
+    if not model or not os.path.exists(model):
+        _piper_err = "falta modelo Piper (.onnx): define ELFIE_PIPER_MODEL o pon uno en models/piper/"
+        print(f"[voz] {_piper_err}", flush=True)
+        return None
+    try:
+        cfg = model + ".json"
+        _piper = PiperVoice.load(model, config_path=cfg) if os.path.exists(cfg) else PiperVoice.load(model)
+        print("[voz] Piper cargado", flush=True)
+    except Exception as e:
+        _piper_err = str(e)
+        print(f"[voz] ERROR cargando Piper: {e}", flush=True)
+    return _piper
+
+
+def speak_piper(text, speed=1.0):
+    v = load_piper()
+    if v is None:
+        return {"ok": False, "error": _piper_err or "piper no disponible"}
+    import wave
+    import tempfile
+    import soundfile as sf
+
+    try:
+        sp = min(max(float(speed or 1.0), 0.5), 2.0)
+    except (TypeError, ValueError):
+        sp = 1.0
+    length_scale = 1.0 / sp  # más rápido = length_scale menor
+    tmp = os.path.join(tempfile.gettempdir(), "elfie_piper.wav")
+    try:
+        with wave.open(tmp, "wb") as wf:
+            try:
+                v.synthesize(text, wf, length_scale=length_scale)
+            except TypeError:
+                v.synthesize(text, wf)  # versiones sin length_scale
+        samples, sr = sf.read(tmp, dtype="float32")
+        _play(samples, sr)
+        return {"ok": True, "engine": "piper"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
 def speak_dispatch(text, voice, speed, engine, speaker_wav):
-    """Elige motor: xtts (voz clonada) con fallback a Kokoro si falla."""
+    """Elige motor: xtts (voz clonada) o piper (ligera); fallback a Kokoro si falla."""
     if engine == "xtts" and speaker_wav:
         r = speak_xtts(text, speaker_wav, speed)
         if r.get("ok"):
             return r
         print(f"[voz] XTTS falló, caigo a Kokoro: {r.get('error')}", flush=True)
+    elif engine == "piper":
+        r = speak_piper(text, speed)
+        if r.get("ok"):
+            return r
+        print(f"[voz] Piper falló, caigo a Kokoro: {r.get('error')}", flush=True)
     return speak(text, voice, speed)
 
 
@@ -691,6 +769,7 @@ class Handler(BaseHTTPRequestHandler):
                     "wake": _wake_enabled.is_set(),
                     "wake_engine": "porcupine" if _porcupine is not None else "vosk",
                     "model": LLM_MODEL,
+                    "piper": _piper is not None,
                 }
             )
         elif self.path == "/wake/next":

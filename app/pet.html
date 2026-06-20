@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0D0C0E">
+<title>Elfie · Mascota</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* La ventana Tauri es transparent: el fondo del body NO se pinta. */
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; }
+  html, body { height: 100%; background: transparent; overflow: hidden; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif; color: #ECE8EA;
+    --accent: #E68AA2; --accent-deep: #B04A62; --warn: #E0A06A; --danger: #E0626C;
+    --surface: #161416; --line: #2C2730; --muted: #ADA3AA;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding: 8px; gap: 8px;
+  }
+
+  /* --- Avatar --- */
+  .avatar-wrap { position: relative; flex: 0 0 auto; -webkit-app-region: drag; cursor: grab; }
+  #pet-avatar {
+    width: 120px; height: 120px; display: block; -webkit-user-drag: none;
+    filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55));
+    transition: transform .12s ease;
+  }
+  #pet-avatar.blink { transform: scaleY(0.9); }
+  body[data-state="speaking"] #pet-avatar { animation: pet-bob 0.5s ease-in-out infinite alternate; }
+  body[data-state="listening"] #pet-avatar { animation: pet-pulse 1.1s ease-in-out infinite; }
+  body[data-state="error"] #pet-avatar { animation: pet-glitch 0.28s steps(2) 2; }
+  @keyframes pet-bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
+  @keyframes pet-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+  @keyframes pet-glitch { 0% { transform: translateX(-2px); } 50% { transform: translateX(2px); } 100% { transform: translateX(0); } }
+  @media (prefers-reduced-motion: reduce) { #pet-avatar { animation: none !important; } }
+
+  .pet-status {
+    position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%);
+    font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); white-space: nowrap; pointer-events: none;
+  }
+
+  /* --- Burbuja de diálogo --- */
+  .pet-bubble {
+    max-width: 240px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 11px; font-size: 12.5px; line-height: 1.35;
+    box-shadow: 0 8px 22px rgba(0,0,0,0.5); text-align: center;
+  }
+  .pet-bubble[data-kind="warn"] { border-color: var(--warn); }
+  .pet-bubble[data-kind="error"] { border-color: var(--danger); }
+  .pet-bubble[data-kind="say"] { border-color: var(--accent); }
+
+  /* --- Confirmación --- */
+  .pet-confirm {
+    background: var(--surface); border: 1px solid var(--accent); border-radius: 12px;
+    padding: 9px 11px; max-width: 240px; box-shadow: 0 8px 22px rgba(0,0,0,0.5);
+  }
+  .pet-confirm[data-irreversible="1"] { border-color: var(--danger); }
+  .pet-confirm .pc-txt { font-size: 12.5px; margin-bottom: 8px; text-align: center; }
+  .pet-confirm .pc-btns { display: flex; gap: 6px; }
+  .pet-confirm button {
+    flex: 1; padding: 6px 8px; border-radius: 8px; font-family: inherit; font-size: 12px;
+    cursor: pointer; border: 1px solid var(--line); background: #1F1C1F; color: #ECE8EA;
+  }
+  .pet-confirm button#pet-yes { background: var(--accent); color: #0D0C0E; border-color: transparent; font-weight: 600; }
+
+  /* --- Historial (solo panel) --- */
+  .pet-history {
+    width: 100%; max-width: 260px; max-height: 150px; overflow-y: auto;
+    border: 1px solid var(--line); border-radius: 10px; padding: 6px; font-size: 11.5px;
+    background: rgba(22,20,22,0.85); display: flex; flex-direction: column; gap: 4px;
+  }
+  .pet-history .ph-row { color: var(--muted); border-bottom: 1px dashed var(--line); padding-bottom: 3px; }
+  .pet-history .ph-row.say { color: #ECE8EA; }
+  .pet-history .ph-row.error { color: var(--danger); }
+
+  /* --- Acciones rápidas --- */
+  .pet-actions { display: flex; gap: 5px; -webkit-app-region: no-drag; }
+  .pet-actions button {
+    width: 30px; height: 30px; border-radius: 9px; border: 1px solid var(--line);
+    background: var(--surface); color: #ECE8EA; font-size: 14px; cursor: pointer;
+    display: grid; place-items: center; transition: border-color .12s, transform .12s;
+  }
+  .pet-actions button:hover { border-color: var(--accent); transform: translateY(-1px); }
+
+  /* --- Modos de tamaño --- */
+  body.mini .pet-bubble, body.mini .pet-actions, body.mini .pet-history, body.mini .pet-confirm { display: none; }
+  body.mini #pet-avatar { width: 92px; height: 92px; }
+  body.normal .pet-history { display: none; }
+  body.panel #pet-avatar { width: 104px; height: 104px; }
+</style>
+</head>
+<body class="normal">
+  <div class="avatar-wrap" data-tauri-drag-region>
+    <img id="pet-avatar" src="pet/assets/neutral.svg" alt="Elfie" draggable="false">
+    <div id="pet-status" class="pet-status"></div>
+  </div>
+
+  <div id="pet-bubble" class="pet-bubble" hidden></div>
+
+  <div id="pet-confirm" class="pet-confirm" hidden>
+    <div id="pet-confirm-text" class="pc-txt"></div>
+    <div class="pc-btns">
+      <button id="pet-yes">Confirmar</button>
+      <button id="pet-no">Cancelar</button>
+    </div>
+  </div>
+
+  <div id="pet-history" class="pet-history" hidden></div>
+
+  <div class="pet-actions">
+    <button data-act="capture" title="Captura rápida">✎</button>
+    <button data-act="voice" title="Activar voz">🎤</button>
+    <button data-act="dashboard" title="Dashboard">▣</button>
+    <button data-act="chat" title="Chat con Elfie">💬</button>
+    <button data-act="size" title="Cambiar tamaño">⤢</button>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="elfie/elfie-config.js"></script>
+  <script src="pet/avatar.js"></script>
+</body>
+</html>

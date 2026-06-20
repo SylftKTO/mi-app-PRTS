@@ -125,8 +125,8 @@ Tres tiers, del más ligero al más expresivo:
 
 ## 5. Fases de implementación
 
-- **9.0 — Ventana flotante + estados base**: `pet.html`, segunda WebviewWindow, `Avatar.setState`, 5 estados MVP (PNG), atajo mostrar/ocultar, 3 tamaños.
-- **9.1 — Cerebro nube + voz ligera**: modo "mascota" (Anthropic + Ollama off), Piper en `voice_server.py`, burbuja de diálogo, confirmar/cancelar por voz.
+- ✅ **9.0 — Ventana flotante + estados base**: `pet.html`, segunda WebviewWindow, `Avatar.setState`, 5 estados MVP (SVG), atajo mostrar/ocultar, 3 tamaños. *(implementado)*
+- ✅ **9.1 — Cerebro nube + voz ligera**: modo "mascota" (Anthropic + Piper), Piper en `voice_server.py`, burbuja de diálogo, tarjeta de confirmación + confirmar/cancelar por voz. *(implementado; ver §9)*
 - **9.2 — Vida visual**: WebP animado, parpadeo/idle/pulso, boca por audio, estados contextuales por módulo.
 - **9.3 — Miniacciones + protocolos**: menú clic-derecho, protocolos sobre `routines.js` con narración + bitácora.
 - **9.4 — Pulido**: anclajes, opacidad, click-through, auto-ocultar, tono por estado.
@@ -147,7 +147,49 @@ Tres tiers, del más ligero al más expresivo:
 
 ## 8. Decisiones abiertas
 
-- Arte del avatar: ¿quién/cómo se producen los archivos por estado? (estilo anime coherente con identidad de Elfie / PRTS-002).
-- Atajo global para mostrar/ocultar la mascota (¿reusar uno existente o nuevo?).
+- Arte del avatar: ¿quién/cómo se producen los archivos por estado? (estilo anime coherente con identidad de Elfie / PRTS-002). Hoy hay **placeholders SVG** en `app/pet/assets/`.
 - ¿La mascota y la ventana grande de Elfie conviven abiertas, o la mascota la reemplaza en modo compacto?
 - Voz de Piper: elegir modelo es_MX concreto y licencia.
+
+## 9. Estado de implementación (9.0 + 9.1)
+
+### Archivos
+- `app/pet.html` — ventana flotante (avatar + burbuja + confirmación + historial + acciones; 3 tamaños).
+- `app/pet/avatar.js` — máquina de estados `window.Avatar` (web-safe): `setState`, `bubble`, `confirmCard`, `voiceConfirm`, `setSize`, parpadeo idle, escucha de eventos del cerebro.
+- `app/pet/assets/{neutral,listening,thinking,speaking,error}.svg` — placeholders on-brand.
+- `elfie-desktop/src-tauri/src/lib.rs` — ventana `pet` (transparent, always-on-top, sin decoración, oculta al inicio); comandos `pet_toggle/show/hide/set_size/click_through`; atajo **Ctrl+Shift+E**; ítem de tray "Mascota Elfie".
+- `app/elfie/desktop.js` — `elfieSys.pet*`; emite `elfie:say`/`elfie:speaking`/`elfie:listening` para conducir el avatar; escucha `pet:action` (acciones rápidas).
+- `app/elfie/elfie-config.js` — modo **`mascota`** (Anthropic + Piper + memoria); `voiceEngine: "piper"`.
+- `app/elfie.html` — botón "Mostrar mascota"; modo Mascota; motor Piper en el selector.
+- `elfie-desktop/sidecars/voice_server.py` — motor **Piper** (`load_piper`/`speak_piper`), `engine:"piper"` en `speak_dispatch` con fallback a Kokoro; `/health` reporta `piper`.
+
+### Conducción del avatar (eventos app-wide)
+`elfie:state {state,text}` · `elfie:say {text}` · `elfie:speaking <bool>` · `elfie:listening <bool>` ·
+`elfie:thinking` · `elfie:bubble {text,kind,sticky}` · `elfie:confirm {text,irreversible}` ·
+`elfie:voice-confirm {text}` · y de vuelta `pet:action {act}` / `pet:confirm-result {ok}`.
+
+### Setup del usuario (una vez, para la voz ligera)
+Instalar Piper en `venv-voice` y dejar un modelo es_MX:
+```
+elfie-desktop/venv-voice/Scripts/pip install piper-tts
+# Descargar voz es_MX (.onnx + .onnx.json) y colocarla en:
+elfie-desktop/models/piper/   (o exportar ELFIE_PIPER_MODEL=<ruta .onnx>)
+```
+Mientras no exista el modelo, `speak_piper` degrada a **Kokoro** automáticamente (nada se rompe).
+`models/` está en `.gitignore` → el `.onnx` se queda local.
+
+### Verificado
+- `pet.html` carga en web (sin Tauri) en modo demo: cicla estados, alterna el archivo de avatar
+  por estado, burbuja/confirmación/tamaños (mini/normal/panel) OK, **sin errores de consola**.
+- `elfie.html` carga sin errores; modo "mascota" y motor "piper" presentes.
+- `voice_server.py` compila (`py_compile`).
+
+### Pendiente de probar en escritorio (requiere recompilar Tauri)
+- Creación/transparencia de la ventana `pet`, atajo Ctrl+Shift+E, tray, comandos de tamaño/click-through.
+- Voz Piper real (tras instalar el modelo).
+
+### Cableado parcial (siguiente iteración)
+- `pet:action` enruta **captura** y **chat**; **voz** reanuda wake y **dashboard** hace scroll.
+  Falta integrar mostrar la ventana principal oculta desde la mascota.
+- Confirmar/cancelar por voz: la API (`Avatar.voiceConfirm`/`elfie:voice-confirm`) está lista,
+  pero conectarla al router de voz real (`actions.js`) queda para 9.3.
