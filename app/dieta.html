@@ -109,7 +109,7 @@
   </div>
 
   <h1 class="page-title">Dieta</h1>
-  <div class="mono-label page-sub">Superávit +200 kcal · 4 comidas</div>
+  <div class="mono-label page-sub">57 kg · Superávit +200 kcal · 4 comidas</div>
 
   <div class="dtabs">
     <button id="dt-hoy" class="dtab on">Hoy</button>
@@ -122,10 +122,10 @@
 
     <!-- Totales del día con semáforo -->
     <div class="stat-grid macros">
-      <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s">de 2,135</div></div>
-      <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s">de 110 g</div></div>
+      <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s">de 2,196</div></div>
+      <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s">de 114 g</div></div>
       <div class="stat-card"><div class="l">Carbs</div><div class="v" id="tot-c">0</div><div class="s">de 300 g</div></div>
-      <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s">de 55 g</div></div>
+      <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s">de 60 g</div></div>
     </div>
 
     <!-- Comparativo target vs real -->
@@ -191,14 +191,14 @@ const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 
-// Targets por comida (doc sección 12)
+// Targets por comida — 57 kg · 114P · 300C · 60G · 2196 kcal
 const COMIDAS = [
-  { id: "desayuno", label: "Desayuno", hora: "11:00 · al despertar", t: { k: 530, p: 30, c: 85, g: 12 } },
-  { id: "comida",   label: "Comida",   hora: "14:00 — 15:00",        t: { k: 700, p: 35, c: 100, g: 18 } },
-  { id: "pregym",   label: "Pre-gym",  hora: "30 min antes",         t: { k: 355, p: 20, c: 60, g: 5 } },
-  { id: "cena",     label: "Cena",     hora: "21:00 — 22:00",        t: { k: 550, p: 25, c: 55, g: 20 } },
+  { id: "desayuno", label: "Desayuno", hora: "11:00 · al despertar", t: { k: 581, p: 31, c: 85, g: 13 } },
+  { id: "comida",   label: "Comida",   hora: "14:00 — 15:00",        t: { k: 724, p: 36, c: 100, g: 20 } },
+  { id: "pregym",   label: "Pre-gym",  hora: "30 min antes",         t: { k: 369, p: 21, c: 60, g: 5 } },
+  { id: "cena",     label: "Cena",     hora: "21:00 — 22:00",        t: { k: 522, p: 26, c: 55, g: 22 } },
 ];
-const TOTAL = { k: 2135, p: 110, c: 300, g: 55 };
+const TOTAL = { k: 2196, p: 114, c: 300, g: 60 };
 
 let banco = [];
 let formAbierto = null; // id de comida con formulario abierto
