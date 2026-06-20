@@ -238,3 +238,23 @@ Mientras no exista el modelo, `speak_piper` degrada a **Kokoro** automáticament
 
 ### Pendiente de probar en escritorio (9.4)
 - Posicionamiento real de `pet_anchor`, click-through del SO, `pet_hide`/`pet_show` del auto-ocultar.
+
+### Cierre (todo lo de código dejado listo)
+- **Contexto automático por módulo**: `app/pet/context-bridge.js` incluido en gym/dieta/finanzas/apuntes/
+  levelup-* → emite `elfie:context` por `location.pathname`; el dashboard repone `neutral`.
+- **WebP**: toggle "Avatar animado (WebP)" en Elfie Core (`pet:config {ext}`); manifiesto de arte en
+  `app/pet/assets/README.md` (nombres exactos por estado).
+- **Follow-ups de código menores** (no bloquean la fase): confirmar/cancelar por voz conectado al router
+  real (`actions.js`) y tono **auditivo** por estado.
+
+## 10. Checklist para finalizar (acciones del usuario)
+
+1. **Recompilar el desktop** para activar lo nativo (ventana `pet`, atajo Ctrl+Shift+E, tray, anclaje,
+   click-through, auto-ocultar): `cd elfie-desktop && npm run dev` (o `npm run build`).
+2. **`npm run db:push`** → crea la tabla `protocol_log` (la bitácora ya funciona en localStorage sin esto).
+3. **Instalar Piper** para la voz ligera: en `venv-voice`, `pip install piper-tts` + modelo es_MX `.onnx`
+   en `elfie-desktop/models/piper/` (o env `ELFIE_PIPER_MODEL`). Sin modelo → cae a Kokoro solo.
+4. **Arte real del avatar** (opcional, mejora visual): dejar los `.webp` en `app/pet/assets/` según el
+   `README.md` y activar el toggle "Avatar animado (WebP)" en Elfie Core.
+5. **Deploy web** (`git push` ya hecho → Vercel redeploya): la mascota es de escritorio, pero el resto
+   de la app (incluido `context-bridge.js` NO-OP) funciona igual en web.

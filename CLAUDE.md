@@ -35,6 +35,7 @@ app/                 # frontend vanilla (mismo en web y desktop)
   styles.css         # tokens de diseño compartidos — único idioma visual
   ai/                # voice.js (push-to-talk web) wakeword.js (Dalia web) actions.js (router+ejecutor) gcal.js (Google Calendar)
   elfie/             # puentes Tauri (NO-OP en web): desktop.js rag.js chat.js elfie-config.js monitor.js routines.js
+  pet.html pet/      # mascota flotante (Fase 9): avatar.js (estados) context-bridge.js assets/ (svg→webp)
 elfie-desktop/       # app Tauri 2
   src-tauri/src/     # Rust: lib.rs (tray/atajos/comandos) monitor.rs system_control.rs voice.rs
   sidecars/          # Python: voice_server.py rag.py chat.py xtts_server.py (corren en venv-voice/venv-xtts)
@@ -264,8 +265,8 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 - **Boca animada (lip-sync simple):** al hablar, alterna 2 sprites (`speaking`/`speaking-closed`) cada 150 ms — ilusión de habla sin analizar audio ni GPU.
 - **Idle:** respiración sutil en `.avatar-wrap` (CSS `pet-breathe`) + parpadeo en estados de reposo (`prefers-reduced-motion` respetado).
-- **Estados contextuales por módulo (pose de reposo):** `restState` + `Avatar.setContext(ctx)` + evento `elfie:context` + helper `elfieSys.petContext()`. 6 contextos con glifo. ⚠️ El **disparo automático** por módulo desde páginas separadas queda pendiente (solo `index.html` carga el bridge) → hoy se fija vía API/evento.
-- **WebP-ready:** `assetUrl()` arma la ruta con la extensión activa; `Avatar.setExt("webp")` cambia de SVG a WebP cuando exista arte animado (sin tocar la lógica).
+- **Estados contextuales por módulo (pose de reposo):** `restState` + `Avatar.setContext(ctx)` + evento `elfie:context` + helper `elfieSys.petContext()`. 6 contextos con glifo. **Disparo automático:** `app/pet/context-bridge.js` (incluido en gym/dieta/finanzas/apuntes/levelup-*) emite `elfie:context` por `location.pathname`; el dashboard (`desktop.js`) repone `neutral`.
+- **WebP-ready:** `assetUrl()` arma la ruta con la extensión activa; `Avatar.setExt("webp")` cambia de SVG a WebP cuando exista arte animado (sin tocar la lógica). Toggle **"Avatar animado (WebP)"** en Elfie Core (`pet:config {ext}`). Manifiesto de arte esperado en `app/pet/assets/README.md`.
 
 ### ✅ 9.3 — Miniacciones + protocolos
 
@@ -284,7 +285,7 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - **Tono por estado (visual):** `KIND` mapea estado→color de burbuja (error→rojo, alert→ámbar, speaking→rosa) + etiqueta de estado. ⚠️ El **tono auditivo** por estado queda como follow-up (Kokoro/Piper solo exponen velocidad).
 - **`pet_anchor` registrado en `invoke_handler`.** Preferencias de la mascota en `localStorage` (`prts_pet_cfg`); origin compartido entre ventana principal y `pet`.
 
-> **Fase 9 completa** (9.0 ventana+estados · 9.1 nube+Piper · 9.2 vida visual · 9.3 miniacciones+protocolos · 9.4 pulido). **Pendiente externo:** **arte real del avatar** (anime, coherente con PRTS-002) reemplaza los placeholders SVG vía `Avatar.setExt("webp")`; **recompilar Tauri** para la ventana `pet`/atajo/tray/comandos/Piper/anclaje; **`db:push`** para `protocol_log`. Follow-ups menores: disparo automático de contexto por módulo desde páginas separadas, confirmar/cancelar por voz conectado al router real (`actions.js`), tono auditivo por estado.
+> **Fase 9 completa** (9.0 ventana+estados · 9.1 nube+Piper · 9.2 vida visual · 9.3 miniacciones+protocolos · 9.4 pulido). **Pendiente externo (acciones del usuario, no de código):** **arte real del avatar** (anime, coherente con PRTS-002) en `app/pet/assets/*.webp` (manifiesto en su `README.md`) + activar el toggle WebP; **recompilar Tauri** (`npm run build`/`dev`) para la ventana `pet`/atajo/tray/comandos/anclaje; **`db:push`** para `protocol_log`; **instalar Piper** (`pip install piper-tts` + modelo es_MX). Follow-up de código menor: confirmar/cancelar por voz conectado al router real (`actions.js`) y tono **auditivo** por estado (los motores locales solo exponen velocidad).
 
 ### Decisiones abiertas (resolver al implementar)
 

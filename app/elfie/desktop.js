@@ -202,6 +202,10 @@
     }
   }, 300);
 
+  // El dashboard no es un módulo → repón la pose neutral (las páginas de módulo
+  // fijan su contexto con pet/context-bridge.js).
+  try { T.event.emit("elfie:context", "neutral"); } catch (_) {}
+
   // La mascota pide acciones a la ventana principal (el cerebro vive aquí).
   const PET_MODES = ["normal", "mascota", "conversacion", "bajos"];
   listen("pet:action", (e) => {

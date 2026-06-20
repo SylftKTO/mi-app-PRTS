@@ -253,6 +253,7 @@
         if (!petCfg.autoHide) invoke("pet_show").catch(() => {});
         else scheduleHide();
       }
+      if ("ext" in p) setExt(p.ext); // svg ↔ webp (arte animado)
     });
     listen("pet:size", (e) => { const s = e.payload; if (SIZES.includes(s)) applySize(s); });
   }

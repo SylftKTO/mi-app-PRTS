@@ -106,6 +106,10 @@
       <div><label>Auto-ocultar mascota</label><div class="desc">Se esconde tras inactividad y reaparece con voz/actividad</div></div>
       <span class="sw"><input type="checkbox" id="sw-pet-autohide"><span class="track"></span><span class="knob"></span></span>
     </div>
+    <div class="row">
+      <div><label>Avatar animado (WebP)</label><div class="desc">Usa el arte WebP de <span class="kbd">app/pet/assets/</span> si ya lo agregaste (si no, deja SVG)</div></div>
+      <span class="sw"><input type="checkbox" id="sw-pet-webp"><span class="track"></span><span class="knob"></span></span>
+    </div>
     <div id="core-status" class="core-status"></div>
   </div>
 
@@ -500,7 +504,9 @@ function render() {
     let pc = {}; try { pc = JSON.parse(localStorage.getItem("prts_pet_cfg") || "{}"); } catch (_) {}
     sw("sw-pet-solo", false, (v) => emitPetCfg({ solo: v }));          // el pet hace el click-through
     sw("sw-pet-autohide", !!pc.autoHide, (v) => emitPetCfg({ autoHide: v }));
-    if (!TAURI) { petSolo.disabled = true; petAuto.disabled = true; }
+    let pext = "svg"; try { pext = localStorage.getItem("prts_pet_ext") || "svg"; } catch (_) {}
+    sw("sw-pet-webp", pext === "webp", (v) => emitPetCfg({ ext: v ? "webp" : "svg" }));
+    if (!TAURI) { petSolo.disabled = true; petAuto.disabled = true; const w = $("sw-pet-webp"); if (w) w.disabled = true; }
   }
 
   $("btn-test").onclick = async () => {
