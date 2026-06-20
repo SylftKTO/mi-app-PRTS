@@ -1,4 +1,10 @@
-# CLAUDE.md — PRTS
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+# PRTS — Sistema Personal de Organización
 
 Sistema personal de organización de Sergio (Sylft): estudiante TecNM Celaya, instructor (Wolves robótica / LevelUp idiomas), atleta de gym. Usuario único. Idioma: **español (es-MX)** — UI, commits y documentación en español.
 
@@ -12,7 +18,7 @@ Sistema personal de organización de Sergio (Sylft): estudiante TecNM Celaya, in
 ## Comandos
 
 ```bash
-npm run dev          # npx serve app
+npm run dev          # npx serve app (sirve app/ en http://localhost:3210)
 npm run db:push      # supabase db push (aplicar migraciones)
 npm run db:new       # supabase migration new <nombre>
 supabase functions deploy <nombre>
@@ -20,6 +26,16 @@ supabase functions deploy <nombre>
 # Elfie Desktop (Tauri) — dentro de elfie-desktop/
 cd elfie-desktop && npm run dev    # tauri dev (compila Rust + lanza app + sidecar de voz)
 cd elfie-desktop && npm run build  # tauri build (instalador Windows)
+
+# Edge Functions — secretos (correr una vez tras clonar o rotar llaves)
+supabase secrets set LLM_API_KEY=sk-ant-...
+supabase secrets set LLM_MODEL=claude-haiku-4-5-20251001
+supabase secrets set LLM_PRICE_IN=1.00 LLM_PRICE_OUT=5.00
+
+# Evals de prompts — antes de subir un prompt.vN+1 (requiere LLM_API_KEY en env)
+$env:LLM_API_KEY="sk-..."  # PowerShell
+deno run --allow-net --allow-env --allow-read ai/evals/run.ts inbox
+deno run --allow-net --allow-env --allow-read ai/evals/run.ts command
 ```
 
 > Git y `supabase` los corre el usuario en PowerShell cuando hay deploy/push real.
@@ -30,21 +46,48 @@ cd elfie-desktop && npm run build  # tauri build (instalador Windows)
 app/                 # frontend vanilla (mismo en web y desktop)
   index.html         # dashboard radial (runa) + tareas/semana/proyectos/insights/recordatorios/levelup (SPA, ~2.5k líneas)
   gym.html dieta.html apuntes.html finanzas.html recordatorios.html elfie.html elfie-chat.html
-  levelup-maestros.html levelup-alumnos.html levelup-admin.html
-  config.js          # URL + anon key Supabase + GOOGLE_CLIENT_ID (público por diseño)
+  levelup-maestros.html levelup-alumnos.html levelup-admin.html lore.html
+  config.js          # URL + anon key Supabase + GOOGLE_CLIENT_ID + SPOTIFY_CLIENT_ID (público por diseño)
   styles.css         # tokens de diseño compartidos — único idioma visual
-  ai/                # voice.js (push-to-talk web) wakeword.js (Dalia web) actions.js (router+ejecutor) gcal.js (Google Calendar)
+  ai/                # voice.js (push-to-talk web) wakeword.js (Dalia web) actions.js (router+ejecutor) gcal.js (Google Calendar) spotify.js (Web API PKCE)
   elfie/             # puentes Tauri (NO-OP en web): desktop.js rag.js chat.js elfie-config.js monitor.js routines.js
 elfie-desktop/       # app Tauri 2
   src-tauri/src/     # Rust: lib.rs (tray/atajos/comandos) monitor.rs system_control.rs voice.rs
-  sidecars/          # Python: voice_server.py rag.py chat.py xtts_server.py (corren en venv-voice/venv-xtts)
-supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0019 = último
+  sidecars/          # Python: voice_server.py rag.py chat.py xtts_server.py orchestrator.py (corren en venv-voice/venv-xtts)
+supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0021 = último (lore_entries)
 supabase/functions/  # Edge Functions: generate-briefing, generate-insights, process-inbox, interpret-command
                      #   + _shared/ (llm.ts, schemas.ts, prompts/*.vN.ts — command.v4 vigente)
+ai/evals/            # casos JSONL + runner Deno para regresión de prompts
 docs/Fase4_Arquitectura_IA.md  # ARQUITECTURA DE REFERENCIA para Fase 4 — leer antes de tocar la capa IA
 docs/Fase5_WakeWord_Consideraciones.md  # decisiones de wake word
+docs/Fase8_Elfie_Core_Plan.md  # plan Elfie Core (modos, orquestador, lore)
 PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referencias (⚠ paleta de DESIGN.md desactualizada)
 ```
+
+## Arquitectura transversal
+
+Estas relaciones cruzan varios archivos y no son obvias leyendo uno solo:
+
+**Flujo de un comando de voz (web):**
+`wakeword.js` detecta "Dalia" → `voice.js` transcribe (WebSpeech) → `actions.js::ejecutarComando()` → `PRTS_AI.routeLocal()` (sin red si hay patrón local) → si freeform: `POST /functions/v1/interpret-command` con JWT → `_shared/llm.ts::callLLM()` → respuesta validada en `_shared/schemas.ts::validateCommand()` → `actions.js` ejecuta contra whitelist cerrada → `PRTS_AI.say()` (TTS).
+
+**El mismo `app/` en web y desktop:**
+`elfie-desktop/src-tauri/tauri.conf.json` apunta `frontendDist` a `../../app`. Todo puente nativo vive en `app/elfie/*.js` y comprueba `!!window.__TAURI__` antes de llamar; en web devuelve `null`/`false` (NO-OP). Nunca añadir lógica nativa directamente en módulos de `app/` — siempre a través de los puentes en `app/elfie/`.
+
+**Venvs de Python independientes:**
+`elfie-desktop/venv-voice/` corre `voice_server.py` (Whisper + Kokoro + numpy2). `elfie-desktop/venv-xtts/` corre `xtts_server.py` (PyTorch + coqui-tts). `voice_server.py` lanza `xtts_server.py` como subproceso del python de `venv-xtts` perezosamente. Mezclar dependencias entre venvs rompe ambos.
+
+**Ciclo de vida de un sidecar:**
+`src-tauri/src/voice.rs` lanza `venv-voice/Scripts/python.exe sidecars/voice_server.py` al arrancar Tauri y lo mata al cerrar. El WebView se comunica con él por `fetch("http://127.0.0.1:7331/...")`. `xtts_server.py` corre en `:7332`. La conectividad web→sidecar no existe (los puentes devuelven `available()=false`).
+
+**Restricción de 8 GB VRAM:**
+Whisper (∼1.5 GB) + Kokoro (∼0.5 GB) + Ollama/qwen2.5:7b (∼4 GB) + XTTS v2 (∼2.4 GB) = ~8.4 GB. qwen y XTTS coexisten al límite. Generar imágenes (Fase 7.2) requiere descargar Ollama primero vía `orchestrator.py::free_for()`. No implementar nada que cargue otro modelo grande sin pasar por el orquestador.
+
+**Prompt versioning y evals:**
+Los prompts en `supabase/functions/_shared/prompts/<agente>.vN.ts` exportan `{ SYSTEM, buildUser, VERSION }`. Las Edge Functions importan la versión activa explícitamente (ej. `command.v4.ts`). Antes de publicar `vN+1`: correr `ai/evals/run.ts` con la nueva versión y verificar que los aciertos no bajen respecto al vN.
+
+**Migración nueva → `supabase db push` no es automático:**
+El usuario ejecuta `npm run db:push` (o `supabase db push`) en PowerShell. Nunca ejecutar migraciones destructivas sin confirmación explícita del usuario.
 
 ## Convenciones
 
