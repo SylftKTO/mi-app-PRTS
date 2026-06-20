@@ -187,6 +187,8 @@
     petHide: () => invoke("pet_hide"),
     petSetSize: (size) => invoke("pet_set_size", { size }),
     petClickThrough: (on) => invoke("pet_click_through", { on }),
+    // Pose por módulo (9.2): study|gym|finance|diet|levelup|music|null.
+    petContext: (ctx) => { try { T.event.emit("elfie:context", ctx || "neutral"); } catch (_) {} },
   };
 
   // --- Mascota: conduce su avatar y enruta sus acciones rápidas (Fase 9.0/9.1) ---

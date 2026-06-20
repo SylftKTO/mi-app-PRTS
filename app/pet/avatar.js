@@ -12,44 +12,73 @@
 
   const $ = (id) => document.getElementById(id);
 
-  // Estados con su archivo de avatar (MVP: 5 en PNG/SVG; se amplía en 9.2).
+  // Estado → nombre base del archivo. La URL la arma assetUrl() con la extensión
+  // activa (svg hoy; webp cuando haya arte animado — Fase 9.2). Alternar el archivo
+  // por estado es la base del sistema visual.
   const ASSETS = {
-    neutral:   "pet/assets/neutral.svg",
-    listening: "pet/assets/listening.svg",
-    thinking:  "pet/assets/thinking.svg",
-    speaking:  "pet/assets/speaking.svg",
-    executing: "pet/assets/thinking.svg",   // alias hasta tener arte propio
-    confirming:"pet/assets/listening.svg",  // alias
-    error:     "pet/assets/error.svg",
-    alert:     "pet/assets/error.svg",       // alias
+    neutral: "neutral", listening: "listening", thinking: "thinking",
+    speaking: "speaking", "speaking-closed": "speaking-closed",
+    executing: "thinking", confirming: "listening", error: "error", alert: "error",
+    // Estados contextuales por módulo (9.2): pose de reposo según lo que se hace.
+    study: "study", gym: "gym", finance: "finance", diet: "diet", levelup: "levelup", music: "music",
   };
+  const CONTEXTS = ["study", "gym", "finance", "diet", "levelup", "music"];
+  const REST = new Set(["neutral"].concat(CONTEXTS)); // estados de "reposo" (parpadean)
   const STATUS = {
     neutral: "", listening: "Escuchando…", thinking: "Pensando…",
     speaking: "", executing: "Ejecutando…", confirming: "¿Confirmas?",
     error: "No entendí", alert: "Atención",
+    study: "Estudio", gym: "Gym", finance: "Finanzas", diet: "Dieta", levelup: "LevelUp", music: "Música",
   };
 
+  const EXT_KEY = "prts_pet_ext";
+  let EXT = "svg";
+  try { EXT = localStorage.getItem(EXT_KEY) || "svg"; } catch (_) {}
+  function assetUrl(base) { return "pet/assets/" + base + "." + EXT; }
+
   let state = "neutral";
-  let idleTimer = null, blinkTimer = null, bubbleTimer = null;
+  let restState = "neutral"; // pose por defecto al volver a reposo (neutral o contexto)
+  let idleTimer = null, blinkTimer = null, bubbleTimer = null, talkTimer = null;
 
   function preload() {
-    Object.values(ASSETS).forEach((src) => { const i = new Image(); i.src = src; });
+    Object.values(ASSETS).forEach((b) => { const i = new Image(); i.src = assetUrl(b); });
   }
 
   // --- Cambio de estado: alterna el archivo del avatar ---
   function setState(next, opts) {
     opts = opts || {};
+    if (next === "neutral") next = restState; // "neutral" muestra la pose de reposo activa
     if (!ASSETS[next]) next = "neutral";
     state = next;
     const img = $("pet-avatar");
-    if (img) img.src = ASSETS[next];
+    if (img) img.src = assetUrl(ASSETS[next]);
     document.body.dataset.state = next;
     const st = $("pet-status");
     if (st) st.textContent = opts.status != null ? opts.status : (STATUS[next] || "");
     if (opts.text) bubble(opts.text, opts.kind || "info");
-    // El parpadeo solo en reposo (en otros estados el arte ya expresa).
-    if (next === "neutral") scheduleBlink(); else stopBlink();
+    // Boca animada solo al hablar; parpadeo solo en reposo.
+    if (next === "speaking") startTalk(); else stopTalk();
+    if (REST.has(next)) scheduleBlink(); else stopBlink();
   }
+
+  // --- Pose por módulo: fija la "pose de reposo" (9.2) ---
+  function setContext(ctx) {
+    restState = ctx && ASSETS[ctx] && CONTEXTS.includes(ctx) ? ctx : "neutral";
+    if (REST.has(state)) setState(restState); // si está en reposo, refléjalo ya
+  }
+
+  // --- Boca animada (lip-sync simple): alterna 2 sprites mientras habla ---
+  function startTalk() {
+    stopTalk();
+    let open = true;
+    talkTimer = setInterval(() => {
+      const img = $("pet-avatar");
+      if (!img || state !== "speaking") { stopTalk(); return; }
+      open = !open;
+      img.src = assetUrl(open ? "speaking" : "speaking-closed");
+    }, 150);
+  }
+  function stopTalk() { if (talkTimer) { clearInterval(talkTimer); talkTimer = null; } }
 
   // --- Parpadeo / idle (ilusión de vida sin GPU): un micro scaleY en el avatar ---
   function scheduleBlink() {
@@ -57,7 +86,7 @@
     const next = 3500 + Math.floor(2500 * ((Date.now() % 997) / 997)); // 3.5–6 s, sin Math.random global
     blinkTimer = setTimeout(() => {
       const img = $("pet-avatar");
-      if (img && state === "neutral") {
+      if (img && REST.has(state)) {
         img.classList.add("blink");
         setTimeout(() => img.classList.remove("blink"), 130);
       }
@@ -65,6 +94,14 @@
     }, next);
   }
   function stopBlink() { if (blinkTimer) { clearTimeout(blinkTimer); blinkTimer = null; } }
+
+  // Cambia la extensión de assets (svg → webp cuando haya arte animado).
+  function setExt(ext) {
+    EXT = ext === "webp" ? "webp" : "svg";
+    try { localStorage.setItem(EXT_KEY, EXT); } catch (_) {}
+    preload();
+    setState(state);
+  }
 
   // --- Burbuja de diálogo ---
   function bubble(text, kind, sticky) {
@@ -158,6 +195,7 @@
     listen("elfie:thinking", () => setState("thinking"));
     listen("elfie:confirm", (e) => { const p = e.payload || {}; confirmCard(p.text || "¿Confirmas?", p); });
     listen("elfie:voice-confirm", (e) => voiceConfirm((e.payload && e.payload.text) || ""));
+    listen("elfie:context", (e) => setContext(e.payload));
     listen("pet:size", (e) => { const s = e.payload; if (SIZES.includes(s)) applySize(s); });
   }
 
@@ -194,7 +232,7 @@
     }
   }
 
-  window.Avatar = { setState, bubble, clearBubble, confirmCard, voiceConfirm, setSize, cycleSize, action, get state() { return state; } };
+  window.Avatar = { setState, setContext, setExt, bubble, clearBubble, confirmCard, voiceConfirm, setSize, cycleSize, action, get state() { return state; }, get rest() { return restState; } };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

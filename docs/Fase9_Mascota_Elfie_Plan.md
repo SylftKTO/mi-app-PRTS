@@ -127,7 +127,7 @@ Tres tiers, del más ligero al más expresivo:
 
 - ✅ **9.0 — Ventana flotante + estados base**: `pet.html`, segunda WebviewWindow, `Avatar.setState`, 5 estados MVP (SVG), atajo mostrar/ocultar, 3 tamaños. *(implementado)*
 - ✅ **9.1 — Cerebro nube + voz ligera**: modo "mascota" (Anthropic + Piper), Piper en `voice_server.py`, burbuja de diálogo, tarjeta de confirmación + confirmar/cancelar por voz. *(implementado; ver §9)*
-- **9.2 — Vida visual**: WebP animado, parpadeo/idle/pulso, boca por audio, estados contextuales por módulo.
+- ✅ **9.2 — Vida visual**: boca animada (2 sprites), respiración idle + parpadeo, estados contextuales por módulo, soporte WebP. *(implementado; ver §9)*
 - **9.3 — Miniacciones + protocolos**: menú clic-derecho, protocolos sobre `routines.js` con narración + bitácora.
 - **9.4 — Pulido**: anclajes, opacidad, click-through, auto-ocultar, tono por estado.
 
@@ -193,3 +193,15 @@ Mientras no exista el modelo, `speak_piper` degrada a **Kokoro** automáticament
   Falta integrar mostrar la ventana principal oculta desde la mascota.
 - Confirmar/cancelar por voz: la API (`Avatar.voiceConfirm`/`elfie:voice-confirm`) está lista,
   pero conectarla al router de voz real (`actions.js`) queda para 9.3.
+
+### 9.2 — Vida visual (añadido)
+- **Boca animada**: `startTalk()` alterna `speaking` ↔ `speaking-closed` cada 150 ms mientras
+  el estado es `speaking` (ilusión de habla sin analizar audio → 0 GPU).
+- **Idle**: respiración en `.avatar-wrap` (CSS `pet-breathe`, en `.avatar-wrap` para no chocar
+  con el `scaleY` del parpadeo del `img`); parpadeo en estados de reposo. `prefers-reduced-motion` ok.
+- **Contextos por módulo**: `restState` + `Avatar.setContext(ctx)` + evento `elfie:context` +
+  `elfieSys.petContext()`. 6 SVG con glifo (study/gym/finance/diet/levelup/music). El **disparo
+  automático** por módulo es follow-up (solo `index.html` carga el bridge); hoy se fija por API/evento.
+- **WebP-ready**: `assetUrl()` + `Avatar.setExt("webp")` cambian de SVG a WebP sin tocar la lógica.
+- **Verificado en web**: contexto (gym → pose+status), boca alterna sprites, `pet-breathe` aplicado,
+  6 contextos OK, API completa, **0 errores de consola**.

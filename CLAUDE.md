@@ -241,6 +241,34 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 > **Fase 8 completa** (8.1 Core + 8.2 Orquestador + 8.3a Lore + 8.3b Personalidad). Decisión abierta heredada: arquetipo/identidad de Elfie ("¿basada en un personaje?") — el campo `personaDesc` y la entrada PRTS-003 lo dejan listo para definir.
 
+## Fase 9 — Mascota Virtual de Elfie (plan en `docs/Fase9_Mascota_Elfie_Plan.md`)
+
+> Ventana **flotante** sobre el escritorio: un avatar que **alterna archivos según su estado**, habla con voz ligera, muestra burbuja de texto y ejecuta acciones/protocolos. **Cerebro en la nube (Anthropic) por defecto** → GPU casi libre; lo local queda como respaldo (degradación total). Restricción rectora heredada: la VRAM de 8 GB.
+
+### ✅ 9.0 — Ventana flotante + estados base
+
+- **`app/pet.html`** (nuevo): la mascota. Avatar + burbuja + tarjeta de confirmación + historial + acciones rápidas. **3 tamaños** (mini = solo avatar · normal = avatar+texto · panel = +historial+acciones). Ventana Tauri **transparent + always-on-top + sin decoración**, arrastrable (`data-tauri-drag-region`).
+- **`app/pet/avatar.js`** (nuevo): máquina de estados `window.Avatar` (web-safe: corre como demo sin Tauri). `setState` **alterna el archivo del avatar por estado**; parpadeo idle, burbuja, confirmación, tamaños. Conducida por **eventos app-wide** del cerebro.
+- **`app/pet/assets/*.svg`** (nuevos): placeholders on-brand rosa/gris. 5 estados base (neutral/listening/thinking/speaking/error) + boca (`speaking-closed`) + 6 contextuales (study/gym/finance/diet/levelup/music).
+- **`elfie-desktop/src-tauri/src/lib.rs`:** ventana `pet` (creada oculta al arranque para recibir eventos); comandos `pet_toggle/show/hide/set_size/click_through`; **atajo global Ctrl+Shift+E**; ítem de tray "Mascota Elfie".
+- **`app/elfie/desktop.js`:** `elfieSys.pet*` (toggle/show/hide/setSize/clickThrough/**context**); emite `elfie:say`/`elfie:speaking`/`elfie:listening` para conducir el avatar; escucha `pet:action` (acciones rápidas: captura, chat, voz→wake, dashboard).
+- **`app/elfie.html`:** botón **"Mostrar mascota"** en Elfie Core (deshabilitado en web).
+
+### ✅ 9.1 — Cerebro nube + voz ligera (Piper)
+
+- **Modo `mascota`** en `elfie-config.js` (`MODES.mascota`): interpreter=anthropic, voz=piper, memoria on → GPU casi libre. Botón de modo + motor "Piper" en `elfie.html`.
+- **Piper** en `voice_server.py` (`load_piper`/`speak_piper`, carga perezosa CPU, ~0 GPU): tier de **voz rápida** para confirmaciones; `engine:"piper"` en `speak_dispatch` con **fallback a Kokoro**; `/health` reporta `piper`. **Setup usuario:** `pip install piper-tts` en `venv-voice` + modelo es_MX `.onnx` en `models/piper/` (o env `ELFIE_PIPER_MODEL`). Sin modelo → degrada a Kokoro.
+- **Burbuja + confirmación:** tarjeta junto al avatar; confirmar/cancelar **por voz** (`Avatar.voiceConfirm` / evento `elfie:voice-confirm`) — API lista; conectar al router real (`actions.js`) queda para 9.3.
+
+### ✅ 9.2 — Vida visual
+
+- **Boca animada (lip-sync simple):** al hablar, alterna 2 sprites (`speaking`/`speaking-closed`) cada 150 ms — ilusión de habla sin analizar audio ni GPU.
+- **Idle:** respiración sutil en `.avatar-wrap` (CSS `pet-breathe`) + parpadeo en estados de reposo (`prefers-reduced-motion` respetado).
+- **Estados contextuales por módulo (pose de reposo):** `restState` + `Avatar.setContext(ctx)` + evento `elfie:context` + helper `elfieSys.petContext()`. 6 contextos con glifo. ⚠️ El **disparo automático** por módulo desde páginas separadas queda pendiente (solo `index.html` carga el bridge) → hoy se fija vía API/evento.
+- **WebP-ready:** `assetUrl()` arma la ruta con la extensión activa; `Avatar.setExt("webp")` cambia de SVG a WebP cuando exista arte animado (sin tocar la lógica).
+
+> **Pendiente Fase 9:** 9.3 (miniacciones clic-derecho + protocolos sobre `routines.js` con narración/bitácora) · 9.4 (anclajes, opacidad, click-through, auto-ocultar, tono por estado). **Arte real del avatar** (anime, coherente con PRTS-002) reemplaza los placeholders SVG. **A probar en escritorio** (recompilar Tauri): ventana `pet`, atajo, tray, comandos y voz Piper real.
+
 ### Decisiones abiertas (resolver al implementar)
 
 - Tarifas/modelo vigentes para `cost_usd` (verificar precios al implementar).

@@ -21,7 +21,8 @@
   }
 
   /* --- Avatar --- */
-  .avatar-wrap { position: relative; flex: 0 0 auto; -webkit-app-region: drag; cursor: grab; }
+  .avatar-wrap { position: relative; flex: 0 0 auto; -webkit-app-region: drag; cursor: grab; animation: pet-breathe 5s ease-in-out infinite; }
+  @keyframes pet-breathe { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
   #pet-avatar {
     width: 120px; height: 120px; display: block; -webkit-user-drag: none;
     filter: drop-shadow(0 6px 18px rgba(0,0,0,0.55));
@@ -34,7 +35,7 @@
   @keyframes pet-bob { from { transform: translateY(0); } to { transform: translateY(-3px); } }
   @keyframes pet-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.04); } }
   @keyframes pet-glitch { 0% { transform: translateX(-2px); } 50% { transform: translateX(2px); } 100% { transform: translateX(0); } }
-  @media (prefers-reduced-motion: reduce) { #pet-avatar { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { #pet-avatar, .avatar-wrap { animation: none !important; } }
 
   .pet-status {
     position: absolute; left: 50%; bottom: -4px; transform: translateX(-50%);
