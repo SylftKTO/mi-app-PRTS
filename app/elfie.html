@@ -90,6 +90,10 @@
       <div><label>Auto-recursos</label><div class="desc">Baja a "bajos" si la GPU/CPU se satura o hay un juego/IDE en primer plano</div></div>
       <span class="sw"><input type="checkbox" id="sw-auto"><span class="track"></span><span class="knob"></span></span>
     </div>
+    <div class="row">
+      <div><label>Pantalla completa</label><div class="desc">Modo inmersivo (también F11; Escape sale)</div></div>
+      <button class="btn" id="btn-fs">Pantalla completa</button>
+    </div>
     <div id="core-status" class="core-status"></div>
   </div>
 
@@ -447,6 +451,20 @@ function render() {
   sw("sw-voice", f.voice, (v) => { f.voice = v; C.save(); });
   sw("sw-metrics", f.metricsWidget, (v) => { f.metricsWidget = v; C.save(); });
   sw("sw-monitor", f.monitor, (v) => { f.monitor = v; C.save(); });
+
+  // Pantalla completa (solo escritorio): el botón alterna y su rótulo se
+  // sincroniza con el evento elfie:fullscreen (F11/Escape/tray).
+  const fsBtn = $("btn-fs");
+  if (fsBtn && !fsBtn.dataset.wired) {
+    fsBtn.dataset.wired = "1";
+    const fsLabel = (on) => { fsBtn.textContent = on ? "Salir de pantalla completa" : "Pantalla completa"; };
+    if (!TAURI || !window.elfieSys?.toggleFullscreen) {
+      fsBtn.disabled = true; fsBtn.title = "Disponible en el Elfie de escritorio";
+    } else {
+      fsBtn.onclick = async () => { try { fsLabel(await window.elfieSys.toggleFullscreen()); } catch (_) {} };
+      try { window.__TAURI__?.event?.listen("elfie:fullscreen", (e) => fsLabel(!!e.payload)); } catch (_) {}
+    }
+  }
 
   $("btn-test").onclick = async () => {
     if (!TAURI || C.data.voiceEngine === "navegador") {

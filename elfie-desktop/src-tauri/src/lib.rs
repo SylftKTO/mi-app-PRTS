@@ -47,6 +47,9 @@ fn fullscreen_toggle(app: &tauri::AppHandle) -> bool {
         let now = win.is_fullscreen().unwrap_or(false);
         let _ = win.set_fullscreen(!now);
         let _ = win.set_focus();
+        // Notifica al frontend el nuevo estado para mantener sincronizados
+        // todos los puntos de entrada (F11, Escape, ítem del tray).
+        let _ = app.emit("elfie:fullscreen", !now);
         !now
     } else {
         false

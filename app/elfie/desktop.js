@@ -181,6 +181,9 @@
 
   // --- Pantalla completa: F11 alterna; Escape sale (solo cuando está activa) ---
   let fsOn = false;
+  // Rust emite el estado real tras cualquier alternancia (F11, Escape o ítem
+  // del tray) → fsOn nunca se desincroniza aunque se cambie desde el menú.
+  listen("elfie:fullscreen", (e) => { fsOn = !!e.payload; });
   async function setFullscreen() {
     try { fsOn = await invoke("toggle_fullscreen"); } catch (e) { console.warn("[elfie] fullscreen falló:", e); }
   }
