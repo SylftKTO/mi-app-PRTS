@@ -129,7 +129,9 @@ Tres tiers, del más ligero al más expresivo:
 - ✅ **9.1 — Cerebro nube + voz ligera**: modo "mascota" (Anthropic + Piper), Piper en `voice_server.py`, burbuja de diálogo, tarjeta de confirmación + confirmar/cancelar por voz. *(implementado; ver §9)*
 - ✅ **9.2 — Vida visual**: boca animada (2 sprites), respiración idle + parpadeo, estados contextuales por módulo, soporte WebP. *(implementado; ver §9)*
 - ✅ **9.3 — Miniacciones + protocolos**: menú clic-derecho, protocolos sobre `routines.js` con narración + bitácora. *(implementado; ver §9)*
-- **9.4 — Pulido**: anclajes, opacidad, click-through, auto-ocultar, tono por estado.
+- ✅ **9.4 — Pulido**: anclajes a esquina, opacidad, click-through "solo avatar", auto-ocultar, tono visual por estado. *(implementado; ver §9)*
+
+**Fase 9 completa.**
 
 ## 6. Datos (migraciones tentativas)
 
@@ -221,3 +223,18 @@ Mientras no exista el modelo, `speak_piper` degrada a **Kokoro** automáticament
 ### Pendiente de probar en escritorio (9.3)
 - Narración real (Piper/Kokoro) y burbuja por paso en la ventana `pet` mientras corre un protocolo.
 - Inserción en Supabase `protocol_log` (requiere `db:push` de la migración `..0022`).
+
+### 9.4 — Pulido (añadido)
+- **Anclaje a esquina**: comando Rust `pet_anchor(corner)` (monitor actual + margen); menú "Anclar a
+  esquina" cicla `tr→br→bl→tl`. Persiste en `prts_pet_cfg`.
+- **Opacidad**: `Avatar.setOpacity`/`cycleOpacity` (100/85/70/55 %) sobre el contenido; menú "Opacidad".
+- **Solo-avatar (click-through)**: menú "Solo avatar" → `pet_click_through(true)` + `body.solo` oculta el
+  chrome. Salida confiable desde el toggle **"Solo avatar"** en Elfie Core (`pet:config {solo:false}`).
+- **Auto-ocultar**: toggle en Elfie Core; tras ~20 s en reposo `pet_hide`, reaparece (`pet_show`) con actividad.
+- **Tono por estado (visual)**: `KIND` mapea estado→color de burbuja + etiqueta. El tono **auditivo** por
+  estado queda como follow-up (Kokoro/Piper solo exponen velocidad).
+- **Verificado en web**: opacidad (body.opacity=0.85), ancla (tr→br), solo (chrome oculto, sobrevive al
+  cambio de tamaño), tono (error→rojo, speaking→rosa), menú con 12 ítems, tamaños ciclan; **0 errores**.
+
+### Pendiente de probar en escritorio (9.4)
+- Posicionamiento real de `pet_anchor`, click-through del SO, `pet_hide`/`pet_show` del auto-ocultar.

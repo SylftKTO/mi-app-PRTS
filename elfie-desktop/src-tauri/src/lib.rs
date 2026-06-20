@@ -145,6 +145,29 @@ fn pet_click_through(app: tauri::AppHandle, on: bool) {
     }
 }
 
+/// Ancla la mascota a una esquina del monitor actual: "tl" | "tr" | "bl" | "br".
+#[tauri::command]
+fn pet_anchor(app: tauri::AppHandle, corner: String) {
+    if let Some(w) = app.get_webview_window("pet") {
+        if let Ok(Some(mon)) = w.current_monitor() {
+            let ms = mon.size();          // PhysicalSize<u32>
+            let mp = mon.position();      // PhysicalPosition<i32>
+            let ws = w.outer_size().unwrap_or(*ms);
+            let margin = 24i32;
+            let taskbar = 48i32;          // reserva aprox. para la barra de tareas (esquinas bajas)
+            let right = mp.x + ms.width as i32 - ws.width as i32 - margin;
+            let bottom = mp.y + ms.height as i32 - ws.height as i32 - margin - taskbar;
+            let (x, y) = match corner.as_str() {
+                "tl" => (mp.x + margin, mp.y + margin),
+                "bl" => (mp.x + margin, bottom),
+                "br" => (right, bottom),
+                _ => (right, mp.y + margin), // "tr" por defecto
+            };
+            let _ = w.set_position(tauri::PhysicalPosition::new(x, y));
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = tauri::Builder::default();
@@ -224,6 +247,7 @@ pub fn run() {
             pet_hide,
             pet_set_size,
             pet_click_through,
+            pet_anchor,
         ])
         .setup(|app| {
             if cfg!(debug_assertions) {

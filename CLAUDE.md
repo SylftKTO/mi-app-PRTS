@@ -275,7 +275,16 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - **Bitácora:** cada ejecución se registra en `localStorage` (`prts_protocol_log`, durable on-device) **y best-effort** en Supabase `protocol_log`. `elfieRoutines.bitacora()` la lee.
 - **Migración `..0022_protocol_log.sql`:** `protocol_log` (`name`, `steps_total/done`, `status` completado/parcial/error, `started_at`/`ended_at`), RLS `owner_all`. Degradación total: funciona sin la tabla (solo localStorage).
 
-> **Pendiente Fase 9:** 9.4 (anclajes, opacidad, click-through, auto-ocultar, tono por estado). **Arte real del avatar** (anime, coherente con PRTS-002) reemplaza los placeholders SVG. **A probar en escritorio** (recompilar Tauri): ventana `pet`, atajo, tray, comandos, voz Piper real y narración de protocolos. **`db:push`** para crear `protocol_log`.
+### ✅ 9.4 — Pulido
+
+- **Anclaje a esquina:** comando Rust `pet_anchor(corner)` (posiciona en el monitor actual con margen; `tl|tr|bl|br`). Menú "Anclar a esquina" cicla esquinas; se persiste.
+- **Opacidad ajustable:** `Avatar.setOpacity`/`cycleOpacity` (100/85/70/55%) sobre el contenido (la ventana es transparent); menú "Opacidad"; persiste en `prts_pet_cfg`.
+- **Solo-avatar (click-through):** menú "Solo avatar" → `pet_click_through(true)` + `body.solo` oculta el chrome. **Se sale** desde el toggle **"Solo avatar"** en Elfie Core (emite `pet:config {solo:false}`) — evita dejar la ventana atrapada.
+- **Auto-ocultar:** toggle "Auto-ocultar mascota" en Elfie Core (`pet:config {autoHide}`); `avatar.js` esconde la ventana (`pet_hide`) tras ~20 s en reposo y la **reaparece** (`pet_show`) ante cualquier actividad (escuchar/hablar/estado).
+- **Tono por estado (visual):** `KIND` mapea estado→color de burbuja (error→rojo, alert→ámbar, speaking→rosa) + etiqueta de estado. ⚠️ El **tono auditivo** por estado queda como follow-up (Kokoro/Piper solo exponen velocidad).
+- **`pet_anchor` registrado en `invoke_handler`.** Preferencias de la mascota en `localStorage` (`prts_pet_cfg`); origin compartido entre ventana principal y `pet`.
+
+> **Fase 9 completa** (9.0 ventana+estados · 9.1 nube+Piper · 9.2 vida visual · 9.3 miniacciones+protocolos · 9.4 pulido). **Pendiente externo:** **arte real del avatar** (anime, coherente con PRTS-002) reemplaza los placeholders SVG vía `Avatar.setExt("webp")`; **recompilar Tauri** para la ventana `pet`/atajo/tray/comandos/Piper/anclaje; **`db:push`** para `protocol_log`. Follow-ups menores: disparo automático de contexto por módulo desde páginas separadas, confirmar/cancelar por voz conectado al router real (`actions.js`), tono auditivo por estado.
 
 ### Decisiones abiertas (resolver al implementar)
 

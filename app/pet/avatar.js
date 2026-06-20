@@ -30,6 +30,8 @@
     error: "No entendí", alert: "Atención",
     study: "Estudio", gym: "Gym", finance: "Finanzas", diet: "Dieta", levelup: "LevelUp", music: "Música",
   };
+  // Tono visual por estado: color de la burbuja según lo que comunica el avatar.
+  const KIND = { error: "error", alert: "warn", confirming: "info", speaking: "say", executing: "info" };
 
   const EXT_KEY = "prts_pet_ext";
   let EXT = "svg";
@@ -55,10 +57,12 @@
     document.body.dataset.state = next;
     const st = $("pet-status");
     if (st) st.textContent = opts.status != null ? opts.status : (STATUS[next] || "");
-    if (opts.text) bubble(opts.text, opts.kind || "info");
+    if (opts.text) bubble(opts.text, opts.kind || KIND[next] || "info");
     // Boca animada solo al hablar; parpadeo solo en reposo.
     if (next === "speaking") startTalk(); else stopTalk();
-    if (REST.has(next)) scheduleBlink(); else stopBlink();
+    // En reposo: parpadeo + temporizador de auto-ocultar. En actividad: reaparece.
+    if (REST.has(next)) { scheduleBlink(); scheduleHide(); }
+    else { stopBlink(); clearHide(); revealIfNeeded(); }
   }
 
   // --- Pose por módulo: fija la "pose de reposo" (9.2) ---
@@ -164,7 +168,7 @@
   // --- Tamaños: mini (solo avatar) · normal (avatar+texto) · panel (+historial+acciones) ---
   const SIZES = ["mini", "normal", "panel"];
   function applySize(size) {
-    document.body.className = size;
+    SIZES.forEach((s) => document.body.classList.toggle(s, s === size)); // preserva "solo"
     const h = $("pet-history");
     if (h) h.hidden = size !== "panel"; // el historial solo existe en panel
   }
@@ -175,9 +179,53 @@
     invoke("pet_set_size", { size }).catch(() => {});
   }
   function cycleSize() {
-    const i = SIZES.indexOf(document.body.className || "normal");
-    setSize(SIZES[(i + 1) % SIZES.length]);
+    const cur = SIZES.find((s) => document.body.classList.contains(s)) || "normal";
+    setSize(SIZES[(SIZES.indexOf(cur) + 1) % SIZES.length]);
   }
+
+  // --- Preferencias de la mascota (9.4): opacidad, ancla, auto-ocultar, solo-avatar ---
+  const PCFG_KEY = "prts_pet_cfg";
+  let petCfg = { opacity: 1, anchor: "tr", autoHide: false, solo: false };
+  try { petCfg = Object.assign(petCfg, JSON.parse(localStorage.getItem(PCFG_KEY) || "{}")); } catch (_) {}
+  function savePetCfg() { try { localStorage.setItem(PCFG_KEY, JSON.stringify(petCfg)); } catch (_) {} }
+
+  // Opacidad (transparencia ajustable): se aplica al contenido (la ventana es transparent).
+  const OPAC = [1, 0.85, 0.7, 0.55];
+  function setOpacity(v) { petCfg.opacity = v; savePetCfg(); document.body.style.opacity = String(v); }
+  function cycleOpacity() {
+    const i = OPAC.indexOf(petCfg.opacity);
+    setOpacity(OPAC[(i + 1) % OPAC.length]);
+    bubble("Opacidad " + Math.round(petCfg.opacity * 100) + "%", "info");
+  }
+
+  // Ancla a esquina del monitor (lo posiciona Rust).
+  const CORNERS = ["tr", "br", "bl", "tl"];
+  const CORNER_LBL = { tr: "arriba dcha.", br: "abajo dcha.", bl: "abajo izq.", tl: "arriba izq." };
+  function anchor(c) { petCfg.anchor = c; savePetCfg(); invoke("pet_anchor", { corner: c }).catch(() => {}); }
+  function cycleAnchor() {
+    const i = CORNERS.indexOf(petCfg.anchor);
+    const c = CORNERS[(i + 1) % CORNERS.length];
+    anchor(c);
+    bubble("Anclada: " + CORNER_LBL[c], "info");
+  }
+
+  // Solo-avatar (click-through): deja pasar el ratón y oculta el chrome. Se SALE desde
+  // Elfie Core (ventana principal) o el atajo/tray → emite pet:config {solo:false}.
+  function setSolo(on) {
+    petCfg.solo = on; savePetCfg();
+    document.body.classList.toggle("solo", on);
+    invoke("pet_click_through", { on }).catch(() => {});
+  }
+
+  // Auto-ocultar: tras inactividad en reposo, esconde la ventana; reaparece con actividad.
+  let hideTimer = null;
+  function scheduleHide() {
+    clearHide();
+    if (!petCfg.autoHide) return;
+    hideTimer = setTimeout(() => { if (REST.has(state)) invoke("pet_hide").catch(() => {}); }, 20000);
+  }
+  function clearHide() { if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; } }
+  function revealIfNeeded() { if (petCfg.autoHide) invoke("pet_show").catch(() => {}); }
 
   // --- Miniacciones: la mascota pide a la ventana principal que actúe ---
   function action(act) { emit("pet:action", { act }); }
@@ -196,6 +244,16 @@
     listen("elfie:confirm", (e) => { const p = e.payload || {}; confirmCard(p.text || "¿Confirmas?", p); });
     listen("elfie:voice-confirm", (e) => voiceConfirm((e.payload && e.payload.text) || ""));
     listen("elfie:context", (e) => setContext(e.payload));
+    // La ventana principal (Elfie Core) controla solo-avatar y auto-ocultar.
+    listen("pet:config", (e) => {
+      const p = e.payload || {};
+      if ("solo" in p) setSolo(!!p.solo);
+      if ("autoHide" in p) {
+        petCfg.autoHide = !!p.autoHide; savePetCfg();
+        if (!petCfg.autoHide) invoke("pet_show").catch(() => {});
+        else scheduleHide();
+      }
+    });
     listen("pet:size", (e) => { const s = e.payload; if (SIZES.includes(s)) applySize(s); });
   }
 
@@ -206,13 +264,20 @@
     try { size = localStorage.getItem("prts_pet_size") || "normal"; } catch (_) {}
     applySize(SIZES.includes(size) ? size : "normal");
 
+    // Acciones locales de la mascota (no van al cerebro); el resto → pet:action.
+    const LOCAL_ACTS = { size: cycleSize, anchor: cycleAnchor, opacity: cycleOpacity, solo: () => setSolo(true) };
     document.querySelectorAll("[data-act]").forEach((b) => {
       b.addEventListener("click", () => {
         const a = b.dataset.act;
-        if (a === "size") cycleSize();
+        if (LOCAL_ACTS[a]) LOCAL_ACTS[a]();
         else action(a);
       });
     });
+
+    // Aplica preferencias guardadas (opacidad + ancla). Solo-avatar NO se auto-aplica
+    // al iniciar (evita dejar la ventana atrapada sin clics).
+    setOpacity(petCfg.opacity || 1);
+    if (petCfg.anchor) anchor(petCfg.anchor);
 
     // Menú contextual (clic derecho sobre la mascota).
     const menu = $("pet-menu");
@@ -247,7 +312,11 @@
     }
   }
 
-  window.Avatar = { setState, setContext, setExt, bubble, clearBubble, confirmCard, voiceConfirm, setSize, cycleSize, action, get state() { return state; }, get rest() { return restState; } };
+  window.Avatar = {
+    setState, setContext, setExt, bubble, clearBubble, confirmCard, voiceConfirm,
+    setSize, cycleSize, setOpacity, cycleOpacity, anchor, cycleAnchor, setSolo,
+    action, get state() { return state; }, get rest() { return restState; }, get cfg() { return petCfg; },
+  };
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
   else init();

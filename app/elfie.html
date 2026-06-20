@@ -98,6 +98,14 @@
       <div><label>Mascota flotante</label><div class="desc">Avatar sobre el escritorio (también Ctrl+Shift+E)</div></div>
       <button class="btn" id="btn-pet">Mostrar mascota</button>
     </div>
+    <div class="row">
+      <div><label>Solo avatar</label><div class="desc">Click-through: deja pasar el ratón y oculta el chrome (apaga aquí para salir)</div></div>
+      <span class="sw"><input type="checkbox" id="sw-pet-solo"><span class="track"></span><span class="knob"></span></span>
+    </div>
+    <div class="row">
+      <div><label>Auto-ocultar mascota</label><div class="desc">Se esconde tras inactividad y reaparece con voz/actividad</div></div>
+      <span class="sw"><input type="checkbox" id="sw-pet-autohide"><span class="track"></span><span class="knob"></span></span>
+    </div>
     <div id="core-status" class="core-status"></div>
   </div>
 
@@ -482,6 +490,17 @@ function render() {
         try { const on = await window.elfieSys.petToggle(); petBtn.textContent = on ? "Ocultar mascota" : "Mostrar mascota"; } catch (_) {}
       };
     }
+  }
+
+  // Solo-avatar (click-through) + auto-ocultar de la mascota (solo escritorio).
+  const petSolo = $("sw-pet-solo"), petAuto = $("sw-pet-autohide");
+  if (petSolo && !petSolo.dataset.wired) {
+    petSolo.dataset.wired = "1";
+    const emitPetCfg = (o) => { try { window.__TAURI__?.event?.emit("pet:config", o); } catch (_) {} };
+    let pc = {}; try { pc = JSON.parse(localStorage.getItem("prts_pet_cfg") || "{}"); } catch (_) {}
+    sw("sw-pet-solo", false, (v) => emitPetCfg({ solo: v }));          // el pet hace el click-through
+    sw("sw-pet-autohide", !!pc.autoHide, (v) => emitPetCfg({ autoHide: v }));
+    if (!TAURI) { petSolo.disabled = true; petAuto.disabled = true; }
   }
 
   $("btn-test").onclick = async () => {
