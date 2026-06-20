@@ -6,11 +6,11 @@ product
 
 ## Users
 
-Sergio (Sylft): estudiante de ingeniería en TecNM Celaya, instructor en Wolves (robótica) y LevelUp (idiomas), y atleta de gimnasio. Usuario único del sistema. Contexto de uso: el módulo Gym se usa **desde el teléfono, en el gimnasio, entre series** — una mano, prisa, luz artificial. El módulo Tareas se usa en ráfagas cortas de captura y revisión durante el día.
+Sylft: estudiante de ingeniería en TecNM Celaya, instructor en Wolves (robótica) y LevelUp (idiomas), y atleta de gimnasio. Usuario único del sistema. Contexto de uso: el módulo Gym se usa **desde el teléfono, en el gimnasio, entre series** — una mano, prisa, luz artificial. El módulo Tareas se usa en ráfagas cortas de captura y revisión durante el día.
 
 ## Product Purpose
 
-PRTS / SYLFT es el sistema personal de organización de Sergio: una sola app que cubre sus tres roles (estudiante, instructor, vida personal). Fase 1: módulos Gym (registro de entrenamiento PPL con sobrecarga progresiva) y Tareas (captura rápida con origen/prioridad/deadline). Éxito = registrar una serie o una tarea en menos de 5 segundos, y que el progreso sea visible sin esfuerzo.
+PRTS / SYLFT es el sistema personal de organización de Sylft: una sola app que cubre sus tres roles (estudiante, instructor, vida personal). Fase 1: módulos Gym (registro de entrenamiento PPL con sobrecarga progresiva) y Tareas (captura rápida con origen/prioridad/deadline). Éxito = registrar una serie o una tarea en menos de 5 segundos, y que el progreso sea visible sin esfuerzo.
 
 ## Brand Personality
 
