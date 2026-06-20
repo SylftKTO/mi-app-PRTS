@@ -38,7 +38,7 @@ app/                 # frontend vanilla (mismo en web y desktop)
 elfie-desktop/       # app Tauri 2
   src-tauri/src/     # Rust: lib.rs (tray/atajos/comandos) monitor.rs system_control.rs voice.rs
   sidecars/          # Python: voice_server.py rag.py chat.py xtts_server.py (corren en venv-voice/venv-xtts)
-supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0019 = último
+supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0022 = último (protocol_log)
 supabase/functions/  # Edge Functions: generate-briefing, generate-insights, process-inbox, interpret-command
                      #   + _shared/ (llm.ts, schemas.ts, prompts/*.vN.ts — command.v4 vigente)
 docs/Fase4_Arquitectura_IA.md  # ARQUITECTURA DE REFERENCIA para Fase 4 — leer antes de tocar la capa IA
@@ -199,7 +199,7 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 ### ⏭️ Pendiente Fase 7
 
-- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (Fase 8.2, descargar Ollama antes de generar). Migración `..0022_elfie_images.sql` + `app/elfie-galeria.html` + intent `generate_image`.
+- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (Fase 8.2, descargar Ollama antes de generar). Migración `..0023_elfie_images.sql` (la 0022 la tomó `protocol_log`) + `app/elfie-galeria.html` + intent `generate_image`.
 - **7.3 — Extras sugeridos:** visión de pantalla (qwen2-vl/llava sobre `elfieSys.screenshot`), avatar anime de Dalia (sinergia con 7.2), briefing hablado matutino, diario por voz, RAG de PDFs.
 
 ## Fase 8 — Elfie Core, Orquestador y Lore
@@ -267,7 +267,15 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - **Estados contextuales por módulo (pose de reposo):** `restState` + `Avatar.setContext(ctx)` + evento `elfie:context` + helper `elfieSys.petContext()`. 6 contextos con glifo. ⚠️ El **disparo automático** por módulo desde páginas separadas queda pendiente (solo `index.html` carga el bridge) → hoy se fija vía API/evento.
 - **WebP-ready:** `assetUrl()` arma la ruta con la extensión activa; `Avatar.setExt("webp")` cambia de SVG a WebP cuando exista arte animado (sin tocar la lógica).
 
-> **Pendiente Fase 9:** 9.3 (miniacciones clic-derecho + protocolos sobre `routines.js` con narración/bitácora) · 9.4 (anclajes, opacidad, click-through, auto-ocultar, tono por estado). **Arte real del avatar** (anime, coherente con PRTS-002) reemplaza los placeholders SVG. **A probar en escritorio** (recompilar Tauri): ventana `pet`, atajo, tray, comandos y voz Piper real.
+### ✅ 9.3 — Miniacciones + protocolos
+
+- **Menú clic-derecho** (`#pet-menu` en `pet.html`): captura, voz, música, protocolo…, cambiar modo, ver estado, dashboard, chat, tamaño. `avatar.js` lo posiciona en el cursor y lo cierra con clic/Escape; cada ítem enruta por `pet:action`.
+- **`desktop.js` enruta `pet:action`:** `music` (fija contexto + resume Spotify), `mode` (cicla normal→mascota→conversacion→bajos + narra), `status` (burbuja con modo/voz/wake), `protocol` (abre el gestor de rutinas), además de captura/voz/chat/dashboard.
+- **Protocolos = rutinas con narración:** `routines.js run()` ahora **narra inicio/cierre** (`say`), pone el avatar en `executing`, muestra **cada paso** en la burbuja (`elfie:bubble`) y al terminar vuelve a reposo. Cubre voz (`tryRun`), gestor (▶) y la mascota.
+- **Bitácora:** cada ejecución se registra en `localStorage` (`prts_protocol_log`, durable on-device) **y best-effort** en Supabase `protocol_log`. `elfieRoutines.bitacora()` la lee.
+- **Migración `..0022_protocol_log.sql`:** `protocol_log` (`name`, `steps_total/done`, `status` completado/parcial/error, `started_at`/`ended_at`), RLS `owner_all`. Degradación total: funciona sin la tabla (solo localStorage).
+
+> **Pendiente Fase 9:** 9.4 (anclajes, opacidad, click-through, auto-ocultar, tono por estado). **Arte real del avatar** (anime, coherente con PRTS-002) reemplaza los placeholders SVG. **A probar en escritorio** (recompilar Tauri): ventana `pet`, atajo, tray, comandos, voz Piper real y narración de protocolos. **`db:push`** para crear `protocol_log`.
 
 ### Decisiones abiertas (resolver al implementar)
 

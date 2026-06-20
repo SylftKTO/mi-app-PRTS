@@ -128,7 +128,7 @@ Tres tiers, del más ligero al más expresivo:
 - ✅ **9.0 — Ventana flotante + estados base**: `pet.html`, segunda WebviewWindow, `Avatar.setState`, 5 estados MVP (SVG), atajo mostrar/ocultar, 3 tamaños. *(implementado)*
 - ✅ **9.1 — Cerebro nube + voz ligera**: modo "mascota" (Anthropic + Piper), Piper en `voice_server.py`, burbuja de diálogo, tarjeta de confirmación + confirmar/cancelar por voz. *(implementado; ver §9)*
 - ✅ **9.2 — Vida visual**: boca animada (2 sprites), respiración idle + parpadeo, estados contextuales por módulo, soporte WebP. *(implementado; ver §9)*
-- **9.3 — Miniacciones + protocolos**: menú clic-derecho, protocolos sobre `routines.js` con narración + bitácora.
+- ✅ **9.3 — Miniacciones + protocolos**: menú clic-derecho, protocolos sobre `routines.js` con narración + bitácora. *(implementado; ver §9)*
 - **9.4 — Pulido**: anclajes, opacidad, click-through, auto-ocultar, tono por estado.
 
 ## 6. Datos (migraciones tentativas)
@@ -205,3 +205,19 @@ Mientras no exista el modelo, `speak_piper` degrada a **Kokoro** automáticament
 - **WebP-ready**: `assetUrl()` + `Avatar.setExt("webp")` cambian de SVG a WebP sin tocar la lógica.
 - **Verificado en web**: contexto (gym → pose+status), boca alterna sprites, `pet-breathe` aplicado,
   6 contextos OK, API completa, **0 errores de consola**.
+
+### 9.3 — Miniacciones + protocolos (añadido)
+- **Menú clic-derecho** (`#pet-menu`): captura, voz, música, protocolo…, cambiar modo, ver estado,
+  dashboard, chat, tamaño. `avatar.js` lo abre en el cursor y lo cierra con clic/Escape; enruta por `pet:action`.
+- **`pet:action` (desktop.js)**: `music` (contexto + resume Spotify), `mode` (cicla modos + narra),
+  `status` (burbuja modo/voz/wake), `protocol` (abre gestor de rutinas), + captura/voz/chat/dashboard.
+- **Protocolos = rutinas narradas**: `routines.js run()` narra inicio/cierre (`say`), pone el avatar en
+  `executing`, muestra cada paso en la burbuja y vuelve a reposo. Cubre voz (`tryRun`), gestor (▶) y mascota.
+- **Bitácora**: `localStorage` (`prts_protocol_log`) durable + best-effort Supabase `protocol_log`
+  (migración `..0022`). `elfieRoutines.bitacora()` la lee. Degradación total sin la tabla.
+- **Verificado en web**: menú aparece/cierra con 9 ítems; `run()` de un protocolo de 2 pasos registra
+  en bitácora (`{steps_total:2, steps_done:2, status:"completado"}`); **0 errores de consola**.
+
+### Pendiente de probar en escritorio (9.3)
+- Narración real (Piper/Kokoro) y burbuja por paso en la ventana `pet` mientras corre un protocolo.
+- Inserción en Supabase `protocol_log` (requiere `db:push` de la migración `..0022`).

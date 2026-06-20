@@ -137,12 +137,55 @@
     }
   }
 
+  // Conduce a la mascota (NO-OP en web sin Tauri).
+  function emitPet(event, payload) {
+    try { if (window.__TAURI__) window.__TAURI__.event.emit(event, payload); } catch (_) {}
+  }
+
+  // ---- Bitácora de protocolos (Fase 9.3): localStorage durable + best-effort Supabase ----
+  const PLOG_KEY = "prts_protocol_log";
+  function logProtocol(entry) {
+    let arr = [];
+    try { arr = JSON.parse(localStorage.getItem(PLOG_KEY) || "[]"); } catch (_) {}
+    arr.unshift(entry);
+    try { localStorage.setItem(PLOG_KEY, JSON.stringify(arr.slice(0, 50))); } catch (_) {}
+    const sb = window.sb;
+    if (sb) {
+      try {
+        sb.from("protocol_log").insert({
+          name: entry.name, steps_total: entry.steps_total, steps_done: entry.steps_done,
+          status: entry.status, started_at: entry.started_at, ended_at: entry.ended_at,
+        }).then(() => {}, () => {});
+      } catch (_) {}
+    }
+  }
+  const bitacora = () => { try { return JSON.parse(localStorage.getItem(PLOG_KEY) || "[]"); } catch (_) { return []; } };
+
+  // Ejecuta un protocolo narrando inicio/cierre y mostrando los pasos en la mascota.
   async function run(r) {
     if (!r || !r.steps) return;
-    for (const s of r.steps) {
-      await execStep(s);
-      if (s.delay_ms) await sleep(s.delay_ms);
+    const ai = window.PRTS_AI;
+    const total = r.steps.length;
+    const started_at = new Date().toISOString();
+    let done = 0, status = "completado";
+
+    emitPet("elfie:state", { state: "executing", text: "Protocolo " + r.name + " iniciado", status: "Protocolo" });
+    if (ai && ai.say) ai.say("Protocolo " + r.name + " iniciado");
+    try {
+      for (const s of r.steps) {
+        emitPet("elfie:bubble", { text: stepsToText([s]), kind: "info" });
+        await execStep(s);
+        done++;
+        if (s.delay_ms) await sleep(s.delay_ms);
+      }
+    } catch (e) {
+      status = "error";
+      console.warn("[rutina] protocolo falló", e);
     }
+    if (status === "completado" && done < total) status = "parcial";
+    if (ai && ai.say) ai.say("Protocolo " + r.name + (status === "completado" ? " completado" : " finalizado"));
+    emitPet("elfie:state", { state: "neutral" });
+    logProtocol({ name: r.name, steps_total: total, steps_done: done, status, started_at, ended_at: new Date().toISOString() });
   }
 
   // Dispara por frase (voz/texto). Devuelve true si ejecutó una rutina.
@@ -153,13 +196,12 @@
       (r) => r.is_active !== false && r.trigger_phrase && t.includes(r.trigger_phrase.toLowerCase())
     );
     if (!hit) return false;
-    if (window.PRTS_AI && window.PRTS_AI.say) window.PRTS_AI.say("Ejecutando " + hit.name);
-    await run(hit);
+    await run(hit); // run() ya narra "Protocolo … iniciado/completado"
     return true;
   }
 
   window.elfieRoutines = {
-    load, save, remove, run, tryRun, parseSteps, stepsToText,
+    load, save, remove, run, tryRun, parseSteps, stepsToText, bitacora,
     list: () => routines,
     openManager: () => openManager(),
   };

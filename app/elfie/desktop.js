@@ -203,19 +203,37 @@
   }, 300);
 
   // La mascota pide acciones a la ventana principal (el cerebro vive aquí).
+  const PET_MODES = ["normal", "mascota", "conversacion", "bajos"];
   listen("pet:action", (e) => {
     const act = e && e.payload && e.payload.act;
+    const ai = window.PRTS_AI, cfg = window.ElfieConfig;
     try {
       if (act === "capture") {
         enfocarCaptura();
       } else if (act === "voice") {
         // Reanuda la escucha continua (wake word) si está disponible.
-        if (window.PRTS_AI && window.PRTS_AI.wakeResume) window.PRTS_AI.wakeResume();
+        if (ai && ai.wakeResume) ai.wakeResume();
         else enfocarCaptura();
       } else if (act === "chat") {
         window.location.href = "elfie-chat.html";
       } else if (act === "dashboard") {
         window.scrollTo({ top: 0, behavior: "smooth" });
+      } else if (act === "music") {
+        T.event.emit("elfie:context", "music");
+        if (ai && ai.spotify && ai.spotify.resume) ai.spotify.resume().catch(() => {});
+      } else if (act === "mode" && cfg) {
+        const i = PET_MODES.indexOf(cfg.data.mode);
+        const next = PET_MODES[(i + 1) % PET_MODES.length];
+        cfg.applyMode(next);
+        T.event.emit("elfie:bubble", { text: "Modo: " + next, kind: "info" });
+        if (ai && ai.say) ai.say("Modo " + next);
+      } else if (act === "status") {
+        const c = cfg ? cfg.data : {};
+        const txt = "Modo " + (c.mode || "—") + " · voz " + (c.voiceEngine || "—") +
+          " · wake " + (c.features && c.features.wake ? "on" : "off");
+        T.event.emit("elfie:bubble", { text: txt, kind: "info", sticky: false });
+      } else if (act === "protocol") {
+        if (window.elfieRoutines && window.elfieRoutines.openManager) window.elfieRoutines.openManager();
       }
     } catch (err) { console.warn("[elfie] pet:action sin manejar:", act, err); }
   });

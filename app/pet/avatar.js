@@ -213,6 +213,21 @@
         else action(a);
       });
     });
+
+    // Menú contextual (clic derecho sobre la mascota).
+    const menu = $("pet-menu");
+    function showMenu(x, y) {
+      if (!menu) return;
+      menu.hidden = false;
+      const mw = menu.offsetWidth || 172, mh = menu.offsetHeight || 260;
+      menu.style.left = Math.max(4, Math.min(x, window.innerWidth - mw - 4)) + "px";
+      menu.style.top = Math.max(4, Math.min(y, window.innerHeight - mh - 4)) + "px";
+    }
+    function hideMenu() { if (menu) menu.hidden = true; }
+    document.addEventListener("contextmenu", (e) => { e.preventDefault(); showMenu(e.clientX, e.clientY); });
+    document.addEventListener("click", (e) => { if (menu && !menu.hidden && !menu.contains(e.target)) hideMenu(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideMenu(); });
+    if (menu) menu.addEventListener("click", () => hideMenu()); // cierra tras elegir
     const yes = $("pet-yes"), no = $("pet-no");
     if (yes) yes.addEventListener("click", () => resolveConfirm(true));
     if (no) no.addEventListener("click", () => resolveConfirm(false));

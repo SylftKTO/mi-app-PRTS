@@ -91,6 +91,19 @@
   body.mini #pet-avatar { width: 92px; height: 92px; }
   body.normal .pet-history { display: none; }
   body.panel #pet-avatar { width: 104px; height: 104px; }
+
+  /* --- Menú contextual (clic derecho) --- */
+  .pet-menu {
+    position: fixed; z-index: 50; min-width: 172px; -webkit-app-region: no-drag;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 5px; box-shadow: 0 14px 34px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 1px;
+  }
+  .pet-menu button {
+    text-align: left; background: transparent; border: none; color: #ECE8EA;
+    font: inherit; font-size: 12.5px; padding: 7px 9px; border-radius: 7px; cursor: pointer;
+  }
+  .pet-menu button:hover { background: #1F1C1F; color: var(--accent); }
+  .pet-menu hr { border: none; border-top: 1px solid var(--line); margin: 4px 2px; }
 </style>
 </head>
 <body class="normal">
@@ -117,6 +130,19 @@
     <button data-act="dashboard" title="Dashboard">▣</button>
     <button data-act="chat" title="Chat con Elfie">💬</button>
     <button data-act="size" title="Cambiar tamaño">⤢</button>
+  </div>
+
+  <div id="pet-menu" class="pet-menu" hidden>
+    <button data-act="capture">✎  Captura rápida</button>
+    <button data-act="voice">🎤  Activar voz</button>
+    <button data-act="music">🎵  Música</button>
+    <button data-act="protocol">⚙  Protocolo…</button>
+    <button data-act="mode">◐  Cambiar modo</button>
+    <button data-act="status">◍  Ver estado</button>
+    <hr>
+    <button data-act="dashboard">▣  Dashboard</button>
+    <button data-act="chat">💬  Chat con Elfie</button>
+    <button data-act="size">⤢  Cambiar tamaño</button>
   </div>
 
   <script src="config.js"></script>
