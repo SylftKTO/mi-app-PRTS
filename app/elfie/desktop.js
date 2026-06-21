@@ -92,12 +92,13 @@
     const originalSay = window.PRTS_AI.say ? window.PRTS_AI.say.bind(window.PRTS_AI) : null;
     window.PRTS_AI.say = async function (text) {
       if (!text || !ELFIE_CFG.ttsEnabled) return; // personalidad silenciosa → sin voz
+      try { T.event.emit("elfie:say", { text }); } catch (_) {} // la mascota muestra lo dicho en cualquier motor
       if (ELFIE_CFG.voiceEngine === "navegador") {
         if (originalSay) originalSay(text);
+        try { T.event.emit("elfie:speaking", false); } catch (_) {} // sin tracking de fin → vuelve a reposo
         return;
       }
       window.PRTS_AI.speaking = true; // ondas de voz (auras rosa de la runa)
-      try { T.event.emit("elfie:say", { text }); } catch (_) {} // conduce la mascota
       try {
         const body = { text, speed: ELFIE_CFG.voiceSpeed };
         // Voz clonada: solo si hay perfil XTTS con audio de referencia (si no, Kokoro).
@@ -229,6 +230,11 @@
         const i = PET_MODES.indexOf(cfg.data.mode);
         const next = PET_MODES[(i + 1) % PET_MODES.length];
         cfg.applyMode(next);
+        // Reconfigura el sidecar igual que el selector de Elfie Core (si no, wake/modelo
+        // quedan desincronizados del modo).
+        const wake = cfg.data.features && cfg.data.features.wake;
+        voicePost(wake ? "/wake/enable" : "/wake/disable").catch(() => {});
+        voicePost("/config", { model: cfg.data.localModel }).catch(() => {});
         T.event.emit("elfie:bubble", { text: "Modo: " + next, kind: "info" });
         if (ai && ai.say) ai.say("Modo " + next);
       } else if (act === "status") {

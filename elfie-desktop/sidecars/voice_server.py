@@ -355,10 +355,19 @@ def speak_piper(text, speed=1.0):
     tmp = os.path.join(tempfile.gettempdir(), "elfie_piper.wav")
     try:
         with wave.open(tmp, "wb") as wf:
-            try:
-                v.synthesize(text, wf, length_scale=length_scale)
-            except TypeError:
-                v.synthesize(text, wf)  # versiones sin length_scale
+            if hasattr(v, "synthesize_wav"):
+                # piper-tts 1.x: escribe el WAV. Intenta pasar velocidad vía SynthesisConfig.
+                try:
+                    from piper import SynthesisConfig
+                    v.synthesize_wav(text, wf, syn_config=SynthesisConfig(length_scale=length_scale))
+                except Exception:
+                    v.synthesize_wav(text, wf)
+            else:
+                # Versiones antiguas: synthesize(text, wave_file[, length_scale]).
+                try:
+                    v.synthesize(text, wf, length_scale=length_scale)
+                except TypeError:
+                    v.synthesize(text, wf)
         samples, sr = sf.read(tmp, dtype="float32")
         _play(samples, sr)
         return {"ok": True, "engine": "piper"}

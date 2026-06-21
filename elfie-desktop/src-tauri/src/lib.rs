@@ -102,6 +102,9 @@ fn pet_toggle_inner(app: &tauri::AppHandle) -> bool {
         let _ = win.hide();
         false
     } else {
+        // Al mostrarla explícitamente, garantiza que sea interactiva (sale de "solo avatar").
+        let _ = win.set_ignore_cursor_events(false);
+        let _ = win.emit("pet:exit-solo", ());
         let _ = win.show();
         let _ = win.set_focus();
         true
@@ -116,6 +119,8 @@ fn pet_toggle(app: tauri::AppHandle) -> bool {
 #[tauri::command]
 fn pet_show(app: tauri::AppHandle) {
     if let Some(w) = app.get_webview_window("pet").or_else(|| ensure_pet(&app)) {
+        let _ = w.set_ignore_cursor_events(false); // siempre interactiva al mostrarse
+        let _ = w.emit("pet:exit-solo", ());
         let _ = w.show();
         let _ = w.set_focus();
     }
@@ -142,6 +147,15 @@ fn pet_set_size(app: tauri::AppHandle, size: String) {
 fn pet_click_through(app: tauri::AppHandle, on: bool) {
     if let Some(w) = app.get_webview_window("pet") {
         let _ = w.set_ignore_cursor_events(on);
+    }
+}
+
+/// Redimensiona la ventana de la mascota (px lógicos). Lo usa el menú contextual para
+/// crecer temporalmente y no recortarse en la ventanita.
+#[tauri::command]
+fn pet_resize(app: tauri::AppHandle, width: f64, height: f64) {
+    if let Some(w) = app.get_webview_window("pet") {
+        let _ = w.set_size(LogicalSize::new(width.max(120.0), height.max(120.0)));
     }
 }
 
@@ -247,6 +261,7 @@ pub fn run() {
             pet_hide,
             pet_set_size,
             pet_click_through,
+            pet_resize,
             pet_anchor,
         ])
         .setup(|app| {

@@ -6,6 +6,21 @@
 > nube (Anthropic) por defecto** para dejar la GPU casi libre; lo local queda como
 > respaldo (degradación total — principio no negociable de la Fase 4).
 
+## Correcciones post-cierre (revisión de bugs)
+
+- **Menú contextual recortado**: la ventanita (~250 px) no contenía el menú (12 ítems ≈ 400 px) →
+  ítems inferiores inaccesibles. Fix: `pet_resize` (Rust) agranda la ventana mientras el menú está
+  abierto y la restaura al cerrarlo; + respaldo CSS `max-height/overflow` (desplazable en el borde).
+- **Trampa de "solo avatar"**: si se activaba el click-through, no había forma fácil de salir. Fix:
+  mostrar la mascota (atajo Ctrl+Shift+E / tray / `pet_show`) **siempre** la vuelve interactiva
+  (`set_ignore_cursor_events(false)` + evento `pet:exit-solo`).
+- **Voz "navegador" no animaba la mascota**: `elfie:say` se emitía después del `return` → sin burbuja.
+  Fix: emitir `elfie:say` antes de la rama de motor (la mascota refleja lo dicho en cualquier motor).
+- **Piper con API obsoleta**: `synthesize(text, wf)` no existe en piper-tts 1.x → siempre caía a Kokoro.
+  Fix: usar `synthesize_wav` (con `SynthesisConfig` para velocidad) y fallback a la API antigua.
+- **Cambiar modo desde la mascota** no reconfiguraba el sidecar (wake/modelo). Fix: replica las llamadas
+  `/wake/enable|disable` + `/config` del selector de Elfie Core.
+
 ## 0. Idea rectora y principio de GPU/costo
 
 La mascota es una segunda interfaz, no solo decorativa: interpreta, responde, confirma

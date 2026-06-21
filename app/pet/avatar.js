@@ -255,6 +255,8 @@
       }
       if ("ext" in p) setExt(p.ext); // svg ↔ webp (arte animado)
     });
+    // Salida de seguridad de "solo avatar" (la dispara Rust al mostrar la mascota).
+    listen("pet:exit-solo", () => { if (petCfg.solo) setSolo(false); });
     listen("pet:size", (e) => { const s = e.payload; if (SIZES.includes(s)) applySize(s); });
   }
 
@@ -280,16 +282,32 @@
     setOpacity(petCfg.opacity || 1);
     if (petCfg.anchor) anchor(petCfg.anchor);
 
-    // Menú contextual (clic derecho sobre la mascota).
+    // Menú contextual (clic derecho sobre la mascota). Como la ventana es pequeña,
+    // si el menú no cabe se agranda la ventana temporalmente para no recortarlo.
     const menu = $("pet-menu");
+    let menuGrew = false;
     function showMenu(x, y) {
       if (!menu) return;
       menu.hidden = false;
-      const mw = menu.offsetWidth || 172, mh = menu.offsetHeight || 260;
-      menu.style.left = Math.max(4, Math.min(x, window.innerWidth - mw - 4)) + "px";
-      menu.style.top = Math.max(4, Math.min(y, window.innerHeight - mh - 4)) + "px";
+      const mw = menu.offsetWidth || 180, mh = menu.scrollHeight || 360;
+      const needW = Math.max(window.innerWidth, mw + 12);
+      const needH = Math.max(window.innerHeight, mh + 12);
+      if (needW > window.innerWidth + 1 || needH > window.innerHeight + 1) {
+        menuGrew = true;
+        invoke("pet_resize", { width: Math.ceil(needW), height: Math.ceil(needH) }).catch(() => {});
+      }
+      menu.style.left = Math.max(4, Math.min(x, needW - mw - 6)) + "px";
+      menu.style.top = Math.max(4, Math.min(y, needH - mh - 6)) + "px";
     }
-    function hideMenu() { if (menu) menu.hidden = true; }
+    function hideMenu() {
+      if (!menu || menu.hidden) return;
+      menu.hidden = true;
+      if (menuGrew) {
+        menuGrew = false;
+        const cur = SIZES.find((s) => document.body.classList.contains(s)) || "normal";
+        invoke("pet_set_size", { size: cur }).catch(() => {});
+      }
+    }
     document.addEventListener("contextmenu", (e) => { e.preventDefault(); showMenu(e.clientX, e.clientY); });
     document.addEventListener("click", (e) => { if (menu && !menu.hidden && !menu.contains(e.target)) hideMenu(); });
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") hideMenu(); });
