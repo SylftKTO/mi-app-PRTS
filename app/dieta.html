@@ -86,6 +86,24 @@
   .peso-form input[type="number"] { flex: 1; min-width: 0; text-align: center; }
   .peso-form input[type="date"] { flex: 0 0 130px; }
   .v.up { color: var(--danger); } .v.down { color: var(--ok); }
+
+  /* buscador de alimentos (banco de información) */
+  .food-results { margin-top: 4px; }
+  .food-msg { font-size: 0.8rem; color: var(--faint); padding: 8px 2px; }
+  .food-res { display: flex; align-items: center; gap: 10px; padding: 9px 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .food-res:active, .food-res.open { background: var(--surface-2); }
+  .fr-main { flex: 1; min-width: 0; }
+  .fr-name { font-size: 0.9rem; }
+  .fr-brand { color: var(--faint); font-size: 0.8rem; }
+  .fr-macros { font-family: var(--mono); font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .fr-per { color: var(--faint); }
+  .fr-src { font-family: var(--mono); font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--faint); white-space: nowrap; }
+  .fr-src.off { color: var(--warn); border-color: rgba(224, 160, 106, 0.4); }
+  .fr-src.curado { color: var(--accent); border-color: var(--accent-deep); }
+  .food-ed { display: flex; align-items: center; gap: 8px; padding: 10px 4px; border-bottom: 1px solid var(--line); font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .food-ed .fe-g { width: 72px; text-align: center; padding: 8px 4px; }
+  .food-ed .fe-calc { flex: 1; min-width: 0; color: var(--accent); font-size: 10.5px; }
+  .food-ed .fe-ok { padding: 8px 14px; font-family: var(--sans); }
 </style>
 </head>
 <body>
@@ -123,10 +141,33 @@
 
     <!-- Totales del día con semáforo -->
     <div class="stat-grid macros">
-      <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s">de 2,135</div></div>
-      <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s">de 110 g</div></div>
-      <div class="stat-card"><div class="l">Carbs</div><div class="v" id="tot-c">0</div><div class="s">de 300 g</div></div>
-      <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s">de 55 g</div></div>
+      <div class="stat-card"><div class="l">Kcal</div><div class="v" id="tot-k">0</div><div class="s" id="s-k">de 2,135</div></div>
+      <div class="stat-card"><div class="l">Proteína</div><div class="v" id="tot-p">0</div><div class="s" id="s-p">de 110 g</div></div>
+      <div class="stat-card"><div class="l">Carbs</div><div class="v" id="tot-c">0</div><div class="s" id="s-c">de 300 g</div></div>
+      <div class="stat-card"><div class="l">Grasas</div><div class="v" id="tot-g">0</div><div class="s" id="s-g">de 55 g</div></div>
+    </div>
+
+    <!-- Metas de macros (por cuenta) -->
+    <div class="card" id="meta-card">
+      <div class="meal-head">
+        <div>
+          <div class="nombre">Metas de macros</div>
+          <div class="hora" id="meta-sub">2135 kcal · 110P · 300C · 55G</div>
+        </div>
+        <button class="btn-ghost" id="meta-toggle" style="padding:7px 14px">Editar</button>
+      </div>
+      <div id="meta-form" class="hidden">
+        <div class="macro-row" style="margin-top:12px">
+          <input type="number" id="m-p" inputmode="numeric" placeholder="P g">
+          <input type="number" id="m-c" inputmode="numeric" placeholder="C g">
+          <input type="number" id="m-g" inputmode="numeric" placeholder="G g">
+          <span class="kcal-calc" id="m-kcal">= 0 kcal</span>
+        </div>
+        <div class="form-foot">
+          <button class="btn-ghost" id="m-reset" style="flex:0 0 auto">Restablecer</button>
+          <button class="btn-primary" id="m-save">Guardar metas</button>
+        </div>
+      </div>
     </div>
 
     <!-- Comparativo target vs real -->
@@ -192,14 +233,26 @@ const { createClient } = supabase;
 const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
 const $ = (id) => document.getElementById(id);
 
-// Targets por comida (doc sección 12)
+// Distribución de referencia por comida (doc sección 12). Los targets por comida se
+// escalan proporcionalmente a META respecto a META_DEF (la referencia suma justo META_DEF).
 const COMIDAS = [
   { id: "desayuno", label: "Desayuno", hora: "11:00 · al despertar", t: { k: 530, p: 30, c: 85, g: 12 } },
   { id: "comida",   label: "Comida",   hora: "14:00 — 15:00",        t: { k: 700, p: 35, c: 100, g: 18 } },
   { id: "pregym",   label: "Pre-gym",  hora: "30 min antes",         t: { k: 355, p: 20, c: 60, g: 5 } },
   { id: "cena",     label: "Cena",     hora: "21:00 — 22:00",        t: { k: 550, p: 25, c: 55, g: 20 } },
 ];
-const TOTAL = { k: 2135, p: 110, c: 300, g: 55 };
+// Meta de macros del día (por cuenta). META_DEF = referencia; META = la vigente (de diet_goals).
+const META_DEF = { k: 2135, p: 110, c: 300, g: 55 };
+let META = { ...META_DEF };
+// Target de una comida escalado a la META actual (kcal derivada de macros).
+function metaMeal(t) {
+  return {
+    k: Math.round(t.k * META.k / META_DEF.k),
+    p: Math.round(t.p * META.p / META_DEF.p),
+    c: Math.round(t.c * META.c / META_DEF.c),
+    g: Math.round(t.g * META.g / META_DEF.g),
+  };
+}
 
 let banco = [];
 let formAbierto = null; // id de comida con formulario abierto
@@ -253,6 +306,122 @@ async function borrar(id) {
   cargar();
 }
 
+// ---------- BANCO DE INFORMACIÓN (búsqueda de alimentos) ----------
+const num = (v) => (v == null || v === "") ? null : Math.round(+v * 10) / 10;
+
+// Busca en la tabla curada/propia (food_db) y, si hay pocos resultados, en Open Food Facts.
+async function buscarAlimentos(q) {
+  let locales = [];
+  try {
+    const { data } = await sb.from("food_db").select("*").ilike("name", `%${q}%`).limit(8);
+    locales = (data || []).map(r => ({
+      src: r.user_id ? "propio" : "curado", name: r.name, brand: r.brand,
+      k: +r.kcal_100, p: +r.protein_100, c: +r.carbs_100, g: +r.fat_100,
+    }));
+  } catch (_) { /* tabla no migrada aún → solo Open Food Facts */ }
+  let off = [];
+  if (locales.length < 5) off = await buscarOFF(q);
+  const seen = new Set(locales.map(x => x.name.toLowerCase()));
+  return locales.concat(off.filter(x => !seen.has(x.name.toLowerCase()))).slice(0, 12);
+}
+
+async function buscarOFF(q) {
+  try {
+    const url = `https://world.openfoodfacts.org/cgi/search.pl?search_terms=${encodeURIComponent(q)}`
+      + `&search_simple=1&action=process&json=1&page_size=20&lc=es`
+      + `&fields=product_name,product_name_es,brands,nutriments,code`;
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 6000);
+    const r = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(to);
+    const j = await r.json();
+    return (j.products || []).map(p => {
+      const n = p.nutriments || {};
+      let k = n["energy-kcal_100g"];
+      if (k == null && n["energy_100g"] != null) k = n["energy_100g"] / 4.184;
+      return {
+        src: "off", code: p.code,
+        name: (p.product_name_es || p.product_name || "").trim(),
+        brand: (p.brands || "").split(",")[0].trim(),
+        k: k != null ? Math.round(k) : null,
+        p: num(n.proteins_100g), c: num(n.carbohydrates_100g), g: num(n.fat_100g),
+      };
+    }).filter(x => x.name && x.k != null && x.p != null && x.c != null && x.g != null);
+  } catch (_) { return []; }
+}
+
+function renderResultados(box, meal, res) {
+  if (!res.length) { box.innerHTML = `<div class="food-msg">Sin resultados. Usa la captura manual abajo.</div>`; return; }
+  const etiqueta = { off: "OFF", propio: "mío", curado: "banco" };
+  box.innerHTML = res.map((r, i) => `
+    <div class="food-res" data-i="${i}">
+      <div class="fr-main">
+        <div class="fr-name">${r.name.replace(/</g, "&lt;")}${r.brand ? ` <span class="fr-brand">${r.brand.replace(/</g, "&lt;")}</span>` : ""}</div>
+        <div class="fr-macros">${r.k} kcal · ${r.p}P ${r.c}C ${r.g}G <span class="fr-per">/100g</span></div>
+      </div>
+      <span class="fr-src ${r.src}">${etiqueta[r.src] || r.src}</span>
+    </div>`).join("");
+  box.querySelectorAll(".food-res").forEach(el => {
+    el.onclick = () => abrirPorcion(el, meal, res[+el.dataset.i]);
+  });
+}
+
+function abrirPorcion(el, meal, item) {
+  el.parentElement.querySelectorAll(".food-ed").forEach(e => e.remove());
+  el.parentElement.querySelectorAll(".food-res.open").forEach(e => e.classList.remove("open"));
+  el.classList.add("open");
+  const ed = document.createElement("div");
+  ed.className = "food-ed";
+  ed.innerHTML = `
+    <input type="number" inputmode="numeric" class="fe-g" value="100"> g
+    <span class="fe-calc"></span>
+    <button class="btn-primary fe-ok">Agregar</button>`;
+  const g = ed.querySelector(".fe-g");
+  const calc = ed.querySelector(".fe-calc");
+  const pinta = () => { const s = scale(item, +g.value || 0); calc.textContent = `= ${s.kcal} kcal · ${s.p}P ${s.c}C ${s.g}G`; };
+  g.oninput = pinta; pinta();
+  ed.querySelector(".fe-ok").onclick = () => {
+    const grams = +g.value;
+    if (!grams || grams <= 0) { toast("Cantidad inválida"); return; }
+    registrarPorcion(meal, item, grams);
+  };
+  el.insertAdjacentElement("afterend", ed);
+  g.focus(); g.select();
+}
+
+function scale(item, grams) {
+  const f = grams / 100;
+  return {
+    name: item.name + (item.brand ? ` · ${item.brand}` : ""),
+    kcal: Math.round(item.k * f),
+    p: +(item.p * f).toFixed(1), c: +(item.c * f).toFixed(1), g: +(item.g * f).toFixed(1),
+  };
+}
+
+// Cachea un alimento de Open Food Facts en food_db (fila propia) para encontrarlo local la próxima vez.
+async function cacheFoodDb(item) {
+  if (item.src !== "off") return;
+  try {
+    await sb.from("food_db").insert({
+      name: item.name, brand: item.brand || null,
+      kcal_100: item.k, protein_100: item.p, carbs_100: item.c, fat_100: item.g,
+      source: "off", off_code: item.code || null,
+    });
+  } catch (_) { /* sin tabla o duplicado → ignorar */ }
+}
+
+async function registrarPorcion(meal, item, grams) {
+  const s = scale(item, grams);
+  const { error } = await sb.from("meal_logs").insert({
+    log_date: $("day-date-pick").value, meal,
+    name: `${s.name} (${grams} g)`, kcal: s.kcal, protein_g: s.p, carbs_g: s.c, fat_g: s.g,
+  });
+  if (error) { alert(error.message); return; }
+  cacheFoodDb(item);
+  toast(`${s.name} registrado`);
+  cargar();
+}
+
 // ---------- RENDER ----------
 function formCaptura(meal) {
   const wrap = document.createElement("div");
@@ -263,6 +432,9 @@ function formCaptura(meal) {
          `<button class="chip" data-id="${f.id}">${f.name}<small>${+f.kcal} kcal</small></button>`).join("")}</div>`
     : "";
   wrap.innerHTML = `
+    <div class="sep">Buscar alimento</div>
+    <input type="text" id="f-search" placeholder="pollo, avena, plátano…" autocomplete="off">
+    <div id="f-results" class="food-results"></div>
     ${chips}
     <div class="sep">Captura manual</div>
     <input type="text" id="f-name" placeholder="¿Qué comiste?">
@@ -276,12 +448,29 @@ function formCaptura(meal) {
       <label><input type="checkbox" id="f-save" checked> Guardar en banco</label>
       <button class="btn-primary" id="f-ok">Registrar</button>
     </div>`;
+  // chips del banco personal (porción absoluta, un toque)
   wrap.querySelectorAll(".chip").forEach(ch => {
     ch.onclick = () => {
       const f = banco.find(b => b.id === ch.dataset.id);
       registrar(meal, { food_id: f.id, name: f.name, kcal: +f.kcal, p: +f.protein_g, c: +f.carbs_g, g: +f.fat_g }, false);
     };
   });
+  // buscador (curado + banco propio + Open Food Facts) con debounce
+  const inp = wrap.querySelector("#f-search");
+  const box = wrap.querySelector("#f-results");
+  let tBusca, ultima = 0;
+  inp.oninput = () => {
+    clearTimeout(tBusca);
+    const q = inp.value.trim();
+    if (q.length < 2) { box.innerHTML = ""; return; }
+    box.innerHTML = `<div class="food-msg">Buscando…</div>`;
+    tBusca = setTimeout(async () => {
+      const id = ++ultima;
+      const res = await buscarAlimentos(q);
+      if (id !== ultima) return; // descarta respuesta vieja
+      renderResultados(box, meal, res);
+    }, 350);
+  };
   // kcal calculadas en vivo: P×4 + C×4 + G×9
   const kcalDe = () => {
     const p = +wrap.querySelector("#f-p").value || 0;
@@ -312,7 +501,7 @@ async function cargar() {
   logs.forEach(l => { sum.k += +l.kcal; sum.p += +l.protein_g; sum.c += +l.carbs_g; sum.g += +l.fat_g; });
   for (const [key, el] of [["k", "tot-k"], ["p", "tot-p"], ["c", "tot-c"], ["g", "tot-g"]]) {
     $(el).textContent = Math.round(sum[key]);
-    $(el).className = "v " + semaforo(sum[key], TOTAL[key]);
+    $(el).className = "v " + semaforo(sum[key], META[key]);
   }
   renderComparativo(sum);
 
@@ -321,6 +510,7 @@ async function cargar() {
   for (const cm of COMIDAS) {
     const items = logs.filter(l => l.meal === cm.id);
     const k = items.reduce((a, l) => a + +l.kcal, 0);
+    const mt = metaMeal(cm.t);
     const card = document.createElement("div");
     card.className = "card";
     card.innerHTML = `
@@ -329,9 +519,9 @@ async function cargar() {
           <div class="nombre">${cm.label}</div>
           <div class="hora">${cm.hora}</div>
         </div>
-        <div class="meal-kcal"><b>${Math.round(k)}</b> / ${cm.t.k} kcal</div>
+        <div class="meal-kcal"><b>${Math.round(k)}</b> / ${mt.k} kcal</div>
       </div>
-      <div class="meal-target">target · ${cm.t.p}P · ${cm.t.c}C · ${cm.t.g}G</div>`;
+      <div class="meal-target">target · ${mt.p}P · ${mt.c}C · ${mt.g}G</div>`;
     for (const it of items) {
       const row = document.createElement("div");
       row.className = "mlog";
@@ -361,7 +551,7 @@ const MACROS = [
 ];
 function renderComparativo(sum) {
   $("comparativo").innerHTML = MACROS.map(m => {
-    const real = Math.round(sum[m.key]), target = TOTAL[m.key];
+    const real = Math.round(sum[m.key]), target = META[m.key];
     const pct = Math.min(100, Math.round(real / target * 100));
     const sem = semaforo(real, target) || "none";
     const dif = real - target;
@@ -504,7 +694,7 @@ function renderPesoChart(W) {
 }
 
 function renderAdherencia(kcalDia, W) {
-  const low = TOTAL.k * 0.9, high = TOTAL.k * 1.1;
+  const low = META.k * 0.9, high = META.k * 1.1;
   const weeks = {};
   Object.entries(kcalDia).forEach(([d, k]) => { (weeks[lunes(d)] = weeks[lunes(d)] || { dias: [], pesos: [] }).dias.push(k); });
   W.forEach(p => { (weeks[lunes(p.d)] = weeks[lunes(p.d)] || { dias: [], pesos: [] }).pesos.push(p.w); });
@@ -554,6 +744,62 @@ function renderAdherencia(kcalDia, W) {
      "Señal aún débil; sigue registrando para confirmar el superávit.");
 }
 
+// ---------- METAS DE MACROS (por cuenta) ----------
+function pintarMetaLabels() {
+  $("s-k").textContent = `de ${Math.round(META.k).toLocaleString("es-MX")}`;
+  $("s-p").textContent = `de ${META.p} g`;
+  $("s-c").textContent = `de ${META.c} g`;
+  $("s-g").textContent = `de ${META.g} g`;
+  $("meta-sub").textContent = `${Math.round(META.k)} kcal · ${META.p}P · ${META.c}C · ${META.g}G`;
+}
+
+async function cargarMeta() {
+  try {
+    const { data } = await sb.from("diet_goals").select("*").maybeSingle();
+    if (data) META = { k: +data.kcal, p: +data.protein_g, c: +data.carbs_g, g: +data.fat_g };
+  } catch (_) { /* tabla no migrada → defaults */ }
+  pintarMetaLabels();
+}
+
+function metaKcalForm() {
+  const p = +$("m-p").value || 0, c = +$("m-c").value || 0, g = +$("m-g").value || 0;
+  return { p, c, g, k: p * 4 + c * 4 + g * 9 };
+}
+
+function abrirMetaForm(abrir) {
+  $("meta-form").classList.toggle("hidden", !abrir);
+  $("meta-toggle").textContent = abrir ? "Cerrar" : "Editar";
+  if (abrir) {
+    $("m-p").value = META.p; $("m-c").value = META.c; $("m-g").value = META.g;
+    $("m-kcal").textContent = `= ${Math.round(META.k)} kcal`;
+  }
+}
+
+async function guardarMeta() {
+  const { p, c, g, k } = metaKcalForm();
+  if (!p && !c && !g) { toast("Ingresa al menos un macro"); return; }
+  const { error } = await sb.from("diet_goals").upsert(
+    { kcal: k, protein_g: p, carbs_g: c, fat_g: g, updated_at: new Date().toISOString() },
+    { onConflict: "user_id" });
+  if (error) { alert(error.message); return; }
+  META = { k, p, c, g };
+  pintarMetaLabels();
+  abrirMetaForm(false);
+  toast("Metas actualizadas");
+  cargar();
+}
+
+function initMeta() {
+  $("meta-toggle").onclick = () => abrirMetaForm($("meta-form").classList.contains("hidden"));
+  ["m-p", "m-c", "m-g"].forEach(id =>
+    $(id).oninput = () => $("m-kcal").textContent = `= ${Math.round(metaKcalForm().k)} kcal`);
+  $("m-reset").onclick = () => {
+    $("m-p").value = META_DEF.p; $("m-c").value = META_DEF.c; $("m-g").value = META_DEF.g;
+    $("m-kcal").textContent = `= ${Math.round(META_DEF.k)} kcal`;
+  };
+  $("m-save").onclick = guardarMeta;
+}
+
 // ---------- ARRANQUE ----------
 function show(id) { $("view-login").classList.add("hidden"); $("view-app").classList.add("hidden"); $(id).classList.remove("hidden"); }
 
@@ -566,6 +812,8 @@ async function init() {
   $("dt-prog").onclick = () => dietaTab("prog");
   $("peso-save").onclick = guardarPeso;
   $("peso-input").onkeydown = (e) => { if (e.key === "Enter") guardarPeso(); };
+  initMeta();
+  await cargarMeta();
   await cargarBanco();
   cargar();
 }

@@ -169,7 +169,7 @@ const $ = (id) => document.getElementById(id);
 // (p. ej. "https://prts.tudominio.com/"). El override de config.js tiene prioridad.
 const PRTS_URL = (window.PRTS_CONFIG && PRTS_CONFIG.PRTS_MAIN_URL) || "../index.html";
 
-// Targets de dieta (espejo de dieta.html · doc sección 12)
+// Metas de dieta: default (espejo de dieta.html) → se sobreescriben con diet_goals por cuenta.
 const DIETA_TOTAL = { k: 2135, p: 110 };
 const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 const DIAS_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
@@ -238,14 +238,22 @@ async function cargarGym() {
 async function cargarDieta() {
   const { fecha } = hoyMX();
   $("dieta-sub").textContent = "superávit +200 kcal";
+
+  // metas por cuenta (diet_goals); degrada a los defaults si no hay fila/tabla
+  let metaK = DIETA_TOTAL.k, metaP = DIETA_TOTAL.p;
+  try {
+    const { data: g } = await sb.from("diet_goals").select("kcal, protein_g").maybeSingle();
+    if (g) { metaK = +g.kcal; metaP = +g.protein_g; }
+  } catch (_) {}
+
   const { data: logs } = await sb.from("meal_logs").select("kcal, protein_g").eq("log_date", fecha);
 
   const sum = { k: 0, p: 0 };
   (logs || []).forEach(l => { sum.k += +l.kcal; sum.p += +l.protein_g; });
 
   const filas = [
-    { name: "Calorías", real: Math.round(sum.k), target: DIETA_TOTAL.k, unit: "" },
-    { name: "Proteína", real: Math.round(sum.p), target: DIETA_TOTAL.p, unit: " g" },
+    { name: "Calorías", real: Math.round(sum.k), target: metaK, unit: "" },
+    { name: "Proteína", real: Math.round(sum.p), target: metaP, unit: " g" },
   ];
   $("dieta-body").innerHTML = filas.map(f => {
     const pct = Math.min(100, Math.round(f.real / f.target * 100));

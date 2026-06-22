@@ -36,10 +36,11 @@ app/                 # frontend vanilla (mismo en web y desktop)
   ai/                # voice.js (push-to-talk web) wakeword.js (Dalia web) actions.js (router+ejecutor) gcal.js (Google Calendar)
   elfie/             # puentes Tauri (NO-OP en web): desktop.js rag.js chat.js elfie-config.js monitor.js routines.js
   pet.html pet/      # mascota flotante (Fase 9): avatar.js (estados) context-bridge.js assets/ (svg→webp)
+  pocket/            # Elfie Pocket: sitio AISLADO (gym+dieta+captura). Copias propias de gym/dieta/styles/config (ver § Elfie Pocket)
 elfie-desktop/       # app Tauri 2
   src-tauri/src/     # Rust: lib.rs (tray/atajos/comandos) monitor.rs system_control.rs voice.rs
   sidecars/          # Python: voice_server.py rag.py chat.py xtts_server.py (corren en venv-voice/venv-xtts)
-supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0022 = último (protocol_log)
+supabase/migrations/ # SQL versionado (timestamp YYYYMMDDNNNNNN_nombre.sql) — ..0024 = último (diet_goals; ..0023 = food_db)
 supabase/functions/  # Edge Functions: generate-briefing, generate-insights, process-inbox, interpret-command
                      #   + _shared/ (llm.ts, schemas.ts, prompts/*.vN.ts — command.v4 vigente)
 docs/Fase4_Arquitectura_IA.md  # ARQUITECTURA DE REFERENCIA para Fase 4 — leer antes de tocar la capa IA
@@ -200,7 +201,7 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 
 ### ⏭️ Pendiente Fase 7
 
-- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (Fase 8.2, descargar Ollama antes de generar). Migración `..0023_elfie_images.sql` (la 0022 la tomó `protocol_log`) + `app/elfie-galeria.html` + intent `generate_image`.
+- **7.2 — Imágenes anime:** sidecar `image_server.py` (:7333, reusar `venv-xtts` + diffusers) con **Illustrious XL** (un checkpoint = un estilo; ~6-7 GB @1024² → cabe en 8 GB) + few-step (Hyper-SD/Lightning). Requiere **orquestador de GPU** (Fase 8.2, descargar Ollama antes de generar). Migración `..0025_elfie_images.sql` (0023=food_db, 0024=diet_goals ya tomadas) + `app/elfie-galeria.html` + intent `generate_image`.
 - **7.3 — Extras sugeridos:** visión de pantalla (qwen2-vl/llava sobre `elfieSys.screenshot`), avatar anime de Dalia (sinergia con 7.2), briefing hablado matutino, diario por voz, RAG de PDFs.
 
 ## Fase 8 — Elfie Core, Orquestador y Lore
@@ -292,3 +293,31 @@ PRODUCT.md / DESIGN.md         # identidad, principios de diseño, anti-referenc
 - Tarifas/modelo vigentes para `cost_usd` (verificar precios al implementar).
 - API de clima y permiso de ubicación (intent `weather`).
 - Playlists de estudio: presets fijos vs API de Spotify.
+
+## Elfie Pocket — sitio web ligero (gym + dieta + captura)
+
+> Versión reducida para uso diario: solo **Gimnasio**, **Dieta** y **Captura**. Vive en `app/pocket/` como **sitio totalmente aislado** (no comparte assets vía `../`), instalable como **PWA propia**. Mismo backend Supabase/RLS, mismo idioma visual.
+
+- ✅ **`app/pocket/index.html`** — dashboard mínimo: **Runa** (enlaza al PRTS completo), tarjeta **Gym hoy** (rutina del día + series hechas/objetivo desde `routine_days`/`routine_exercises`/`workout_sets`), tarjeta **Dieta hoy** (kcal + proteína vs meta, barras con semáforo) y **Captura rápida** (inserta en `inbox_entries`, dictado opcional `webkitSpeechRecognition`; lista las 5 pendientes). Sin dependencia de Edge Functions/IA.
+- ✅ **Carpeta autosuficiente:** copias propias de `gym.html`, `dieta.html`, `styles.css`, `config.js`, iconos, `runa.png`, `manifest.json` (PWA, `scope: ./`) y `sw.js` (caché `pocket-v1`). **Navegación recortada a Pocket:** en las copias de gym/dieta se quitó el ítem **Apuntes** y el `pet/context-bridge.js` (NO-OP en web); "Inicio" → dashboard de Pocket.
+- ✅ **Runa → PRTS principal:** constante `PRTS_URL` en `index.html` = `(PRTS_CONFIG.PRTS_MAIN_URL) || "../index.html"`. Sirviendo bajo el mismo dominio en `/pocket/`, el default funciona. Si algún día Pocket va a **otro dominio**, definir `PRTS_MAIN_URL` (URL absoluta) en `config.js`.
+- ⚠️ **Mantener en sync:** gym/dieta de Pocket son **copias** del `app/` (decisión: aislamiento por encima de DRY). Al tocar `app/gym.html` o `app/dieta.html`, **recopiar** a `pocket/` y **re-aplicar** los 2 ajustes (quitar `context-bridge`, quitar ítem Apuntes de la navbar). `styles.css`/`config.js` también son copias.
+- **Deploy:** mismo dominio → ruta `/pocket/` (default). Aislado → 2º proyecto Vercel con Root Directory = `app/pocket`.
+
+## Módulo Dieta — banco de alimentos + metas por cuenta (post-Fase 9)
+
+### ✅ Banco de información de alimentos (búsqueda + alta directa)
+
+- **Por qué:** la tabla `foods` era solo el **banco personal** (porciones absolutas que el usuario ya capturó). Faltaba **buscar** alimentos por nombre y agregarlos con sus macros.
+- **Migración `..0023_food_db.sql`:** tabla `food_db` con macros **por 100 g** (a diferencia de `foods`). Filas **curadas globales** (`user_id` NULL, visibles para todos) + filas **propias** (`user_id = auth.uid()`, p. ej. cacheadas de Open Food Facts). RLS: lectura `user_id is null or auth.uid()=user_id`; escritura solo propias (curadas = solo lectura para el cliente). Índices únicos parciales por nombre (global y por usuario). **Siembra curada de ~80 alimentos es-MX/gym** (pollo, res, huevo, avena, arroz, tortilla, frijoles, frutas, verduras, grasas, whey…).
+- **`app/dieta.html` (y copia `pocket/dieta.html`):** dentro del formulario de cada comida, sección **"Buscar alimento"** con **debounce**. Fuente híbrida (decisión "las dos"): busca primero en `food_db` (curado + propio) y, si hay <5 resultados, consulta **Open Food Facts** (`world.openfoodfacts.org/cgi/search.pl`, `lc=es`, sin key, `AbortController` 6 s). Cada resultado muestra macros/100g + etiqueta de fuente (banco/mío/OFF). Al elegir → editor **por gramos** (default 100) con cálculo en vivo; al agregar, escala P/C/G/kcal y registra en `meal_logs` como `"Nombre (150 g)"`. Los picks de **OFF se cachean** en `food_db` (fila propia, `source='off'`) → locales la próxima vez.
+- **Degradación total:** sin `db:push`, `food_db` no existe → la búsqueda local falla en silencio y usa solo Open Food Facts. Tras `db:push`, los ~80 curados aparecen rankeados primero.
+- ⚠️ Open Food Facts es mayormente **productos empacados**; para genéricos confiables están los curados. Requiere red (degrada a captura manual, que sigue intacta).
+
+### ✅ Metas de macros editables por cuenta
+
+- **Por qué:** los targets de dieta (`2135 kcal · 110P · 300C · 55G`) estaban **hardcodeados**. Ahora cada cuenta define su meta y sincroniza entre dispositivos.
+- **Migración `..0024_diet_goals.sql`:** tabla `diet_goals` (**PK `user_id`** → una fila por cuenta; `kcal`, `protein_g`, `carbs_g`, `fat_g`, `updated_at`), RLS `owner_all`. `kcal` se guarda ya calculada (P·4 + C·4 + G·9) para lectura directa.
+- **`app/dieta.html`:** tarjeta **"Metas de macros"** en la vista Hoy con editor (P/C/G → kcal en vivo; Guardar / **Restablecer** a defaults). `cargarMeta()` lee `diet_goals` (`maybeSingle`); `guardarMeta()` hace `upsert` con `onConflict:"user_id"` (mismo patrón que `body_weights`). `META` reemplaza al viejo `TOTAL` en totales/semáforo/comparativo/adherencia. Los **targets por comida** se escalan: `metaMeal(t) = t[macro] · META[macro]/META_DEF[macro]` (la distribución de referencia suma justo `META_DEF`, así que las comidas escaladas suman la META, ±1 por redondeo).
+- **`app/pocket/index.html` y `pocket/dieta.html`:** el dashboard de Pocket y la copia de dieta también leen `diet_goals` (degradan a los defaults si no hay fila/tabla).
+- **Degradación total:** sin fila o sin `db:push`, se usan los defaults (`META_DEF`).
