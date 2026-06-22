@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0D0C0E">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Elfie Pocket</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,300..600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<style>
+  /* Runa → enlace al PRTS principal */
+  .pk-rune {
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    text-decoration: none; margin: 4px auto 18px; width: max-content;
+  }
+  .pk-rune img {
+    width: 60px; height: 60px; object-fit: contain;
+    opacity: 0.92; animation: rune-breathe 5.5s ease-in-out infinite;
+    filter: drop-shadow(0 0 14px rgba(230, 138, 162, 0.18));
+  }
+  .pk-rune .cap {
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.22em;
+    text-transform: uppercase; color: var(--faint);
+  }
+  .pk-rune:active img { transform: scale(0.96); }
+  @keyframes rune-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.9; }
+    50% { transform: scale(1.05); opacity: 1; }
+  }
+
+  /* Encabezado de tarjeta con acción a la derecha */
+  .pk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .pk-head .t { font-family: var(--serif); font-size: 19px; font-weight: 500; }
+  .pk-head a {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--accent); text-decoration: none; white-space: nowrap;
+  }
+  .pk-sub { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); margin-top: 3px; }
+
+  /* Barra de progreso simple */
+  .pk-prog { margin-top: 14px; }
+  .pk-prog + .pk-prog { margin-top: 12px; }
+  .pk-prog .lab { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.86rem; }
+  .pk-prog .lab .name { color: var(--muted); }
+  .pk-prog .lab .num { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .pk-prog .lab .num b { color: var(--text); font-weight: 500; }
+  .pk-bar { height: 8px; background: var(--surface-2); border-radius: 5px; overflow: hidden; margin-top: 6px; }
+  .pk-bar i { display: block; height: 100%; border-radius: 5px; transition: width 0.5s; background: var(--accent-deep); }
+  .pk-bar i.ok { background: var(--ok); } .pk-bar i.warn { background: var(--warn); } .pk-bar i.over { background: var(--danger); }
+
+  .pk-empty { color: var(--faint); font-size: 0.88rem; margin-top: 12px; }
+
+  /* Captura */
+  .cap-row { display: flex; gap: 8px; margin-top: 6px; }
+  .cap-row .f-in { flex: 1; min-width: 0; }
+  .cap-row .f-btn { padding: 10px 16px; white-space: nowrap; }
+  .cap-mic { padding: 0 12px; background: var(--surface-2); border: 1px solid var(--line); color: var(--muted); }
+  .cap-mic.rec { color: var(--accent); border-color: var(--accent-deep); }
+  .cap-mic svg { width: 18px; height: 18px; display: block; }
+  #cap-lista { margin-top: 12px; }
+  .cap-item { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .cap-item:last-child { border-bottom: none; }
+  .cap-item .txt { flex: 1; font-size: 0.9rem; }
+  .cap-item .x { background: transparent; border: none; color: var(--faint); padding: 2px 6px; }
+  .cap-note { font-size: 0.78rem; color: var(--faint); margin-top: 12px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="hidden login-wrap">
+  <div class="logo">Pocket</div>
+  <div class="mono-label" style="margin-top:6px">Elfie · Gym &amp; Dieta</div>
+  <div class="card">
+    <input id="email" type="email" placeholder="Correo" autocomplete="username" style="width:100%">
+    <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password" style="width:100%;margin-top:10px">
+    <button id="btn-login" class="btn-primary w100">Entrar</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="view-app" class="hidden">
+  <div class="brand-row">
+    <div class="brand">Sylft <small>· Pocket</small></div>
+    <div class="links"><a href="#" id="btn-logout">Salir</a></div>
+  </div>
+
+  <!-- Runa → sitio principal de PRTS -->
+  <a class="pk-rune" id="rune-link" href="#" title="Ir al PRTS completo">
+    <img src="runa.png" alt="Ir a PRTS">
+    <span class="cap">PRTS completo ›</span>
+  </a>
+
+  <h1 class="page-title">Pocket</h1>
+  <div class="mono-label page-sub" id="hoy-sub"></div>
+
+  <!-- ===== GYM HOY ===== -->
+  <div class="card">
+    <div class="pk-head">
+      <div>
+        <div class="t" id="gym-dia">Gimnasio</div>
+        <div class="pk-sub" id="gym-sub">cargando…</div>
+      </div>
+      <a href="gym.html">Abrir ›</a>
+    </div>
+    <div id="gym-body"></div>
+  </div>
+
+  <!-- ===== DIETA HOY ===== -->
+  <div class="card">
+    <div class="pk-head">
+      <div>
+        <div class="t">Dieta de hoy</div>
+        <div class="pk-sub" id="dieta-sub">cargando…</div>
+      </div>
+      <a href="dieta.html">Abrir ›</a>
+    </div>
+    <div id="dieta-body"></div>
+  </div>
+
+  <!-- ===== CAPTURA ===== -->
+  <div class="card">
+    <div class="pk-head">
+      <div class="t">Captura rápida</div>
+    </div>
+    <div class="cap-row">
+      <input id="cap-text" class="f-in" placeholder="Anota algo para PRTS…" autocomplete="off">
+      <button id="cap-voz" class="cap-mic hidden" title="Dictar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2.5" width="6" height="11.5" rx="3"/><path d="M5 11.5a7 7 0 0 0 14 0"/><path d="M12 18.5V22M8.5 22h7"/></svg>
+      </button>
+      <button id="cap-add" class="btn-primary f-btn">Guardar</button>
+    </div>
+    <div id="cap-lista"></div>
+    <div class="cap-note">Se guarda en tu bandeja de PRTS para procesarla luego desde el panel completo.</div>
+  </div>
+</div>
+
+<!-- Nav inferior -->
+<nav class="navbar">
+  <div class="nav-inner">
+    <a class="nav-item on" href="index.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+      <span>Pocket</span></a>
+    <a class="nav-item" href="gym.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3 9.5v5M21 9.5v5M6.5 12h11"/></svg>
+      <span>Gym</span></a>
+    <a class="nav-item" href="dieta.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 3v7a2.5 2.5 0 0 0 5 0V3"/><path d="M9.5 3v18"/><path d="M17 3c-1.5 2-2 4-2 6 0 2.5 1 3 2 3v9"/></svg>
+      <span>Dieta</span></a>
+  </div>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(PRTS_CONFIG.SUPABASE_URL, PRTS_CONFIG.SUPABASE_ANON_KEY);
+const $ = (id) => document.getElementById(id);
+
+// Destino de la Runa → PRTS completo. Esta carpeta es un sitio AISLADO; si despliegas
+// Pocket en su propio dominio, reemplaza por la URL absoluta del PRTS principal
+// (p. ej. "https://prts.tudominio.com/"). El override de config.js tiene prioridad.
+const PRTS_URL = (window.PRTS_CONFIG && PRTS_CONFIG.PRTS_MAIN_URL) || "../index.html";
+
+// Targets de dieta (espejo de dieta.html · doc sección 12)
+const DIETA_TOTAL = { k: 2135, p: 110 };
+const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+const DIAS_LARGO = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+
+function hoyMX() {
+  const fecha = new Date().toLocaleDateString("en-CA", { timeZone: "America/Mexico_City" });
+  const weekday = new Date(fecha + "T12:00:00").getDay();
+  return { fecha, weekday };
+}
+function toast(txt) {
+  const t = $("toast");
+  t.textContent = txt; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1800);
+}
+function semaforo(real, target) {
+  const pct = real / target;
+  return pct > 1.1 ? "over" : pct >= 0.8 ? "ok" : pct > 0 ? "warn" : "";
+}
+
+// ---------- AUTH ----------
+$("btn-login").onclick = async () => {
+  const { error } = await sb.auth.signInWithPassword({ email: $("email").value, password: $("password").value });
+  if (error) $("msg").textContent = error.message; else init();
+};
+$("btn-logout").onclick = async (e) => { e.preventDefault(); await sb.auth.signOut(); show("view-login"); };
+
+// ---------- GYM HOY ----------
+async function cargarGym() {
+  const { fecha, weekday } = hoyMX();
+  const { data: dia } = await sb.from("routine_days").select("id, name").eq("weekday", weekday).maybeSingle();
+
+  if (!dia) {
+    $("gym-dia").textContent = "Descanso";
+    $("gym-sub").textContent = "sin rutina hoy";
+    $("gym-body").innerHTML = `<div class="pk-empty">Hoy no hay rutina programada. Disfruta el descanso.</div>`;
+    return;
+  }
+  $("gym-dia").textContent = dia.name || "Gimnasio";
+  $("gym-sub").textContent = DIAS[weekday];
+
+  const { data: rex } = await sb.from("routine_exercises")
+    .select("target_sets").eq("routine_day_id", dia.id);
+  const targetSets = (rex || []).reduce((a, e) => a + (+e.target_sets || 0), 0);
+
+  const { data: ses } = await sb.from("workout_sessions")
+    .select("id").eq("session_date", fecha).eq("routine_day_id", dia.id).maybeSingle();
+  let done = 0;
+  if (ses) {
+    const { count } = await sb.from("workout_sets")
+      .select("*", { count: "exact", head: true }).eq("session_id", ses.id);
+    done = count || 0;
+  }
+
+  const pct = targetSets ? Math.min(100, Math.round(done / targetSets * 100)) : 0;
+  const estado = !targetSets ? "" : done === 0 ? "warn" : done >= targetSets ? "ok" : "";
+  $("gym-body").innerHTML = `
+    <div class="pk-prog">
+      <div class="lab"><span class="name">Series</span><span class="num"><b>${done}</b> / ${targetSets || "—"}</span></div>
+      <div class="pk-bar"><i class="${estado}" style="width:${pct}%"></i></div>
+    </div>
+    ${done === 0 ? `<div class="pk-empty">Aún no registras series hoy. Toca «Abrir» para empezar.</div>` : ""}`;
+}
+
+// ---------- DIETA HOY ----------
+async function cargarDieta() {
+  const { fecha } = hoyMX();
+  $("dieta-sub").textContent = "superávit +200 kcal";
+  const { data: logs } = await sb.from("meal_logs").select("kcal, protein_g").eq("log_date", fecha);
+
+  const sum = { k: 0, p: 0 };
+  (logs || []).forEach(l => { sum.k += +l.kcal; sum.p += +l.protein_g; });
+
+  const filas = [
+    { name: "Calorías", real: Math.round(sum.k), target: DIETA_TOTAL.k, unit: "" },
+    { name: "Proteína", real: Math.round(sum.p), target: DIETA_TOTAL.p, unit: " g" },
+  ];
+  $("dieta-body").innerHTML = filas.map(f => {
+    const pct = Math.min(100, Math.round(f.real / f.target * 100));
+    const sem = semaforo(f.real, f.target);
+    return `<div class="pk-prog">
+      <div class="lab"><span class="name">${f.name}</span><span class="num"><b>${f.real}</b> / ${f.target}${f.unit}</span></div>
+      <div class="pk-bar"><i class="${sem}" style="width:${pct}%"></i></div>
+    </div>`;
+  }).join("") + (sum.k === 0 ? `<div class="pk-empty">Sin comidas registradas hoy.</div>` : "");
+}
+
+// ---------- CAPTURA ----------
+async function addCaptura() {
+  const txt = $("cap-text").value.trim();
+  if (!txt) return;
+  $("cap-text").value = "";
+  $("cap-text").focus();
+  const { error } = await sb.from("inbox_entries").insert({ raw_text: txt });
+  if (error) { toast("No se pudo guardar"); return; }
+  toast("Capturado");
+  cargarCapturas();
+}
+
+async function descartarCaptura(id) {
+  await sb.from("inbox_entries").update({ status: "descartada" }).eq("id", id);
+  cargarCapturas();
+}
+
+async function cargarCapturas() {
+  const { data } = await sb.from("inbox_entries")
+    .select("id, raw_text").eq("status", "pendiente")
+    .order("created_at", { ascending: false }).limit(5);
+  const cont = $("cap-lista");
+  cont.innerHTML = (data || []).map(e => `
+    <div class="cap-item">
+      <span class="txt">${e.raw_text.replace(/</g, "&lt;")}</span>
+      <button class="x" data-id="${e.id}">✕</button>
+    </div>`).join("");
+  cont.querySelectorAll(".x").forEach(b => b.onclick = () => descartarCaptura(b.dataset.id));
+}
+
+// Dictado opcional (solo navegadores con webkitSpeechRecognition)
+function initVoz() {
+  const SR = window.webkitSpeechRecognition || window.SpeechRecognition;
+  if (!SR) return;
+  const btn = $("cap-voz");
+  btn.classList.remove("hidden");
+  let rec = null, escuchando = false;
+  btn.onclick = () => {
+    if (escuchando) { rec && rec.stop(); return; }
+    rec = new SR();
+    rec.lang = "es-MX"; rec.interimResults = false; rec.maxAlternatives = 1;
+    rec.onstart = () => { escuchando = true; btn.classList.add("rec"); };
+    rec.onend = () => { escuchando = false; btn.classList.remove("rec"); };
+    rec.onerror = () => { escuchando = false; btn.classList.remove("rec"); };
+    rec.onresult = (ev) => {
+      const t = ev.results[0][0].transcript.trim();
+      if (t) { $("cap-text").value = t; addCaptura(); }
+    };
+    rec.start();
+  };
+}
+
+// ---------- ARRANQUE ----------
+function show(id) {
+  $("view-login").classList.add("hidden");
+  $("view-app").classList.add("hidden");
+  $(id).classList.remove("hidden");
+}
+
+async function init() {
+  show("view-app");
+  $("rune-link").href = PRTS_URL;
+  const { fecha, weekday } = hoyMX();
+  const d = new Date(fecha + "T12:00:00");
+  $("hoy-sub").textContent = `${DIAS_LARGO[weekday]} ${d.getDate()} de ${MESES[d.getMonth()]}`;
+  $("cap-add").onclick = addCaptura;
+  $("cap-text").onkeydown = (e) => { if (e.key === "Enter") addCaptura(); };
+  initVoz();
+  cargarGym();
+  cargarDieta();
+  cargarCapturas();
+}
+
+(async () => {
+  const { data: { session } } = await sb.auth.getSession();
+  session ? init() : show("view-login");
+})();
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+</script>
+</body>
+</html>

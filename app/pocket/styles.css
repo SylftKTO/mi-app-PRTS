@@ -1,0 +1,180 @@
+/* ============================================================
+   SYLFT · sistema de diseño compartido (ver DESIGN.md)
+   Tokens y componentes comunes a todos los módulos.
+   ============================================================ */
+:root {
+  --bg: #0D0C0E;
+  --surface: #161416;
+  --surface-2: #1F1C1F;
+  --surface-3: #2A2529;
+  --line: #2C2730;
+  --text: #ECE8EA;
+  --muted: #ADA3AA;
+  --faint: #837A82;
+  --accent: #E68AA2;
+  --accent-deep: #B04A62;
+  --accent-soft: rgba(230, 138, 162, 0.12);
+  --ok: #C99BB0;
+  --warn: #E0A06A;
+  --danger: #E0626C;
+  --radius: 14px;
+  --nav-h: 64px;
+  --serif: 'Source Serif 4', Georgia, serif;
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 18px 16px calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);
+  min-height: 100vh;
+}
+
+.hidden { display: none !important; }
+
+/* ---------- Tipografía ---------- */
+h1, .serif { font-family: var(--serif); font-weight: 500; letter-spacing: -0.01em; }
+.num { font-family: var(--serif); font-variant-numeric: tabular-nums; }
+
+.mono-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.muted { color: var(--muted); font-size: 0.85rem; }
+
+/* ---------- Encabezado de página ---------- */
+.brand-row {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 20px;
+}
+.brand-row .brand {
+  font-family: var(--mono); font-size: 12px; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--text); font-weight: 500;
+}
+.brand-row .brand small { color: var(--faint); letter-spacing: 0.18em; }
+.brand-row .links { display: flex; gap: 14px; }
+.brand-row .links a {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--faint); text-decoration: none;
+}
+.brand-row .links a:hover { color: var(--muted); }
+
+.page-title { font-size: 30px; line-height: 1.1; }
+.page-sub { margin-top: 6px; }
+
+/* ---------- Tarjetas ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-top: 12px;
+}
+
+/* Stat card: patrón del dashboard (guion + etiqueta mono + cifra serif) */
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 16px; }
+.stat-card {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 12px 14px;
+}
+.stat-card::before {
+  content: ""; display: block; width: 16px; height: 2px;
+  background: var(--faint); margin-bottom: 10px;
+}
+.stat-card .l {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--faint);
+}
+.stat-card .v {
+  font-family: var(--serif); font-weight: 400; font-size: 26px;
+  line-height: 1.15; margin-top: 2px; font-variant-numeric: tabular-nums;
+}
+.stat-card .v small { font-size: 14px; color: var(--muted); }
+.stat-card .s { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.stat-card .v.acc { color: var(--accent); }
+
+/* ---------- Controles ---------- */
+input, button, select {
+  font-size: 16px; font-family: var(--sans);
+  border-radius: 10px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--text); padding: 10px 12px;
+  outline: none;
+}
+input:focus, select:focus { border-color: var(--accent-deep); }
+input::placeholder { color: var(--faint); }
+select {
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23767D92' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  padding-right: 32px;
+}
+input[type="date"] { color-scheme: dark; }
+
+button { cursor: pointer; font-weight: 600; transition: background 0.15s, border-color 0.15s, transform 0.12s; }
+button:disabled { opacity: 0.45; cursor: default; }
+.btn-primary {
+  background: var(--accent-deep); border-color: var(--accent-deep); color: #fff;
+}
+.btn-primary:not(:disabled):active { transform: scale(0.985); }
+.btn-ghost { background: transparent; border: 1px solid var(--line); color: var(--muted); }
+.w100 { width: 100%; margin-top: 12px; padding: 13px; }
+
+#msg { margin-top: 12px; font-size: 0.85rem; color: var(--warn); min-height: 1.2em; }
+
+/* ---------- Nav inferior ---------- */
+.navbar {
+  position: fixed; bottom: 0; left: 0; right: 0; z-index: 50;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  background: rgba(13, 16, 23, 0.92);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border-top: 1px solid var(--line);
+}
+.nav-inner { max-width: 520px; margin: 0 auto; height: var(--nav-h); display: flex; }
+.nav-item {
+  flex: 1; background: none; border: none; color: var(--faint);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; cursor: pointer; text-decoration: none; padding: 0; border-radius: 0;
+}
+.nav-item svg { width: 21px; height: 21px; }
+.nav-item span {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+  text-transform: uppercase; font-weight: 500;
+}
+.nav-item.on { color: var(--accent); }
+
+/* ---------- Toast ---------- */
+.toast {
+  position: fixed; left: 50%; bottom: calc(var(--nav-h) + 22px); z-index: 60;
+  transform: translateX(-50%) translateY(16px);
+  background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--line);
+  padding: 11px 18px; border-radius: 12px;
+  font-size: 14px; font-weight: 600;
+  opacity: 0; transition: opacity 0.25s, transform 0.25s;
+  pointer-events: none; white-space: nowrap;
+  box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.7);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.pr { border-color: var(--accent-deep); color: var(--accent); }
+
+/* ---------- Login ---------- */
+.login-wrap { padding-top: 12vh; text-align: center; }
+.login-wrap .logo { font-family: var(--serif); font-size: 44px; font-weight: 500; }
+.login-wrap .card { text-align: left; margin-top: 24px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
